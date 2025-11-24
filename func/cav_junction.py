@@ -484,7 +484,7 @@ class CAV:
     # 経路変更の必要があるか判定
     def checkPathChangeNecessity(self):
 
-        if self.plannedPath and self.pos_y >= -50.0 and self.route in ["BR", "BL"] and self.road == "-bottom":
+        if self.plannedPath and self.pos_y >= -50.0 and self.route in ["BR", "BL"] and self.road == "bottom":
             return True
         else:
             return False
@@ -843,9 +843,12 @@ class CAV:
 
 
     def generateDesiredPath(self, ob):
-        if self.route in ["BR", "BL"] and self.road == "-bottom":
+        # 下から進入する車両（BR, BL）が停止線付近に近づいたときのみ希望経路（右左折）を生成
+        if self.route in ["BR", "BL"] and self.road == "bottom" and self.pos_y > -50.0:
             path_candidates = generate_frenet_frame(objects=ob, c_s_d=self.speed, c_s_dd=self.accel, c_s=150 + self.pos_y, c_d=0.0,\
                                                 target_pos=141.8, target_speed=0, mode="turn", route=self.route, simTime=self.simTime, vehInstance=self)
+        else:
+            path_candidates = []
 
         return path_candidates
 
