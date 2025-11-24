@@ -648,7 +648,7 @@ def generate_frenet_frame(objects, c_s, c_s_d, c_s_dd, c_d, mode, route, target_
         fplist = interpolatePath(fplist)
         fplist = calc_global_paths(fplist, csp)
         fplist = check_paths(fplist, ob, route=route, targetPos=target_pos)
-    
+
     elif mode == "follow":
         fplist = calc_frenet_paths_following(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_pos, target_speed=target_speed, duration=duration)
         fplist = interpolatePath(fplist)

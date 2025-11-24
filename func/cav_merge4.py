@@ -60,7 +60,13 @@ class CAV:
         self.route = traci.vehicle.getRouteID(self.id)
         self.road = None
         self.lane = None
-        self.status = None # free, follow, stop, lanechange, turn, yield
+        self.status = None
+        # free:最高速度を目指して走行
+        # follow:前方車両を追従
+        # stop:停止
+        # lanechange:車線変更
+        # turn:曲がる
+        # yield:譲る
 
         self.pos_x = 0
         self.pos_y = 0
@@ -138,7 +144,7 @@ class CAV:
                 leadPath = [path for path in self.receivedPaths if path.vehID == self.leader and path.isLaneChange == True]
                 if leadPath:
                     self.leadPath = leadPath[0]
-                    
+
                 if self.leader == ld[0]:
                     self.status = "follow"
 
@@ -900,7 +906,7 @@ class CAV:
 
         return best_change_path, best_straight_path
 
-    
+
     # 予定経路に従い速度調整
     def executionDrive(self):
         if self.plannedPath:
@@ -913,8 +919,8 @@ class CAV:
                     next_speed = max(min(dif_pos/timeStep, maxSpeed), 0)
                     traci.vehicle.setSpeed(vehID=self.id, speed=next_speed)
                     break
-                    
-    
+
+
     def getStatistics(self):
         return self.count_accept_utility ,self.count_refuse_utility, self.count_refuse_physics,\
             self.count_send_PT, self.count_send_DT, self.count_send_AT

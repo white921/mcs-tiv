@@ -49,6 +49,7 @@ class CAV:
         self.isPathValid = True
         self.pathID = 0
 
+        self.typeID = traci.vehicle.getTypeID(self.id)
         self.route = traci.vehicle.getRouteID(self.id)
         self.road = None
         self.lane = None
@@ -65,7 +66,7 @@ class CAV:
         elif self.route in ["BR", "BL"]:
             self.pos_x = 151.6
             self.pos_y = -150.0
-        self.angle = None       
+        self.angle = None
         self.speed = 0
         self.accel = 0
         self.leader = None
@@ -83,7 +84,7 @@ class CAV:
         self.waitPath = None
         self.waitAgreeID = []
         self.receiveAgreeID = []
-    
+
         self.count_accept_utility = 0
         self.count_refuse_utility = 0
         self.count_refuse_physics = 0
@@ -685,16 +686,15 @@ class CAV:
         path.convergeTime = max(path.convergeTime - count*timeStep, 0)
 
         return path
-                
-        
+
     def generatePlannedPath(self, ob):
         path_candidates = []
-        
+
         if self.status == "turn":
             print("extend path")
             # 予定経路を延長
             self.plannedPath = self.extendPath(self.plannedPath)
-            return [self.plannedPath]       
+            return [self.plannedPath]
 
         if self.status == "yield":
             print("extend path")
@@ -706,11 +706,11 @@ class CAV:
                 leadPath = [path for path in self.receivedPaths if path.vehID == realLeader[0] and path.type=="planned"]
                 if leadPath:
                     _, path_candidates = self.checkPathCollision(leadPath[0], path_candidates)
-            
+
             if len(path_candidates) > 0:
                 return path_candidates
             elif realLeader:
-                self.leader = realLeader[0]          
+                self.leader = realLeader[0]
 
         if self.leader: #前方車両に追従走行
             #前方車両が既に停止している場合
@@ -746,10 +746,10 @@ class CAV:
                         if self.route in ["BR", "BL"] and self.road not in ["right", "-left"]:
                             target_pos = 150 + leadPath.y[converge] - D_0 - self.length
                             c_s = 150 + self.pos_y
-                        elif self.route == "LR" or self.road == "right":
+                        elif self.route in ["LR", "LB"] or self.road == "right":
                             target_pos = leadPath.x[converge] - D_0 - self.length
                             c_s = self.pos_x
-                        elif self.route == "RL" or self.road == "-left":
+                        elif self.route in ["RL", "RB"] or self.road in ["-left", "-right"]:
                             target_pos = 300 - leadPath.x[converge] - D_0 - self.length
                             c_s = 300 - self.pos_x
 
@@ -762,7 +762,7 @@ class CAV:
                         if len(path_candidates) > 0:
                             self.status = "stop"
                             return path_candidates
-                        
+
                         break
 
                 if leadPath.isTurn and self.road == "-bottom":
@@ -772,7 +772,7 @@ class CAV:
                     if len(path_candidates) > 0:
                         self.status = "follow"
                         return path_candidates
-                        
+
                 else:
                     duration = leadPath.t[-1] - self.simTime
                     target_speed = leadPath.s_d[-1]
@@ -822,10 +822,10 @@ class CAV:
 
             path_candidates = generate_frenet_frame(objects=ob, c_s=c_s, c_s_d=self.speed, c_s_dd=self.accel, c_d=0.0,\
                                                 target_speed=maxSpeed, mode="free", route=self.route, simTime=self.simTime, target_pos=141.8, vehInstance=self)
-            
+
             if self.leadPath:
                 _, path_candidates = self.checkPathCollision(self.leadPath, path_candidates)
-            
+
             if len(path_candidates) > 0:
                 pass
                 # print("B gen free len", len(path_candidates))
