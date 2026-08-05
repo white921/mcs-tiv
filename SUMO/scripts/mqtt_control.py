@@ -209,8 +209,10 @@ def run_control(
         last_flag2 = flag2
         last_leader_for_mv2 = leader_for_mv2
 
-        rv_command = commands.get("RV", {}).get("target_speed")
-        if rv_command is not None and rv_command >= 0:
+        monitor_active = control_state.get("monitor_active")
+        advisory_target_speeds = control_state.get("advisory_target_speeds", {})
+        rv_command = advisory_target_speeds.get("RV")
+        if monitor_active and rv_command is not None:
             metric_samples["rv_abs_advisory_mismatch"].append(
                 abs(rv_command - state["vehicles"]["RV"]["speed"])
             )

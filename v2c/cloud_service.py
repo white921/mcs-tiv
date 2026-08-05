@@ -36,6 +36,14 @@ def frame_key(sim_time: float) -> str:
     return f"{sim_time:.3f}"
 
 
+def load_controller_params(path: str | None) -> dict[str, Any]:
+    """Load the same controller parameters used by the direct-control run."""
+    if not path:
+        return {}
+    with open(path, encoding="utf-8") as config_file:
+        return json.load(config_file)
+
+
 def build_cloud_state(
     vehicles: dict[str, dict[str, Any]], sim_time: float, step_length: float
 ) -> dict[str, Any]:
@@ -65,9 +73,10 @@ def build_cloud_state(
 
 
 class CloudService:
-    def __init__(self, host: str, port: int) -> None:
+    def __init__(self, host: str, port: int, controller_params: dict[str, Any]) -> None:
         self.host = host
         self.port = port
+        self.controller_params = controller_params
         self.controllers: dict[str, CloudController] = {}
         self.pending: dict[str, dict[str, dict[str, dict[str, Any]]]] = defaultdict(
             lambda: defaultdict(dict)
@@ -117,7 +126,9 @@ class CloudService:
             vehicles = {vehicle: frame[vehicle] for vehicle in VEHICLE_IDS}
             del self.pending[run_id][key]
             self._discard_old_frames(run_id, key)
-            controller = self.controllers.setdefault(run_id, CloudController())
+            controller = self.controllers.setdefault(
+                run_id, CloudController(params=self.controller_params)
+            )
 
         cloud_state = build_cloud_state(vehicles, sim_time, step_length)
         commands = controller.compute_commands(cloud_state)
@@ -159,7 +170,8 @@ class CloudService:
 def main() -> None:
     host = os.environ.get("MQTT_HOST", "127.0.0.1")
     port = int(os.environ.get("MQTT_PORT", "1883"))
-    CloudService(host, port).run_forever()
+    controller_config = os.environ.get("CONTROLLER_CONFIG")
+    CloudService(host, port, load_controller_params(controller_config)).run_forever()
 
 
 if __name__ == "__main__":

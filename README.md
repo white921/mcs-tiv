@@ -23,7 +23,7 @@ Cloud Controller (cloud_service.py)
 Docker DesktopまたはDocker EngineとDocker Composeがあれば、次だけでヘッドレス実験が実行されます。
 
 ```bash
-docker compose up --build
+COMPOSE_BAKE=false docker compose up --build
 ```
 
 実行後の要約は`SUMO/outputs/mqtt_run_summary.json`に保存されます。
@@ -64,6 +64,23 @@ python SUMO/scripts/mqtt_control.py --nogui
 | Cloud to vehicle adapter | `v2c/{run_id}/cloud/commands` | 1 |
 
 位置・速度などの状態更新をQoS 0 / 1で切り替えられるようにしてあります。
+
+## Direct control vs MQTT comparison
+
+同じ道路・車両・制御パラメータで、通信を介さない理想状態（direct）と、MQTT V2C状態（MQTT）を比較できます。directはSUMOと制御器が同一プロセス内で直接関数呼び出しをするため、通信遅延・損失がない基準です。
+
+```bash
+# 1. direct版を実行し、SUMO/outputs/direct_run_summary.json を作る
+COMPOSE_BAKE=false docker compose --profile comparison run --rm direct-runner
+
+# 2. MQTT版を実行し、SUMO/outputs/mqtt_run_summary.json を作る
+COMPOSE_BAKE=false docker compose up --build
+
+# 3. 差分を表示し、SUMO/outputs/direct_vs_mqtt_comparison.json に保存する
+COMPOSE_BAKE=false docker compose --profile comparison run --rm compare
+```
+
+`direct_vs_mqtt_comparison.json`の差分はすべて `mqtt_minus_direct` です。現在のDocker内ネットワークでは、通信品質を劣化させていないため、両者が概ね一致することをまず確認します。次に遅延・損失・切断を導入した場合に、どの指標がどれだけ変わるかを評価します。
 
 ## Next research steps
 
