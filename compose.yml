@@ -1,0 +1,37 @@
+name: v2c-ramp-merging
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./docker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  cloud:
+    build: .
+    command: python -m v2c.cloud_service
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
+    depends_on:
+      - mosquitto
+
+  sumo-runner:
+    build: .
+    command:
+      - sh
+      - -c
+      - >-
+        netconvert --node-files SUMO/net/ramp.nod.xml
+        --edge-files SUMO/net/ramp.edg.xml
+        --output-file SUMO/net/ramp.net.xml
+        && python SUMO/scripts/mqtt_control.py
+        --nogui
+        --mqtt-host mosquitto
+        --summary-json SUMO/outputs/mqtt_run_summary.json
+    depends_on:
+      - mosquitto
+      - cloud
+    volumes:
+      - ./SUMO/outputs:/app/SUMO/outputs
