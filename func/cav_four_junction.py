@@ -3,6 +3,7 @@ from re import S
 import sys
 import numpy as np
 import copy
+import thesis_tiv
 import time
 
 if 'SUMO_HOME' in os.environ:
@@ -280,7 +281,7 @@ class CAV:
             self.waitPath = None
 
         # 新しい経路を生成
-        if not self.plannedPath or round(self.simTime - self.plannedPath.t[0], 2) >= pathValidTime or self.isPathValid == False:
+        if not self.plannedPath or round(self.simTime - self.plannedPath.t[0], 2) >= thesis_tiv.planned_update_interval(self, pathValidTime) or self.isPathValid == False:
 
             #経路候補をたくさん生成
             path_candidates = self.generatePlannedPath(ob=ob)
@@ -620,6 +621,8 @@ class CAV:
 
 
     def judgeYield(self, collision_list, ob):
+        if thesis_tiv.enabled(self):
+            return thesis_tiv.judge_yield(self, collision_list, ob, traci)
         
         desired_list = []
         for i in collision_list:
@@ -650,6 +653,11 @@ class CAV:
                 continue
 
             print("judge yield to", leadPath.vehID)
+
+            # Evaluate each trajectory with the maximum speed of the vehicle
+            # that travels on that trajectory.
+            ego_max_speed = traci.vehicle.getAllowedSpeed(self.id)
+            desired_max_speed = traci.vehicle.getAllowedSpeed(leadPath.vehID)
             
             collide_x = path["collide_x"]
             collide_y = path["collide_y"]
@@ -725,7 +733,9 @@ class CAV:
                                     if i.x[0] < self.pos_x and abs(i.y[0] - self.pos_y) < 1.0:
                                         co_ego = (commRange - self.pos_x + i.x[0]) / commRange
                                         print(self.pos_x - i.x[0])
-                                        co_ego_new = self.calculateBehindRate(self.pos_x - i.x[0])
+                                        co_ego_new = self.calculateBehindRate(
+                                            self.pos_x - i.x[0], ego_max_speed
+                                        )
                                         check_duplication = 0
                                         for j in followVehs_ego_list:
                                             if j == i.vehID:
@@ -733,13 +743,15 @@ class CAV:
                                         if check_duplication == 0:
                                             followVehs_ego_list.append(i.vehID)
                                             followCoefficient1_ego_list.append(co_ego)
-                                            followCoefficientnew_ego_list.append(co_ego_new * self.plannedPath.s_d[-1])
-                                        print(co_ego_new, "*", self.plannedPath.s_d[-1])
+                                            followCoefficientnew_ego_list.append(co_ego_new * i.s_d[-1])
+                                        print(co_ego_new, "*", i.s_d[-1])
                                 elif self.route in ["RL", "RT", "RB"]:
                                     if i.x[0] > self.pos_x and abs(i.y[0] - self.pos_y) < 1.0:
                                         co_ego = (commRange - i.x[0] + self.pos_x) / commRange
                                         print(i.x[0] - self.pos_x)
-                                        co_ego_new = self.calculateBehindRate(i.x[0] - self.pos_x)
+                                        co_ego_new = self.calculateBehindRate(
+                                            i.x[0] - self.pos_x, ego_max_speed
+                                        )
                                         check_duplication = 0
                                         for j in followVehs_ego_list:
                                             if j == i.vehID:
@@ -747,13 +759,15 @@ class CAV:
                                         if check_duplication == 0:
                                             followVehs_ego_list.append(i.vehID)
                                             followCoefficient1_ego_list.append(co_ego)
-                                            followCoefficientnew_ego_list.append(co_ego_new * self.plannedPath.s_d[-1])
-                                        print(co_ego_new, "*", self.plannedPath.s_d[-1])
+                                            followCoefficientnew_ego_list.append(co_ego_new * i.s_d[-1])
+                                        print(co_ego_new, "*", i.s_d[-1])
                                 elif self.route in ["BL", "BR", "BT"]:
                                     if i.y[0] < self.pos_y and abs(i.x[0] - self.pos_x) < 1.0:
                                         co_ego = (commRange - self.pos_y + i.y[0]) / commRange
                                         print(self.pos_y - i.y[0])
-                                        co_ego_new = self.calculateBehindRate(self.pos_y - i.y[0])
+                                        co_ego_new = self.calculateBehindRate(
+                                            self.pos_y - i.y[0], ego_max_speed
+                                        )
                                         check_duplication = 0
                                         for j in followVehs_ego_list:
                                             if j == i.vehID:
@@ -761,13 +775,15 @@ class CAV:
                                         if check_duplication == 0:
                                             followVehs_ego_list.append(i.vehID)
                                             followCoefficient1_ego_list.append(co_ego)
-                                            followCoefficientnew_ego_list.append(co_ego_new * self.plannedPath.s_d[-1])
-                                        print(co_ego_new, "*", self.plannedPath.s_d[-1])
+                                            followCoefficientnew_ego_list.append(co_ego_new * i.s_d[-1])
+                                        print(co_ego_new, "*", i.s_d[-1])
                                 elif self.route in ["TR", "TL", "TB"]:
                                     if i.y[0] > self.pos_y and abs(i.x[0] - self.pos_x) < 1.0:
                                         co_ego = (commRange - i.y[0] + self.pos_y) / commRange
                                         print(i.y[0] - self.pos_y)
-                                        co_ego_new = self.calculateBehindRate(i.y[0] - self.pos_y)
+                                        co_ego_new = self.calculateBehindRate(
+                                            i.y[0] - self.pos_y, ego_max_speed
+                                        )
                                         check_duplication = 0
                                         for j in followVehs_ego_list:
                                             if j == i.vehID:
@@ -775,8 +791,8 @@ class CAV:
                                         if check_duplication == 0:
                                             followVehs_ego_list.append(i.vehID)
                                             followCoefficient1_ego_list.append(co_ego)
-                                            followCoefficientnew_ego_list.append(co_ego_new * self.plannedPath.s_d[-1])
-                                        print(co_ego_new, "*", self.plannedPath.s_d[-1])
+                                            followCoefficientnew_ego_list.append(co_ego_new * i.s_d[-1])
+                                        print(co_ego_new, "*", i.s_d[-1])
 
 
                                 if path.x[0] < 145:
@@ -789,10 +805,12 @@ class CAV:
                                             followVehs_alt_list.append(i.vehID)
                                             co_alt = (commRange - path.x[0] + i.x[0]) / commRange
                                             print(path.x[0] - i.x[0])
-                                            co_alt_new = self.calculateBehindRate(path.x[0] - i.x[0])
+                                            co_alt_new = self.calculateBehindRate(
+                                                path.x[0] - i.x[0], desired_max_speed
+                                            )
                                             followCoefficient1_alt_list.append(co_alt)
-                                            followCoefficientnew_alt_list.append(co_alt_new * leadPath.s_d[-1])
-                                        print(co_alt_new, "*", leadPath.s_d[-1])
+                                            followCoefficientnew_alt_list.append(co_alt_new * i.s_d[-1])
+                                        print(co_alt_new, "*", i.s_d[-1])
                                 elif path.x[0] > 155:
                                     if i.x[0] > path.x[0] and abs(i.y[0] - path.y[0]) < 1.0:
                                         check_duplication = 0
@@ -803,10 +821,12 @@ class CAV:
                                             followVehs_alt_list.append(i.vehID)
                                             co_alt = (commRange - i.x[0] + path.x[0]) / commRange 
                                             print(i.x[0] - path.x[0])
-                                            co_alt_new = self.calculateBehindRate(i.x[0] - path.x[0])                                       
+                                            co_alt_new = self.calculateBehindRate(
+                                                i.x[0] - path.x[0], desired_max_speed
+                                            )
                                             followCoefficient1_alt_list.append(co_alt)
-                                            followCoefficientnew_alt_list.append(co_alt_new * leadPath.s_d[-1])
-                                        print(co_alt_new, "*", leadPath.s_d[-1])
+                                            followCoefficientnew_alt_list.append(co_alt_new * i.s_d[-1])
+                                        print(co_alt_new, "*", i.s_d[-1])
                                 elif path.x[0] > 150 and path.x[0] < 155:
                                     if i.y[0] < path.y[0] and abs(i.x[0] - path.x[0]) < 1.0:
                                         check_duplication = 0
@@ -817,10 +837,12 @@ class CAV:
                                             followVehs_alt_list.append(i.vehID)
                                             co_alt = (commRange - path.y[0] + i.y[0]) / commRange
                                             print(path.y[0] - i.y[0])
-                                            co_alt_new = self.calculateBehindRate(path.y[0] - i.y[0])
+                                            co_alt_new = self.calculateBehindRate(
+                                                path.y[0] - i.y[0], desired_max_speed
+                                            )
                                             followCoefficient1_alt_list.append(co_alt)
-                                            followCoefficientnew_alt_list.append(co_alt_new * leadPath.s_d[-1])
-                                        print(co_alt_new, "*", leadPath.s_d[-1])
+                                            followCoefficientnew_alt_list.append(co_alt_new * i.s_d[-1])
+                                        print(co_alt_new, "*", i.s_d[-1])
                                 elif path.x[0] > 145 and path.x[0] < 150:
                                     if i.y[0] > path.y[0] and abs(i.x[0] - path.x[0]) < 1.0:
                                         check_duplication = 0
@@ -831,10 +853,12 @@ class CAV:
                                             followVehs_alt_list.append(i.vehID)
                                             co_alt = (commRange - i.y[0] + path.y[0]) / commRange
                                             print(i.y[0] - path.y[0])
-                                            co_alt_new = self.calculateBehindRate(i.y[0] - path.y[0])
+                                            co_alt_new = self.calculateBehindRate(
+                                                i.y[0] - path.y[0], desired_max_speed
+                                            )
                                             followCoefficient1_alt_list.append(co_alt)
-                                            followCoefficientnew_alt_list.append(co_alt_new * leadPath.s_d[-1])
-                                        print(co_alt_new, "*", leadPath.s_d[-1])
+                                            followCoefficientnew_alt_list.append(co_alt_new * i.s_d[-1])
+                                        print(co_alt_new, "*", i.s_d[-1])
 
                             print(followVehs_ego_list)
                             print(followVehs_alt_list)
@@ -946,17 +970,16 @@ class CAV:
                             #修論提案（環境優先度のみ） alpha = 6
                             elif self.alpha == 6:
                                 coeff_ego = (collide_time_ego/10 + R_co * (self.plannedPath.s_d[-1]+followCoefficientnew_ego))
-                                coeff_alt = (collide_time_alt/10 + R_co * followCoefficientnew_alt) #相手車両の方のみ、followCoefficientnew_egoにすでに希望車両の分が含まれているため
+                                coeff_alt = (collide_time_alt/10 + R_co * (leadPath.s_d[-1]+followCoefficientnew_alt))
                                 utility = coeff_ego - coeff_alt
 
                             #修論提案（性能優先度込み）  alpha = 7
                             elif self.alpha == 7:
-                                coeff_ego = (collide_time_ego/10 + R_co * (self.plannedPath.s_d[-1]+followCoefficientnew_ego)) + R_per * maxAccel  #一旦普通車にのみ値を追加
-                                #coeff_ego = (collide_time_ego/10 + R_co * (self.plannedPath.s_d[-1]+followCoefficientnew_ego)) 
-                                if desiredID % 2 == 0:
-                                    coeff_alt = (collide_time_alt/10 + R_co * followCoefficientnew_alt) + R_per * (maxAccel / 2)#相手車両の方のみ、followCoefficientnew_egoにすでに希望車両の分が含まれているため
-                                else:
-                                    coeff_alt = (collide_time_alt/10 + R_co * followCoefficientnew_alt) + R_per * maxAccel
+                                ego_max_accel = traci.vehicletype.getAccel(self.typeID)
+                                desired_type_id = traci.vehicle.getTypeID(leadPath.vehID)
+                                desired_max_accel = traci.vehicletype.getAccel(desired_type_id)
+                                coeff_ego = (collide_time_ego/10 + R_co * (self.plannedPath.s_d[-1]+followCoefficientnew_ego)) + R_per * ego_max_accel
+                                coeff_alt = (collide_time_alt/10 + R_co * (leadPath.s_d[-1]+followCoefficientnew_alt)) + R_per * desired_max_accel
                                 utility = coeff_ego - coeff_alt
 
 
@@ -1001,6 +1024,8 @@ class CAV:
 
 
     def sendMCM(self, central_path_server):
+        if thesis_tiv.enabled(self):
+            return thesis_tiv.send_mcm(self, central_path_server, traci)
         # send PLANNED path
         if self.plannedPath:
             self.count_send_PT += 1
@@ -1434,7 +1459,9 @@ class CAV:
                     nextpos_x = self.plannedPath.x[i]
                     nextpos_y = self.plannedPath.y[i]
                     dif_pos = np.sqrt((nextpos_x - self.pos_x)**2 + (nextpos_y - self.pos_y)**2)
-                    next_speed = max(min(dif_pos/timeStep, maxSpeed), 0)
+                    planned_speed = max(min(dif_pos/timeStep, maxSpeed), 0)
+                    next_speed = min(planned_speed, self.speed + maxAccel*timeStep)
+                    next_speed = max(next_speed, self.speed + maxDecel*timeStep, 0)
                     traci.vehicle.setSpeed(vehID=self.id, speed=next_speed)
                     break
                     
@@ -1450,15 +1477,34 @@ class CAV:
         if dif_y != 0 and dif_y < LANE_WIDTH/2:
             traci.vehicle.changeLane(vehID=self.id, laneIndex=1, duration=0)
 
-    def calculateBehindRate(self, x):
+    def calculateBehindRate(self, x, vehicle_max_speed):
+        transition_distance = 4 * vehicle_max_speed
+        peak_offset = vehicle_max_speed ** 2 / 4
+        curve_denominator = peak_offset ** 2
+
         if x <= 5:
-            return 1
-        elif x > 5 and x <= 40:
-            return (-1)*R_max/(maxSpeed**2/4)**2 * (x - (5+maxSpeed**2/4))**2 + R_max
-        elif x > 40 and x <= 100:
-            return self.calculateBehindRate(40)/60 * (100 - x)
-        elif x > 100:
-            return 0
+            return 1.0
+
+        if x <= transition_distance:
+            return (
+                -R_max / curve_denominator
+                * (x - (peak_offset + 5)) ** 2
+                + R_max
+            )
+
+        if x <= 100:
+            rate_at_transition = (
+                -R_max / curve_denominator
+                * (transition_distance - (peak_offset + 5)) ** 2
+                + R_max
+            )
+            return (
+                rate_at_transition
+                / (100 - transition_distance)
+                * (100 - x)
+            )
+
+        return 0.0
 
 
     def checkPassJunction(self):
@@ -1473,4 +1519,3 @@ class CAV:
     # destructor
     def __del__(self):
         print("delete veh:", self.id)
-        

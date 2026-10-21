@@ -34,9 +34,13 @@ from sumolib import checkBinary  # noqa
 
 simulation_time = 600.0
 bus_share = 0.25
+bus_allocation = "fixed"
+diagnostic_stop_time = None
 # matplotlibによる描画
 show_animation = False
 import random
+
+vehicle_type_rng = random.Random()
 
 
 def mean_or_nan(values):
@@ -89,7 +93,7 @@ def build_vehicle_type_schedules(lane_counts, target_bus_share):
     # Give the remaining buses to lanes with the largest fractional remainder.
     # Shuffle first so equal remainders do not always favor the same approach.
     lane_order = list(range(len(lane_counts)))
-    random.shuffle(lane_order)
+    vehicle_type_rng.shuffle(lane_order)
     lane_order.sort(
         key=lambda index: lane_counts[index] * target_bus_share - bus_counts[index],
         reverse=True,
@@ -100,9 +104,17 @@ def build_vehicle_type_schedules(lane_counts, target_bus_share):
     schedules = []
     for count, buses in zip(lane_counts, bus_counts):
         schedule = ["Bus"] * buses + ["Car"] * (count - buses)
-        random.shuffle(schedule)
+        vehicle_type_rng.shuffle(schedule)
         schedules.append(deque(schedule))
     return schedules
+
+
+def select_vehicle_type(schedule):
+    """Select a vehicle type without changing the paper's random draw order."""
+    draw = random.choice(["Bus", "Car", "Car", "Car"])
+    if bus_allocation == "paper-random25":
+        return draw
+    return schedule.popleft()
 
 #初期設定（障害物の配置など）
 def set_environment(inflow_0=750, inflow_1=750, inflow_2=750):
@@ -146,7 +158,7 @@ def add_vehicle(alpha):
     if sumo_time in departTime_lane1:
         # 下から入る車両：BR（下→右）またはBL（下→左）を均等に割り振り
         route_id = random.choice(["BR", "BL"])
-        kind = vehicleType_lane1.popleft()
+        kind = select_vehicle_type(vehicleType_lane1)
         #kind = "Car"
         if kind == "Car":
             traci.vehicle.add(vehID=str(veh_id), routeID=route_id, typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
@@ -172,8 +184,7 @@ def add_vehicle(alpha):
         # 左から入る車両：LR（左→右）またはLB（左→下）を均等に割り振り
         route_id = random.choice(["LR", "LB"])
         #route_id = "LR"
-        
-        kind = vehicleType_lane0.popleft()
+        kind = select_vehicle_type(vehicleType_lane0)
         #kind = "Car"
         if kind == "Car":
             traci.vehicle.add(vehID=str(veh_id), routeID=route_id, typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
@@ -198,8 +209,7 @@ def add_vehicle(alpha):
         # 右から入る車両：RL（右→左）またはRB（右→下）を均等に割り振り
         route_id = random.choice(["RL", "RB"])
         #route_id = "RL"
-        
-        kind = vehicleType_lane2.popleft()
+        kind = select_vehicle_type(vehicleType_lane2)
         #kind = "Car"
         if kind == "Car":
             traci.vehicle.add(vehID=str(veh_id), routeID=route_id, typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
@@ -266,7 +276,8 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False):
     animator = Animation(file)
 
     #シミュレーション開始
-    while sumo_time != simulation_time:
+    run_until = diagnostic_stop_time if diagnostic_stop_time is not None else simulation_time
+    while sumo_time < run_until:
         traci.simulationStep()
         sumo_time = traci.simulation.getTime()
         print("\nTIME:", sumo_time)
@@ -530,10 +541,14 @@ def get_options():
     optParser = optparse.OptionParser()
     optParser.add_option("--nogui", action="store_true",default=False, help="run the commandline version of sumo")
     optParser.add_option("--duration", type="float", default=600.0, help="duration of the simulation")
+    optParser.add_option("--stop-time", type="float", default=None, help="stop early while retaining the full-duration input schedule")
+    optParser.add_option("--bus-allocation", type="choice", choices=["fixed", "paper-random25"], default="fixed", help="fixed share or the paper artifact's per-vehicle 25%% draw")
     optParser.add_option("--quiet", action="store_true", default=False, help="suppress verbose per-step output")
     options, args = optParser.parse_args()
     if len(args) != 5:
         optParser.error("expected: alpha seed inflow_left inflow_bottom inflow_right")
+    if options.stop_time is not None and not 0 < options.stop_time <= options.duration:
+        optParser.error("--stop-time must be greater than 0 and no greater than --duration")
     return options, args
 
 
@@ -542,11 +557,14 @@ if __name__ == "__main__":
     # load whether to run with or without GUI
     options, args = get_options()
     simulation_time = options.duration
+    diagnostic_stop_time = options.stop_time
+    bus_allocation = options.bus_allocation
     if not options.quiet:
         print(args)
     alpha = str(args[0])
     seed = args[1]
     random.seed(seed)
+    vehicle_type_rng.seed(f"{seed}:vehicle-types")
     inflow_0 = int(args[2])
     inflow_1 = int(args[3])
     inflow_2 = int(args[4])

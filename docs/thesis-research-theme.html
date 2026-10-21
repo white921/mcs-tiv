@@ -1,0 +1,1413 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="教授の指摘を踏まえた、MCSにおける後続車両影響のオンライン推定を扱う卒業論文テーマ・手法案">
+  <title>卒論テーマ・手法案｜動的な後続車両影響を用いたMCS交渉判断</title>
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']]
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <style>
+    :root {
+      --ink: #14211b;
+      --muted: #5d6b64;
+      --paper: #f7f3ea;
+      --surface: #fffdf8;
+      --line: #d8d5ca;
+      --green: #0f6b4f;
+      --green-dark: #084c39;
+      --green-soft: #dcece4;
+      --amber: #b96716;
+      --amber-soft: #f8e5c9;
+      --blue: #245c8a;
+      --blue-soft: #dce9f4;
+      --red: #a94435;
+      --red-soft: #f3dfda;
+      --shadow: 0 18px 48px rgba(38, 45, 40, 0.09);
+      --radius: 22px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 85% 0%, rgba(36, 92, 138, 0.10), transparent 28rem),
+        radial-gradient(circle at 0% 35%, rgba(15, 107, 79, 0.08), transparent 32rem),
+        var(--paper);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif;
+      line-height: 1.8;
+    }
+
+    a { color: inherit; }
+
+    button { font: inherit; }
+
+    .page-shell {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      border-bottom: 1px solid rgba(20, 33, 27, 0.10);
+      background: rgba(247, 243, 234, 0.88);
+      backdrop-filter: blur(14px);
+    }
+
+    .topbar-inner {
+      min-height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .topbar-title {
+      font-size: 0.86rem;
+      font-weight: 760;
+      letter-spacing: 0.05em;
+    }
+
+    .topbar nav {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      white-space: nowrap;
+      scrollbar-width: none;
+    }
+
+    .topbar nav::-webkit-scrollbar { display: none; }
+
+    .topbar nav a {
+      padding: 7px 11px;
+      border-radius: 999px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.78rem;
+      font-weight: 650;
+    }
+
+    .topbar nav a:hover,
+    .topbar nav a:focus-visible {
+      color: var(--green-dark);
+      background: var(--green-soft);
+      outline: none;
+    }
+
+    header.hero {
+      padding: 76px 0 54px;
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 18px;
+      color: var(--green-dark);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 34px;
+      height: 3px;
+      border-radius: 999px;
+      background: var(--green);
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      max-width: 950px;
+      margin-bottom: 22px;
+      font-family: "Hiragino Mincho ProN", "Yu Mincho", serif;
+      font-size: clamp(2.35rem, 6vw, 5.1rem);
+      line-height: 1.12;
+      letter-spacing: -0.045em;
+    }
+
+    .hero-lead {
+      max-width: 850px;
+      margin-bottom: 30px;
+      color: #3e4d46;
+      font-size: clamp(1rem, 2vw, 1.22rem);
+      line-height: 1.9;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 5px 12px;
+      border: 1px solid rgba(15, 107, 79, 0.22);
+      border-radius: 999px;
+      background: rgba(255, 253, 248, 0.75);
+      color: var(--green-dark);
+      font-size: 0.78rem;
+      font-weight: 750;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.28fr 0.72fr;
+      gap: 22px;
+      margin-top: 48px;
+    }
+
+    .statement,
+    .scope-card,
+    .panel,
+    .method-card,
+    .metric-card,
+    .roadmap-card {
+      border: 1px solid rgba(20, 33, 27, 0.12);
+      border-radius: var(--radius);
+      background: rgba(255, 253, 248, 0.88);
+      box-shadow: var(--shadow);
+    }
+
+    .statement {
+      position: relative;
+      overflow: hidden;
+      padding: 30px 32px 32px;
+      background: var(--green-dark);
+      color: #f8fff9;
+    }
+
+    .statement::after {
+      content: "";
+      position: absolute;
+      right: -45px;
+      bottom: -80px;
+      width: 230px;
+      height: 230px;
+      border: 42px solid rgba(255, 255, 255, 0.08);
+      border-radius: 50%;
+    }
+
+    .statement small,
+    .scope-card small {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 0.74rem;
+      font-weight: 820;
+      letter-spacing: 0.09em;
+    }
+
+    .statement strong {
+      position: relative;
+      z-index: 1;
+      display: block;
+      max-width: 650px;
+      font-family: "Hiragino Mincho ProN", "Yu Mincho", serif;
+      font-size: clamp(1.35rem, 3vw, 2.15rem);
+      line-height: 1.6;
+    }
+
+    .scope-card {
+      padding: 26px 28px;
+    }
+
+    .scope-list {
+      display: grid;
+      gap: 11px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .scope-list li {
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 9px;
+      align-items: start;
+      color: #34443c;
+      font-size: 0.9rem;
+    }
+
+    .scope-list .mark {
+      display: grid;
+      width: 20px;
+      height: 20px;
+      place-items: center;
+      margin-top: 4px;
+      border-radius: 50%;
+      font-size: 0.69rem;
+      font-weight: 900;
+    }
+
+    .mark.in { background: var(--green-soft); color: var(--green-dark); }
+    .mark.out { background: var(--red-soft); color: var(--red); }
+
+    main { padding-bottom: 90px; }
+
+    section {
+      scroll-margin-top: 82px;
+      padding: 62px 0;
+      border-top: 1px solid rgba(20, 33, 27, 0.10);
+    }
+
+    .section-heading {
+      display: grid;
+      grid-template-columns: 0.34fr 1fr;
+      gap: 30px;
+      align-items: start;
+      margin-bottom: 34px;
+    }
+
+    .section-number {
+      color: var(--green);
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+    }
+
+    h2 {
+      margin-bottom: 12px;
+      font-family: "Hiragino Mincho ProN", "Yu Mincho", serif;
+      font-size: clamp(1.75rem, 3.5vw, 2.8rem);
+      line-height: 1.35;
+      letter-spacing: -0.025em;
+    }
+
+    .section-heading p {
+      max-width: 760px;
+      margin-bottom: 0;
+      color: var(--muted);
+    }
+
+    .instruction-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .instruction-card {
+      min-height: 210px;
+      padding: 23px;
+      border: 1px solid rgba(20, 33, 27, 0.12);
+      border-radius: 18px;
+      background: rgba(255, 253, 248, 0.76);
+    }
+
+    .instruction-card .index {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      margin-bottom: 16px;
+      border-radius: 50%;
+      background: var(--ink);
+      color: white;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      font-weight: 800;
+    }
+
+    .instruction-card h3 {
+      margin-bottom: 9px;
+      font-size: 1rem;
+      line-height: 1.5;
+    }
+
+    .instruction-card p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 0.87rem;
+    }
+
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 82px 1fr;
+      align-items: stretch;
+      gap: 14px;
+    }
+
+    .comparison-card {
+      padding: 28px;
+      border-radius: var(--radius);
+      border: 1px solid rgba(20, 33, 27, 0.13);
+    }
+
+    .comparison-card.old { background: #f5eee5; }
+    .comparison-card.new { background: #e6f1eb; }
+
+    .comparison-card h3 {
+      margin-bottom: 18px;
+      font-size: 1.15rem;
+    }
+
+    .comparison-card ul {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding-left: 1.2em;
+      color: #3f4c46;
+      font-size: 0.91rem;
+    }
+
+    .comparison-arrow {
+      display: grid;
+      place-items: center;
+      color: var(--green);
+      font-size: 2.4rem;
+      font-weight: 300;
+    }
+
+    .equation-strip {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 16px;
+      align-items: center;
+      margin-top: 18px;
+      padding: 20px 22px;
+      border-radius: 16px;
+      background: #16261f;
+      color: #f7fbf8;
+      font-family: var(--mono);
+      font-size: 0.86rem;
+      text-align: center;
+    }
+
+    .equation-strip .arrow { color: #8ed7b9; font-size: 1.35rem; }
+
+    .methods-layout {
+      display: grid;
+      grid-template-columns: 0.38fr 1fr;
+      gap: 22px;
+      align-items: start;
+    }
+
+    .method-tabs {
+      position: sticky;
+      top: 82px;
+      display: grid;
+      gap: 9px;
+    }
+
+    .method-tab {
+      width: 100%;
+      padding: 15px 16px;
+      border: 1px solid rgba(20, 33, 27, 0.13);
+      border-radius: 14px;
+      background: rgba(255, 253, 248, 0.72);
+      color: var(--muted);
+      text-align: left;
+      cursor: pointer;
+      transition: transform 160ms ease, background 160ms ease, color 160ms ease;
+    }
+
+    .method-tab:hover { transform: translateX(3px); }
+
+    .method-tab[aria-selected="true"] {
+      border-color: var(--green);
+      background: var(--green-dark);
+      color: white;
+      box-shadow: 0 11px 28px rgba(8, 76, 57, 0.18);
+    }
+
+    .method-tab small {
+      display: block;
+      margin-bottom: 3px;
+      opacity: 0.76;
+      font-family: var(--mono);
+      font-size: 0.67rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+    }
+
+    .method-tab strong { display: block; font-size: 0.9rem; }
+
+    .method-panels { min-width: 0; }
+
+    .method-panel {
+      display: none;
+      padding: 30px;
+      border: 1px solid rgba(20, 33, 27, 0.13);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .method-panel.active { display: block; }
+
+    .method-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .method-kicker {
+      margin-bottom: 6px;
+      color: var(--green);
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+    }
+
+    .method-head h3 {
+      margin-bottom: 0;
+      font-size: clamp(1.25rem, 3vw, 1.7rem);
+      line-height: 1.45;
+    }
+
+    .recommend {
+      flex: 0 0 auto;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--amber-soft);
+      color: #7b400b;
+      font-size: 0.72rem;
+      font-weight: 850;
+    }
+
+    .method-summary {
+      max-width: 780px;
+      margin-bottom: 24px;
+      color: var(--muted);
+      font-size: 0.93rem;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 9px;
+      margin: 25px 0;
+    }
+
+    .flow-node {
+      position: relative;
+      display: grid;
+      align-content: center;
+      min-height: 104px;
+      padding: 14px;
+      border: 1px solid rgba(15, 107, 79, 0.2);
+      border-radius: 15px;
+      background: #f1f7f3;
+      text-align: center;
+    }
+
+    .flow-node:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      top: 50%;
+      right: -17px;
+      z-index: 2;
+      width: 24px;
+      color: var(--green);
+      font-size: 1.1rem;
+      transform: translateY(-50%);
+    }
+
+    .flow-node small {
+      color: var(--green);
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      font-weight: 800;
+    }
+
+    .flow-node strong {
+      margin-top: 5px;
+      font-size: 0.82rem;
+      line-height: 1.55;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .pros-cons {
+      padding: 18px 20px;
+      border-radius: 15px;
+      background: #f8f7f1;
+    }
+
+    .pros-cons h4 {
+      margin: 0 0 9px;
+      font-size: 0.82rem;
+    }
+
+    .pros-cons ul {
+      display: grid;
+      gap: 7px;
+      margin: 0;
+      padding-left: 1.15em;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .candidate-matrix {
+      width: 100%;
+      margin-top: 24px;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 14px;
+      font-size: 0.82rem;
+    }
+
+    .candidate-matrix th,
+    .candidate-matrix td {
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .candidate-matrix th {
+      background: #edf0eb;
+      color: #435149;
+      font-size: 0.74rem;
+    }
+
+    .candidate-matrix tr:last-child td { border-bottom: 0; }
+
+    .architecture {
+      padding: 30px;
+      border: 1px solid rgba(20, 33, 27, 0.13);
+      border-radius: var(--radius);
+      background: #12221b;
+      color: white;
+      box-shadow: var(--shadow);
+    }
+
+    .arch-grid {
+      display: grid;
+      grid-template-columns: 0.9fr 80px 1.2fr 80px 0.9fr;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .arch-block {
+      min-height: 188px;
+      padding: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 17px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .arch-block.accent { background: rgba(85, 190, 146, 0.13); }
+
+    .arch-block small {
+      display: block;
+      margin-bottom: 8px;
+      color: #91d8ba;
+      font-family: var(--mono);
+      font-size: 0.66rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+    }
+
+    .arch-block h3 {
+      margin-bottom: 12px;
+      font-size: 1rem;
+    }
+
+    .arch-block ul {
+      margin: 0;
+      padding-left: 1.1em;
+      color: #cbd8d1;
+      font-size: 0.79rem;
+    }
+
+    .arch-arrow {
+      color: #7fd1ae;
+      text-align: center;
+      font-size: 1.8rem;
+    }
+
+    .propagation {
+      margin-top: 24px;
+      padding: 24px;
+      border-radius: 18px;
+      background: #f2f5ef;
+    }
+
+    .propagation h3 {
+      margin-bottom: 5px;
+      font-size: 1rem;
+    }
+
+    .propagation p {
+      margin-bottom: 20px;
+      color: var(--muted);
+      font-size: 0.83rem;
+    }
+
+    .road {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 20px;
+      align-items: center;
+      min-height: 132px;
+      padding: 30px 26px;
+      overflow: hidden;
+      border-radius: 16px;
+      background: #4a514e;
+    }
+
+    .road::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      border-top: 4px dashed rgba(255,255,255,0.7);
+    }
+
+    .vehicle {
+      position: relative;
+      z-index: 1;
+      min-width: 64px;
+      padding: 8px 7px;
+      border: 3px solid rgba(255,255,255,0.92);
+      border-radius: 9px;
+      color: white;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 0.69rem;
+      font-weight: 850;
+      box-shadow: 0 7px 14px rgba(0,0,0,0.22);
+    }
+
+    .vehicle.base { background: var(--red); }
+    .vehicle.hit-1 { background: #c96d24; }
+    .vehicle.hit-2 { background: #b89823; }
+    .vehicle.hit-3 { background: var(--green); }
+    .vehicle.clear { background: #69736e; opacity: 0.76; }
+
+    .vehicle::after {
+      content: attr(data-note);
+      position: absolute;
+      left: 50%;
+      top: calc(100% + 11px);
+      width: 104px;
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+      font-size: 0.64rem;
+      font-weight: 650;
+      transform: translateX(-50%);
+    }
+
+    .algorithm-notes {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .algorithm-note {
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--surface);
+    }
+
+    .algorithm-note small {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--green);
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      font-weight: 850;
+      letter-spacing: 0.07em;
+    }
+
+    .algorithm-note h3 {
+      margin-bottom: 8px;
+      font-size: 0.95rem;
+    }
+
+    .algorithm-note p,
+    .algorithm-note ul {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 0.79rem;
+    }
+
+    .algorithm-note ul { padding-left: 1.1em; }
+
+    .formula-stack {
+      display: grid;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .formula-row {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 18px;
+      align-items: center;
+      padding: 17px 20px;
+      border-radius: 14px;
+      background: #12221b;
+      color: white;
+    }
+
+    .formula-row strong {
+      color: #91d8ba;
+      font-size: 0.78rem;
+    }
+
+    .formula-row .math-expression {
+      color: #eef8f3;
+      font-size: 0.8rem;
+      overflow-x: auto;
+    }
+
+    .formula-row mjx-container,
+    .equation-strip mjx-container {
+      margin: 0 !important;
+      text-align: left !important;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    .metric-card {
+      padding: 22px;
+      box-shadow: none;
+    }
+
+    .metric-card .metric-id {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--blue);
+      font-family: var(--mono);
+      font-size: 0.66rem;
+      font-weight: 850;
+    }
+
+    .metric-card h3 {
+      margin-bottom: 8px;
+      font-size: 0.96rem;
+    }
+
+    .metric-card p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .hypothesis-box {
+      margin-top: 18px;
+      padding: 24px 26px;
+      border-left: 5px solid var(--blue);
+      border-radius: 0 16px 16px 0;
+      background: var(--blue-soft);
+    }
+
+    .hypothesis-box h3 { margin-bottom: 12px; font-size: 1rem; }
+
+    .hypothesis-box ol {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding-left: 1.3em;
+      color: #344d61;
+      font-size: 0.87rem;
+    }
+
+    .roadmap {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .roadmap-card {
+      position: relative;
+      padding: 24px;
+      box-shadow: none;
+    }
+
+    .roadmap-card::before {
+      content: attr(data-phase);
+      display: inline-block;
+      margin-bottom: 14px;
+      color: var(--green);
+      font-family: var(--mono);
+      font-size: 0.67rem;
+      font-weight: 850;
+      letter-spacing: 0.08em;
+    }
+
+    .roadmap-card h3 { margin-bottom: 8px; font-size: 1rem; }
+
+    .roadmap-card p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .decision-box {
+      margin-top: 26px;
+      padding: 28px;
+      border-radius: var(--radius);
+      background: var(--amber-soft);
+    }
+
+    .decision-box h3 { margin-bottom: 12px; }
+
+    .decision-list {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px 26px;
+      margin: 0;
+      padding-left: 1.25em;
+      color: #674518;
+      font-size: 0.86rem;
+    }
+
+    footer {
+      padding: 28px 0 44px;
+      border-top: 1px solid rgba(20, 33, 27, 0.12);
+      color: var(--muted);
+      font-size: 0.75rem;
+    }
+
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .print-note { text-align: right; }
+
+    @media (max-width: 900px) {
+      .hero-grid,
+      .section-heading,
+      .methods-layout { grid-template-columns: 1fr; }
+
+      .instruction-grid,
+      .metric-grid,
+      .roadmap { grid-template-columns: repeat(2, 1fr); }
+
+      .method-tabs {
+        position: static;
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .arch-grid { grid-template-columns: 1fr; }
+      .arch-arrow { transform: rotate(90deg); }
+      .arch-block { min-height: auto; }
+      .flow { grid-template-columns: 1fr; }
+      .flow-node { min-height: auto; }
+      .flow-node:not(:last-child)::after {
+        top: auto;
+        right: 50%;
+        bottom: -22px;
+        transform: translateX(50%) rotate(90deg);
+      }
+
+      .algorithm-notes { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 680px) {
+      .page-shell { width: min(100% - 22px, 1180px); }
+      .topbar-title { display: none; }
+      .topbar-inner { justify-content: flex-start; }
+      header.hero { padding-top: 52px; }
+      h1 { font-size: clamp(2.15rem, 13vw, 3.4rem); }
+      .statement, .scope-card, .method-panel, .architecture { padding: 22px; }
+      .instruction-grid,
+      .metric-grid,
+      .roadmap,
+      .method-tabs,
+      .two-col,
+      .decision-list { grid-template-columns: 1fr; }
+      .comparison { grid-template-columns: 1fr; }
+      .comparison-arrow { transform: rotate(90deg); }
+      .equation-strip { grid-template-columns: 1fr; }
+      .equation-strip .arrow { transform: rotate(90deg); }
+      .road { grid-template-columns: repeat(3, 1fr); gap: 28px 14px; }
+      .road::before { display: none; }
+      .formula-row { grid-template-columns: 1fr; gap: 6px; }
+      .method-head { display: block; }
+      .recommend { display: inline-block; margin-top: 12px; }
+      .footer-inner { display: block; }
+      .print-note { margin-top: 8px; text-align: left; }
+    }
+
+    @media print {
+      :root { --paper: #fff; --surface: #fff; }
+      body { background: white; font-size: 10.5pt; }
+      .topbar { display: none; }
+      .page-shell { width: 100%; max-width: none; }
+      header.hero { padding-top: 20px; }
+      section { padding: 32px 0; break-inside: avoid; }
+      .statement, .architecture { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .method-panel { display: block !important; margin-bottom: 18px; break-inside: avoid; }
+      .method-tabs { display: none; }
+      .methods-layout { grid-template-columns: 1fr; }
+      .instruction-card, .comparison-card, .metric-card, .roadmap-card { break-inside: avoid; }
+      .print-note { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="page-shell topbar-inner">
+      <div class="topbar-title">MCS-TIV 卒論研究計画</div>
+      <nav aria-label="ページ内ナビゲーション">
+        <a href="#theme">テーマ</a>
+        <a href="#gap">研究差分</a>
+        <a href="#methods">手法案</a>
+        <a href="#algorithm">推奨アルゴリズム</a>
+        <a href="#evaluation">評価</a>
+        <a href="#roadmap">実装</a>
+      </nav>
+    </div>
+  </div>
+
+  <header class="hero page-shell">
+    <p class="eyebrow">Graduation Research Proposal</p>
+    <h1>通信で得た車両状態から、<br>後続車両への影響をその場で計算する。</h1>
+    <p class="hero-lead">
+      山下方式の固定的な後続係数を置き換え、MCSの交渉を受け入れた場合・拒否した場合の交通影響を、
+      SUMO上で既定経路に沿った減速伝播として計算する卒業論文テーマと手法案。
+    </p>
+    <div class="tag-row" aria-label="研究キーワード">
+      <span class="tag">Maneuver Coordination Service</span>
+      <span class="tag">SUMO / TraCI</span>
+      <span class="tag">後続車両影響</span>
+      <span class="tag">減速伝播モデル</span>
+      <span class="tag">可変影響範囲</span>
+      <span class="tag">実車は対象外</span>
+    </div>
+
+    <div class="hero-grid">
+      <div class="statement">
+        <small>推奨する暫定テーマ</small>
+        <strong>通信で取得した動的交通状態に基づく、後続車群への影響を考慮したMCS交渉受け入れ判断手法</strong>
+      </div>
+      <aside class="scope-card" aria-label="研究範囲">
+        <small>研究範囲</small>
+        <ul class="scope-list">
+          <li><span class="mark in">✓</span><span>SUMO上のCAV・MCSシミュレーション</span></li>
+          <li><span class="mark in">✓</span><span>位置・速度・車間・既定経路の共有</span></li>
+          <li><span class="mark in">✓</span><span>山下TIVとの比較評価</span></li>
+          <li><span class="mark out">–</span><span>実車・車載器・無線物理層は扱わない</span></li>
+        </ul>
+      </aside>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section id="theme">
+      <div class="section-heading">
+        <div class="section-number">01 / RESEARCH QUESTION</div>
+        <div>
+          <h2>教授の指摘を、研究課題へ変換する</h2>
+          <p>指摘の中心は「後続車を考慮するか」ではなく、「別実験から作った仮定で影響を代用せず、現在の交通状態から計算できるか」にある。</p>
+        </div>
+      </div>
+
+      <div class="instruction-grid">
+        <article class="instruction-card">
+          <span class="index">01</span>
+          <h3>固定の距離係数を前提にしない</h3>
+          <p>予備実験で作った R(X) を現在の交通へそのまま適用するのではなく、交渉時点の車両状態を使う。</p>
+        </article>
+        <article class="instruction-card">
+          <span class="index">02</span>
+          <h3>受け入れ後の変化を計算する</h3>
+          <p>後続車の現在位置を数えるだけでなく、受け入れによって速度・加速度がどう変わるかを計算する。</p>
+        </article>
+        <article class="instruction-card">
+          <span class="index">03</span>
+          <h3>影響範囲を交通状態から決める</h3>
+          <p>後方100 mなどの固定範囲ではなく、速度・車間と減速伝播に応じて対象車両を決定する。</p>
+        </article>
+        <article class="instruction-card">
+          <span class="index">04</span>
+          <h3>車両通信を観測手段として使う</h3>
+          <p>各車両の位置・速度・加速度・既定経路を共有し、経路の共有区間ごとに現在の車列を再構成する。</p>
+        </article>
+        <article class="instruction-card">
+          <span class="index">05</span>
+          <h3>特定場面だけの経験則にしない</h3>
+          <p>T字路の特定配置に最適化した係数ではなく、同じ入力と処理で異なる流入量や車列にも適用する。</p>
+        </article>
+        <article class="instruction-card">
+          <span class="index">06</span>
+          <h3>卒論ではシミュレーションに限定する</h3>
+          <p>実車搭載は目標にせず、SUMO内で取得可能な情報と計算時間を研究対象とする。</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="gap">
+      <div class="section-heading">
+        <div class="section-number">02 / RESEARCH GAP</div>
+        <div>
+          <h2>山下方式から、今回どこを変えるか</h2>
+          <p>距離を見ていないのではなく、後続車が二つの判断でどう変化するかを再計算していない点が本質的な差になる。</p>
+        </div>
+      </div>
+
+      <div class="comparison">
+        <article class="comparison-card old">
+          <h3>山下方式：固定係数による近似</h3>
+          <ul>
+            <li>予備実験を基に R(X) を定義</li>
+            <li>基準車両からの距離を係数へ変換</li>
+            <li>最終予測速度 × 距離係数を加算</li>
+            <li>100 mより後方は実質的に影響ゼロ</li>
+            <li>受け入れ後の後続車の速度計画は再計算しない</li>
+          </ul>
+        </article>
+        <div class="comparison-arrow" aria-hidden="true">→</div>
+        <article class="comparison-card new">
+          <h3>今回：差分型の減速伝播</h3>
+          <ul>
+            <li>通信で取得した現在の車列状態を使用</li>
+            <li>拒否時の現在計画を基準として保持</li>
+            <li>受け入れで変化する部分だけを順次再計算</li>
+            <li>安全なら計画を変えず、その枝の伝播を終了</li>
+            <li>既定経路の共有区間で影響を追跡</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="equation-strip" aria-label="評価式の変更イメージ">
+        <span>\( \mathrm{TIV} = \Delta t + \alpha \sum_i (v_i R_i) + \beta a_{\max} \)</span>
+        <span class="arrow" aria-hidden="true">→</span>
+        <span>\( I_{\mathrm{prop}} = \sum_i \frac{1}{H}\int_0^H \left[v_i^{\mathrm{reject}}(t)-v_i^{\mathrm{accept}}(t)\right]dt \)</span>
+      </div>
+    </section>
+
+    <section id="methods">
+      <div class="section-heading">
+        <div class="section-number">03 / METHOD CANDIDATES</div>
+        <div>
+          <h2>考えられるアルゴリズム案</h2>
+          <p>すべて固定R(X)から離れる案だが、現在は既定経路上の速度変化を局所的に追う減速伝播モデルを主案とする。</p>
+        </div>
+      </div>
+
+      <div class="methods-layout">
+        <div class="method-tabs" role="tablist" aria-label="アルゴリズム案">
+          <button class="method-tab" id="tab-a" role="tab" aria-controls="method-a" aria-selected="false" data-method="method-a" tabindex="-1">
+            <small>PLAN A / COMPARISON</small>
+            <strong>二分岐オンライン予測</strong>
+          </button>
+          <button class="method-tab" id="tab-b" role="tab" aria-controls="method-b" aria-selected="true" data-method="method-b">
+            <small>PLAN B / RECOMMENDED</small>
+            <strong>既定経路上の減速伝播</strong>
+          </button>
+          <button class="method-tab" id="tab-c" role="tab" aria-controls="method-c" aria-selected="false" data-method="method-c" tabindex="-1">
+            <small>PLAN C / DISTRIBUTED</small>
+            <strong>各車両への軌道問い合わせ</strong>
+          </button>
+          <button class="method-tab" id="tab-d" role="tab" aria-controls="method-d" aria-selected="false" data-method="method-d" tabindex="-1">
+            <small>PLAN D / EXTENSION</small>
+            <strong>データ駆動の影響推定</strong>
+          </button>
+        </div>
+
+        <div class="method-panels">
+          <article class="method-panel" id="method-a" role="tabpanel" aria-labelledby="tab-a" hidden>
+            <div class="method-head">
+              <div>
+                <div class="method-kicker">PLAN A</div>
+                <h3>受け入れ／拒否を短時間シミュレーションする</h3>
+              </div>
+              <span class="recommend">比較案・発展案</span>
+            </div>
+            <p class="method-summary">現在状態を複製し、二つの候補を同じ予測器で10秒程度進める。各後続車の軌道差から影響車両と総遅延を求める。</p>
+            <div class="flow" aria-label="二分岐オンライン予測の流れ">
+              <div class="flow-node"><small>STEP 1</small><strong>通信状態を<br>スナップショット化</strong></div>
+              <div class="flow-node"><small>STEP 2</small><strong>受け入れ／拒否の<br>2状態へ複製</strong></div>
+              <div class="flow-node"><small>STEP 3</small><strong>各ケースで<br>車列を予測</strong></div>
+              <div class="flow-node"><small>STEP 4</small><strong>後続車ごとの<br>遅延差を集計</strong></div>
+              <div class="flow-node"><small>STEP 5</small><strong>安全かつ<br>総遅延が小さい方</strong></div>
+            </div>
+            <div class="two-col">
+              <div class="pros-cons">
+                <h4>長所</h4>
+                <ul><li>教授の「受け入れ後を計算」に最も直接的</li><li>固定距離を置かず影響範囲を結果から得られる</li><li>受け入れ・拒否を同じ尺度で比較できる</li></ul>
+              </div>
+              <div class="pros-cons">
+                <h4>注意点</h4>
+                <ul><li>実状態を変更しない純粋な予測器が必要</li><li>拒否された希望車両の動作定義が必要</li><li>計算時間を測定する必要がある</li></ul>
+              </div>
+            </div>
+          </article>
+
+          <article class="method-panel active" id="method-b" role="tabpanel" aria-labelledby="tab-b">
+            <div class="method-head">
+              <div>
+                <div class="method-kicker">PLAN B</div>
+                <h3>既定経路上で速度変化を伝播する</h3>
+              </div>
+              <span class="recommend">卒論の主手法候補</span>
+            </div>
+            <p class="method-summary">経路形状は生成済みの候補を使い、新たに計算するのは経路に沿う位置 s・速度 v・加速度 a・車間 g とする。拒否時の現在計画を基準に、受け入れで安全な追従が崩れる車両だけ速度計画を再生成する。</p>
+            <div class="flow" aria-label="減速伝播モデルの流れ">
+              <div class="flow-node"><small>STEP 1</small><strong>拒否時の<br>現在計画を基準化</strong></div>
+              <div class="flow-node"><small>STEP 2</small><strong>受け入れ時の<br>起点車両を変更</strong></div>
+              <div class="flow-node"><small>STEP 3</small><strong>共有区間の後続車を<br>安全判定</strong></div>
+              <div class="flow-node"><small>STEP 4</small><strong>危険なら速度計画を<br>再生成して伝播</strong></div>
+              <div class="flow-node"><small>STEP 5</small><strong>変化なし・経路分岐で<br>その枝を終了</strong></div>
+            </div>
+            <div class="two-col">
+              <div class="pros-cons"><h4>長所</h4><ul><li>道路全体を複製せず、変化した部分だけを計算できる</li><li>固定100 mではなく、実際に再計画が必要な車両までを影響範囲にできる</li><li>既存の経路計画をそのまま利用できる</li></ul></div>
+              <div class="pros-cons"><h4>注意点</h4><ul><li>追従モデルの妥当性を先に検証する</li><li>経路分岐前後の先行・後続関係を明確に定義する</li><li>10秒・通信200 mで打ち切った場合は「影響終了」と区別する</li></ul></div>
+            </div>
+          </article>
+
+          <article class="method-panel" id="method-c" role="tabpanel" aria-labelledby="tab-c" hidden>
+            <div class="method-head">
+              <div>
+                <div class="method-kicker">PLAN C</div>
+                <h3>各後続車に条件付き軌道を計算させる</h3>
+              </div>
+            </div>
+            <p class="method-summary">交渉車両が二つの候補軌道を配信し、各後続車が自身の制御アルゴリズムで「この候補ならどう走るか」を計算して返信する。</p>
+            <div class="flow" aria-label="分散軌道問い合わせの流れ">
+              <div class="flow-node"><small>STEP 1</small><strong>候補A/Bを<br>周辺車へ配信</strong></div>
+              <div class="flow-node"><small>STEP 2</small><strong>各車が自身の<br>応答軌道を計算</strong></div>
+              <div class="flow-node"><small>STEP 3</small><strong>軌道・遅延を<br>返信</strong></div>
+              <div class="flow-node"><small>STEP 4</small><strong>後続方向へ<br>問い合わせ継続</strong></div>
+              <div class="flow-node"><small>STEP 5</small><strong>集計して<br>受け入れ判断</strong></div>
+            </div>
+            <div class="two-col">
+              <div class="pros-cons"><h4>長所</h4><ul><li>車両ごとの制御特性を直接反映できる</li><li>一つの共通追従モデルに依存しにくい</li><li>通信を手法そのものへ組み込める</li></ul></div>
+              <div class="pros-cons"><h4>注意点</h4><ul><li>複数往復の通信手順が必要</li><li>応答待ち・同期・タイムアウトが複雑</li><li>卒論の初期実装としては範囲が大きい</li></ul></div>
+            </div>
+          </article>
+
+          <article class="method-panel" id="method-d" role="tabpanel" aria-labelledby="tab-d" hidden>
+            <div class="method-head">
+              <div>
+                <div class="method-kicker">PLAN D</div>
+                <h3>シミュレーション結果から影響を学習する</h3>
+              </div>
+            </div>
+            <p class="method-summary">速度・車間・車列長などを入力し、受け入れ／拒否の遅延差を回帰モデルで推定する。高速だが、今回の主手法より拡張案に向く。</p>
+            <div class="flow" aria-label="データ駆動推定の流れ">
+              <div class="flow-node"><small>STEP 1</small><strong>多数条件で<br>二分岐結果を生成</strong></div>
+              <div class="flow-node"><small>STEP 2</small><strong>交通状態と<br>影響量を記録</strong></div>
+              <div class="flow-node"><small>STEP 3</small><strong>回帰モデルを<br>学習</strong></div>
+              <div class="flow-node"><small>STEP 4</small><strong>交渉時に<br>影響を即時推定</strong></div>
+              <div class="flow-node"><small>STEP 5</small><strong>未知条件で<br>汎化性能を評価</strong></div>
+            </div>
+            <div class="two-col">
+              <div class="pros-cons"><h4>長所</h4><ul><li>判断時の計算が高速</li><li>非線形な関係も近似できる</li><li>案Aの高速化として利用可能</li></ul></div>
+              <div class="pros-cons"><h4>注意点</h4><ul><li>別シミュレーション依存という批判が再発しやすい</li><li>未学習条件での妥当性説明が難しい</li><li>主題が機械学習へ広がりすぎる</li></ul></div>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <table class="candidate-matrix">
+        <thead><tr><th>案</th><th>教授の指摘との一致</th><th>実装難度</th><th>計算負荷</th><th>卒論での位置づけ</th></tr></thead>
+        <tbody>
+          <tr><td>A 二分岐予測</td><td>高い</td><td>中〜高</td><td>中〜高</td><td>比較案・発展案</td></tr>
+          <tr><td>B 既定経路上の減速伝播</td><td>高い</td><td>中</td><td>低〜中</td><td><strong>主手法として推奨</strong></td></tr>
+          <tr><td>C 分散問い合わせ</td><td>非常に高い</td><td>高</td><td>中</td><td>発展案</td></tr>
+          <tr><td>D データ駆動</td><td>注意が必要</td><td>高</td><td>判断時は低</td><td>高速化の将来案</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="algorithm">
+      <div class="section-heading">
+        <div class="section-number">04 / RECOMMENDED ALGORITHM</div>
+        <div>
+          <h2>推奨案：既定経路上の差分型減速伝播モデル</h2>
+          <p>受け入れ時の経路は生成済みの候補から選び、交渉による速度計画の変化を後続車へ局所的に伝播させる。</p>
+        </div>
+      </div>
+
+      <div class="architecture">
+        <div class="arch-grid">
+          <div class="arch-block">
+            <small>INPUT</small>
+            <h3>既定経路＋現在状態</h3>
+            <ul><li>現行経路・希望経路</li><li>経路上の位置 s</li><li>速度 v・加速度 a</li><li>先行車との車間 g</li></ul>
+          </div>
+          <div class="arch-arrow" aria-hidden="true">→</div>
+          <div class="arch-block accent">
+            <small>LOCAL PROPAGATION</small>
+            <h3>受け入れ差分だけを再計算</h3>
+            <ul><li>拒否：現在の経路・速度計画を基準化</li><li>受け入れ：譲る車両と希望車両の計画を変更</li><li>共有経路区間の後続車を安全判定</li><li>再計画が必要な間だけ再帰</li></ul>
+          </div>
+          <div class="arch-arrow" aria-hidden="true">→</div>
+          <div class="arch-block">
+            <small>OUTPUT</small>
+            <h3>動的な後続影響</h3>
+            <ul><li>影響を受けた車両集合</li><li>各車両の速度損失</li><li>伝播影響量 I<sub>prop</sub></li><li>終了／時間・通信範囲で打切り</li></ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="propagation">
+        <h3>固定mではなく、速度計画が変わらなくなる車両までを影響範囲とする</h3>
+        <p>下図では、起点車両の速度変更により第3後続車まで再計画が必要だが、第4後続車は元の計画のまま安全に走れるため、そこで伝播を終了する。</p>
+        <div class="road" role="img" aria-label="起点車両から第3後続車まで速度計画の変化が伝わり、第4後続車で伝播が終了する図">
+          <div class="vehicle base" data-note="速度変更の起点">起点車</div>
+          <div class="vehicle hit-1" data-note="強い影響">後続 1</div>
+          <div class="vehicle hit-2" data-note="影響あり">後続 2</div>
+          <div class="vehicle hit-3" data-note="小さい影響">後続 3</div>
+          <div class="vehicle clear" data-note="計画変更なし">後続 4</div>
+          <div class="vehicle clear" data-note="計算対象外">後続 5</div>
+        </div>
+      </div>
+
+      <div class="algorithm-notes">
+        <article class="algorithm-note">
+          <small>BRANCH / DIVERGENCE</small>
+          <h3>経路分岐までは影響し得る</h3>
+          <p>先行車と後続車の進行経路が異なる場合も、分岐前の共有区間では追従関係にある。共有区間を外れた後は、その車両間の伝播を終了する。</p>
+        </article>
+        <article class="algorithm-note">
+          <small>BOUNDARY / TRUNCATION</small>
+          <h3>打切りと終了を区別する</h3>
+          <p>速度計画が変わらなければ自然終了。予測時間 H または通信200 mに達した場合は、影響ゼロではなく「範囲外で打切り」として記録する。</p>
+        </article>
+      </div>
+
+      <div class="formula-stack" aria-label="減速伝播モデルの主要式">
+        <div class="formula-row"><strong>基本の安全車間</strong><div class="math-expression">\[ g_i(t) \ge \max\!\left(D_0,\,\tau v_i(t)\right) \]</div></div>
+        <div class="formula-row"><strong>制動性能を含む候補</strong><div class="math-expression">\[ g_i^{\mathrm{safe}} = D_0 + \tau v_i + \max\!\left(0,\,\frac{v_i^2}{2b_i}-\frac{v_{i-1}^2}{2b_{i-1}}\right) \]</div></div>
+        <div class="formula-row"><strong>車両別・総影響量</strong><div class="math-expression">\[ I_i = \frac{1}{H}\int_0^H \left[v_i^{\mathrm{reject}}(t)-v_i^{\mathrm{accept}}(t)\right]dt, \qquad I_{\mathrm{prop}}=\sum_i I_i \]</div></div>
+        <div class="formula-row"><strong>符号の解釈</strong><div class="math-expression">\[ I_i > 0:\ \text{受け入れにより減速}, \qquad I_i < 0:\ \text{受け入れにより改善} \]</div></div>
+      </div>
+    </section>
+
+    <section id="evaluation">
+      <div class="section-heading">
+        <div class="section-number">05 / EVALUATION</div>
+        <div>
+          <h2>何をもって有効と判断するか</h2>
+          <p>まず伝播予測が実際の後続反応を再現できるかを検証し、その後MCSへ統合した交通流改善と計算時間を評価する。</p>
+        </div>
+      </div>
+
+      <div class="metric-grid">
+        <article class="metric-card"><span class="metric-id">VALIDITY 01</span><h3>予測と実測の一致</h3><p>強制受け入れ／拒否の対実験で、影響車両集合・速度損失・継続時間・距離を比較。</p></article>
+        <article class="metric-card"><span class="metric-id">PRIMARY 02</span><h3>timeLoss・平均速度・通過台数</h3><p>統合後の交通流改善と、山下論文との比較可能性を確認する指標。</p></article>
+        <article class="metric-card"><span class="metric-id">BEHAVIOR 03</span><h3>停止回数・最大減速度</h3><p>後続車に不要な停止や強い減速を発生させていないか。</p></article>
+        <article class="metric-card"><span class="metric-id">SYSTEM 04</span><h3>判断計算時間</h3><p>局所的な減速伝播計算がMCSの判断周期に収まるか。</p></article>
+        <article class="metric-card"><span class="metric-id">RANGE 05</span><h3>動的な影響車両数</h3><p>速度・車間・混雑状態により対象範囲が実際に変化したか。</p></article>
+        <article class="metric-card"><span class="metric-id">DECISION 06</span><h3>受け入れ率</h3><p>どの交通条件で判断がTIVと変わり、その結果が妥当だったか。</p></article>
+        <article class="metric-card"><span class="metric-id">ROBUSTNESS 07</span><h3>条件変化への頑健性</h3><p>流入量、初期車間、速度、車種を変えても効果が維持されるか。</p></article>
+        <article class="metric-card"><span class="metric-id">SAFETY 08</span><h3>安全制約</h3><p>衝突、TTC、必要減速度を目的値と分離して必須条件として確認。</p></article>
+      </div>
+
+      <div class="hypothesis-box">
+        <h3>検証仮説</h3>
+        <ol>
+          <li>差分型減速伝播は、固定R(X)より実測の影響車両と速度損失を正確に推定できる。</li>
+          <li>混雑・短車間では影響範囲が広がり、低密度・長車間では狭まる。</li>
+          <li>TIVと異なる判断をした場面で、後続車を含む交通流改善を説明できる。</li>
+          <li>局所的な伝播計算がMCSの判断周期内に収まり、オンライン利用が可能である。</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="roadmap">
+      <div class="section-heading">
+        <div class="section-number">06 / IMPLEMENTATION ROADMAP</div>
+        <div>
+          <h2>卒論としての実装順序</h2>
+          <p>最初から全シナリオ・通信遅延まで広げず、T字路の理想通信で主張を成立させてから拡張する。</p>
+        </div>
+      </div>
+
+      <div class="roadmap">
+        <article class="roadmap-card" data-phase="PHASE 1"><h3>比較基準を固定</h3><p>現行TIVのT字路条件と結果を保存し、提案手法を無効にしたとき既存挙動が変わらない状態を作る。</p></article>
+        <article class="roadmap-card" data-phase="PHASE 2"><h3>通信状態を構造化</h3><p>既定経路と s・v・a・g・時刻をスナップショットへ変換し、共有経路区間の車列順序を再構成する。</p></article>
+        <article class="roadmap-card" data-phase="PHASE 3"><h3>追従予測器を検証</h3><p>既存のFrenet追従生成を第一候補とし、強制受け入れ／拒否実験で速度計画と安全車間の再現性を確認する。</p></article>
+        <article class="roadmap-card" data-phase="PHASE 4"><h3>減速伝播を統合</h3><p>安全判定、必要車両だけの再計画、自然終了と打切りの記録、I<sub>prop</sub>の集計をMCS判断へ追加する。</p></article>
+        <article class="roadmap-card" data-phase="PHASE 5"><h3>T字路で比較評価</h3><p>速度・車間・流入量を変え、固定TIVと提案手法を複数seedで比較する。</p></article>
+        <article class="roadmap-card" data-phase="PHASE 6"><h3>余力に応じて拡張</h3><p>バス、十字路、合流、通信遅延・欠損、分散問い合わせ方式へ段階的に広げる。</p></article>
+      </div>
+
+      <div class="decision-box">
+        <h3>実装前に確定する4点</h3>
+        <ol class="decision-list">
+          <li>既存Frenet追従生成と逐次的な安全車間更新のどちらを採用するか</li>
+          <li>予測時間窓H（初期案10秒、3・5・10秒で感度分析）</li>
+          <li>共有経路区間・自然終了・200 m打切りの判定基準</li>
+          <li>I<sub>prop</sub>と既存TIVをどう統合し、係数感度を評価するか</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="page-shell footer-inner">
+      <div>卒業論文テーマ・手法検討資料｜MCS-TIV</div>
+      <div class="print-note">ブラウザの印刷機能からPDF化できます。</div>
+    </div>
+  </footer>
+
+  <script>
+    const tabs = Array.from(document.querySelectorAll('.method-tab'));
+    const panels = Array.from(document.querySelectorAll('.method-panel'));
+
+    function activateMethod(targetId) {
+      tabs.forEach((tab) => {
+        const selected = tab.dataset.method === targetId;
+        tab.setAttribute('aria-selected', String(selected));
+        tab.tabIndex = selected ? 0 : -1;
+      });
+
+      panels.forEach((panel) => {
+        const active = panel.id === targetId;
+        panel.classList.toggle('active', active);
+        panel.hidden = !active;
+      });
+    }
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => activateMethod(tab.dataset.method));
+      tab.addEventListener('keydown', (event) => {
+        if (!['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft'].includes(event.key)) return;
+        event.preventDefault();
+        const direction = ['ArrowDown', 'ArrowRight'].includes(event.key) ? 1 : -1;
+        const next = (index + direction + tabs.length) % tabs.length;
+        tabs[next].focus();
+        activateMethod(tabs[next].dataset.method);
+      });
+    });
+  </script>
+</body>
+</html>

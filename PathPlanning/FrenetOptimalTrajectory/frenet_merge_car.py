@@ -12,6 +12,7 @@ Ref:
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
+from trajectory_precision import position
 import math
 import sys
 import os
@@ -168,7 +169,7 @@ def calc_frenet_paths_free(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, targetSpeed=M
                 lon_qp = QuarticPolynomial_follow(c_s, c_s_d, c_s_dd, tv, 0.0, Ti)
 
                 #各タイムステップの縦方向の位置、速度、加速度、躍度
-                tfp.s = [round(lon_qp.calc_point(t), 3) for t in fp.t]
+                tfp.s = [position(lon_qp.calc_point(t)) for t in fp.t]
                 tfp.s_d = [round(lon_qp.calc_first_derivative(t), 3) for t in fp.t]
                 tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
                 tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
@@ -213,7 +214,7 @@ def calc_frenet_paths_free(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, targetSpeed=M
                     lon_qp = QuarticPolynomial_follow(c_s, c_s_d, c_s_dd, tv, 0.0, Ti)
 
                     #各タイムステップの縦方向の位置、速度、加速度、躍度
-                    tfp.s = [round(lon_qp.calc_point(t), 3) for t in fp.t]
+                    tfp.s = [position(lon_qp.calc_point(t)) for t in fp.t]
                     tfp.s_d = [round(lon_qp.calc_first_derivative(t), 3) for t in fp.t]
                     tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
                     tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
@@ -268,7 +269,7 @@ def calc_frenet_paths_following(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_p
         lon_qp = QuinticPolynomial(c_s, c_s_d, c_s_dd, tp, target_speed, 0.0, Ti)
 
         #各タイムステップの縦方向の位置、速度、加速度、躍度
-        tfp.s = [round(lon_qp.calc_point(t), 3) for t in fp.t]
+        tfp.s = [position(lon_qp.calc_point(t)) for t in fp.t]
         tfp.s_d = [round(lon_qp.calc_first_derivative(t), 3) for t in fp.t]
         tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
         tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
@@ -324,7 +325,7 @@ def calc_frenet_paths_yield(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_pos, 
             lon_qp = QuinticPolynomial(c_s, c_s_d, c_s_dd, tp, tv, target_acc, Ti)
 
             #各タイムステップの縦方向の位置、速度、加速度、躍度
-            tfp.s = [round(lon_qp.calc_point(t), 3) for t in fp.t]
+            tfp.s = [position(lon_qp.calc_point(t)) for t in fp.t]
             tfp.s_d = [round(lon_qp.calc_first_derivative(t), 3) for t in fp.t]
             tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
             tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
@@ -374,7 +375,7 @@ def calc_frenet_paths_stop(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_pos, c
             lon_qp = QuinticPolynomial(c_s, c_s_d, c_s_dd, target_pos, target_speed, target_acc, Ti)
 
             #各タイムステップの縦方向の位置、速度、加速度、躍度
-            tfp.s = [round(lon_qp.calc_point(t), 3) for t in fp.t]
+            tfp.s = [position(lon_qp.calc_point(t)) for t in fp.t]
             tfp.s_d = [round(lon_qp.calc_first_derivative(t), 3) for t in fp.t]
             tfp.s_dd = [round(lon_qp.calc_second_derivative(t), 3) for t in fp.t]
             tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
@@ -423,7 +424,7 @@ def calc_frenet_paths_desired(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, duration=m
         lon_qp = QuarticPolynomial_follow(c_s, c_s_d, c_s_dd, MAX_SPEED, 0.0, Ti)
 
         #各タイムステップの縦方向の位置、速度、加速度、躍度
-        tfp.s = [round(lon_qp.calc_point(t), 3) for t in fp.t]
+        tfp.s = [position(lon_qp.calc_point(t)) for t in fp.t]
         tfp.s_d = [round(lon_qp.calc_first_derivative(t), 3) for t in fp.t]
         tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
         tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]

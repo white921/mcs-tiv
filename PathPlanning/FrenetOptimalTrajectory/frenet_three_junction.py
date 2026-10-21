@@ -11,6 +11,7 @@ Ref:
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
+from trajectory_precision import position
 import math
 import sys
 import os
@@ -165,7 +166,7 @@ def calc_frenet_paths_free(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, targetSpeed=M
             lon_qp = QuarticPolynomial(c_s, c_s_d, c_s_dd, tv, 0.0, Ti)
 
             #各タイムステップの縦方向の位置、速度、加速度、躍度
-            tfp.s = [round(lon_qp.calc_point(t), 3) for t in fp.t]
+            tfp.s = [position(lon_qp.calc_point(t)) for t in fp.t]
             tfp.s_d = [round(lon_qp.calc_first_derivative(t), 3) for t in fp.t]
             tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
             tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
@@ -176,7 +177,7 @@ def calc_frenet_paths_free(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, targetSpeed=M
             #横方向のコスト　ジャークの自乗＋収束時間＋センターラインまでの距離自乗
             tfp.cd = K_J * Jp + K_T * Ti + K_D * tfp.d[-1] ** 2
             #縦方向のコスト　ジャークの自乗＋収束速度＋目標スピードとの差分自乗
-            tfp.cv = K_J * Js + K_T * Ti + K_D * ((MAX_SPEED - tfp.s_d[-1]) ** 2)
+            tfp.cv = K_J * Js + K_T * Ti + K_D * ((targetSpeed - tfp.s_d[-1]) ** 2)
             #コスト関数（横方向コストと縦方向コストの和）
             tfp.cf = K_LAT * tfp.cd + K_LON * tfp.cv
 
@@ -208,7 +209,7 @@ def calc_frenet_paths_free(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, targetSpeed=M
                 lon_qp = QuarticPolynomial(c_s, c_s_d, c_s_dd, tv, 0.0, Ti)
 
                 #各タイムステップの縦方向の位置、速度、加速度、躍度
-                tfp.s = [round(lon_qp.calc_point(t), 3) for t in fp.t]
+                tfp.s = [position(lon_qp.calc_point(t)) for t in fp.t]
                 tfp.s_d = [round(lon_qp.calc_first_derivative(t), 3) for t in fp.t]
                 tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
                 tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
@@ -219,7 +220,7 @@ def calc_frenet_paths_free(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, targetSpeed=M
                 #横方向のコスト　ジャークの自乗＋収束時間＋センターラインまでの距離自乗
                 tfp.cd = K_J * Jp + K_T * Ti + K_D * tfp.d[-1] ** 2
                 #縦方向のコスト　ジャークの自乗＋収束速度＋目標スピードとの差分自乗
-                tfp.cv = K_J * Js + K_T * Ti + K_D * ((MAX_SPEED - tfp.s_d[-1]) ** 2)
+                tfp.cv = K_J * Js + K_T * Ti + K_D * ((targetSpeed - tfp.s_d[-1]) ** 2)
                 #コスト関数（横方向コストと縦方向コストの和）
                 tfp.cf = K_LAT * tfp.cd + K_LON * tfp.cv
 
@@ -263,7 +264,7 @@ def calc_frenet_paths_following(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_p
         lon_qp = QuinticPolynomial(c_s, c_s_d, c_s_dd, tp, target_speed, 0.0, Ti)
 
         #各タイムステップの縦方向の位置、速度、加速度、躍度
-        tfp.s = [round(lon_qp.calc_point(t), 3) for t in fp.t]
+        tfp.s = [position(lon_qp.calc_point(t)) for t in fp.t]
         tfp.s_d = [round(lon_qp.calc_first_derivative(t), 3) for t in fp.t]
         tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
         tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
@@ -283,7 +284,7 @@ def calc_frenet_paths_following(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_p
     return frenet_paths
 
 
-def calc_frenet_paths_yield(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_pos, target_speed, duration):
+def calc_frenet_paths_yield(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_pos, target_speed, duration, max_speed=MAX_SPEED):
     frenet_paths = []
     target_acc = 0
 
@@ -308,8 +309,8 @@ def calc_frenet_paths_yield(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_pos, 
 
         #縦方向のモーションプランニング (目標速度での走行を目指す場合)
         #目的速度を変化させる
-        D_T_S = MAX_SPEED/5
-        tvlist = np.arange(0, MAX_SPEED+0.01, D_T_S)
+        D_T_S = max_speed/5
+        tvlist = np.arange(0, max_speed+0.01, D_T_S)
 
         tp = target_pos
         for tv in tvlist:
@@ -319,7 +320,7 @@ def calc_frenet_paths_yield(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_pos, 
             lon_qp = QuinticPolynomial(c_s, c_s_d, c_s_dd, tp, tv, target_acc, Ti)
 
             #各タイムステップの縦方向の位置、速度、加速度、躍度
-            tfp.s = [round(lon_qp.calc_point(t), 3) for t in fp.t]
+            tfp.s = [position(lon_qp.calc_point(t)) for t in fp.t]
             tfp.s_d = [round(lon_qp.calc_first_derivative(t), 3) for t in fp.t]
             tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
             tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
@@ -330,7 +331,7 @@ def calc_frenet_paths_yield(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_pos, 
             #横方向のコスト　ジャークの自乗＋収束時間＋センターラインまでの距離自乗
             tfp.cd = K_J * Jp + K_T * Ti + K_D * tfp.d[-1] ** 2
             #縦方向のコスト　ジャークの自乗＋収束速度＋目的速度との差分自乗
-            tfp.cv = K_J * Js + K_T * Ti + K_D * ((MAX_SPEED - tfp.s_d[-1]) ** 2)
+            tfp.cv = K_J * Js + K_T * Ti + K_D * ((max_speed - tfp.s_d[-1]) ** 2)
             #コスト関数（横方向コストと縦方向コストの和）
             tfp.cf = K_LAT * tfp.cd + K_LON * tfp.cv
 
@@ -367,7 +368,7 @@ def calc_frenet_paths_stop(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_pos):
         lon_qp = QuinticPolynomial(c_s, c_s_d, c_s_dd, target_pos, target_speed, target_acc, Ti)
 
         #各タイムステップの縦方向の位置、速度、加速度、躍度
-        tfp.s = [round(lon_qp.calc_point(t), 3) for t in fp.t]
+        tfp.s = [position(lon_qp.calc_point(t)) for t in fp.t]
         tfp.s_d = [round(lon_qp.calc_first_derivative(t), 3) for t in fp.t]
         tfp.s_dd = [round(lon_qp.calc_second_derivative(t), 3) for t in fp.t]
         tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
@@ -387,7 +388,8 @@ def calc_frenet_paths_stop(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_pos):
     return frenet_paths
 
 
-def calc_frenet_paths_desired(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, route, duration=maxT):
+def calc_frenet_paths_desired(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, route, duration=maxT,
+                              max_speed=MAX_SPEED, max_accel=MAX_ACCEL, max_decel=MAX_DECEL):
     frenet_paths = []
     target_pos = 141.8
 
@@ -416,7 +418,7 @@ def calc_frenet_paths_desired(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, route, dur
             lon_qp = QuinticPolynomial(c_s, c_s_d, c_s_dd, target_pos, MAX_SPEED_INTERSECTION, 0, Ti)
 
             #各タイムステップの縦方向の位置、速度、加速度、躍度
-            tfp.s = [round(lon_qp.calc_point(t), 3) for t in fp.t]
+            tfp.s = [position(lon_qp.calc_point(t)) for t in fp.t]
             tfp.s_d = [round(lon_qp.calc_first_derivative(t), 3) for t in fp.t]
             tfp.s_dd = [round(lon_qp.calc_second_derivative(t), 3) for t in fp.t]
             tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
@@ -457,7 +459,7 @@ def calc_frenet_paths_desired(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, route, dur
             lon_qp = QuarticPolynomial(c_s, c_s_d, c_s_dd, MAX_SPEED_INTERSECTION, 0.0, Ti)
 
             #各タイムステップの縦方向の位置、速度、加速度、躍度
-            tfp.s = [round(lon_qp.calc_point(t), 3) for t in fp.t]
+            tfp.s = [position(lon_qp.calc_point(t)) for t in fp.t]
             tfp.s_d = [round(lon_qp.calc_first_derivative(t), 3) for t in fp.t]
             tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
             tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
@@ -542,7 +544,7 @@ def calc_frenet_paths_desired(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, route, dur
 
     _, _, _, _, csp = generate_target_course(wx, wy)
     frenet_paths = calc_global_paths(frenet_paths, csp)
-    frenet_paths = check_paths(frenet_paths, ob)
+    frenet_paths = check_paths(frenet_paths, ob, max_speed=max_speed, max_accel=max_accel, max_decel=max_decel)
     if len(frenet_paths) == 0:
         return frenet_paths
     
@@ -575,10 +577,10 @@ def calc_frenet_paths_desired(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, route, dur
         #縦方向のモーションプランニング (目標速度での走行を目指す場合)
         tfp = copy.deepcopy(fp)
         #四元方程式               始点             終点
-        lon_qp = QuarticPolynomial(best_path1.s[-1], best_path1.s_d[-1], best_path1.s_dd[-1], MAX_SPEED, 0.0, Ti)
+        lon_qp = QuarticPolynomial(best_path1.s[-1], best_path1.s_d[-1], best_path1.s_dd[-1], max_speed, 0.0, Ti)
 
         #各タイムステップの縦方向の位置、速度、加速度、躍度
-        tfp.s = [round(lon_qp.calc_point(t), 3) for t in fp.t]
+        tfp.s = [position(lon_qp.calc_point(t)) for t in fp.t]
         tfp.s_d = [round(lon_qp.calc_first_derivative(t), 3) for t in fp.t]
         tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
         tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
@@ -589,14 +591,14 @@ def calc_frenet_paths_desired(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, route, dur
         #横方向のコスト　ジャークの自乗＋収束時間＋センターラインまでの距離自乗
         tfp.cd = K_J * Jp + K_T * Ti + K_D * tfp.d[-1] ** 2
         #縦方向のコスト　ジャークの自乗＋収束速度＋目標スピードとの差分自乗
-        tfp.cv = K_J * Js + K_T * Ti + K_D * ((MAX_SPEED - tfp.s_d[-1]) ** 2)
+        tfp.cv = K_J * Js + K_T * Ti + K_D * ((max_speed - tfp.s_d[-1]) ** 2)
         #コスト関数（横方向コストと縦方向コストの和）
         tfp.cf = K_LAT * tfp.cd + K_LON * tfp.cv
 
         frenet_paths.append(tfp)     
 
     frenet_paths = calc_global_paths(frenet_paths, csp)
-    frenet_paths = check_paths(frenet_paths, ob)
+    frenet_paths = check_paths(frenet_paths, ob, max_speed=max_speed, max_accel=max_accel, max_decel=max_decel)
 
     min_cost = float("inf")
     best_path2 = None
@@ -627,7 +629,7 @@ def calc_frenet_paths_desired(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, route, dur
     return [best_path1]
     
 
-def emergency_stop(pos_x, speed, pos_y, route):
+def emergency_stop(pos_x, speed, pos_y, route, max_decel=MAX_DECEL):
 
     print("Emergency Stop")
     frenet_paths = []
@@ -645,44 +647,44 @@ def emergency_stop(pos_x, speed, pos_y, route):
     #縦方向のモーションプランニング (目標速度での走行を目指す場合)
     tfp = copy.deepcopy(fp)
 
-    count = math.ceil(speed/abs(MAX_DECEL)/timeStep)
+    count = math.ceil(speed/abs(max_decel)/timeStep)
     #各タイムステップの縦方向の位置、速度、加速度、躍度
     if route == "LR":
-        xmax = pos_x + speed*(count*timeStep) + (1/2)*MAX_DECEL*((count*timeStep)**2)
-        tfp.x = [pos_x+speed*t*timeStep + (1/2)*MAX_DECEL*((t*timeStep)**2) for t in range(count)]
+        xmax = pos_x + speed*(count*timeStep) + (1/2)*max_decel*((count*timeStep)**2)
+        tfp.x = [pos_x+speed*t*timeStep + (1/2)*max_decel*((t*timeStep)**2) for t in range(count)]
         tfp.x.extend([xmax for i in range(len(fp.t)-count)])
         tfp.y = [pos_y for t in tfp.t]
     elif route == "RL":
-        xmax = pos_x - (speed*(count*timeStep) + (1/2)*MAX_DECEL*((count*timeStep)**2))
-        tfp.x = [pos_x-(speed*t*timeStep+(1/2)*MAX_DECEL*((t*timeStep)**2) ) for t in range(count)]
+        xmax = pos_x - (speed*(count*timeStep) + (1/2)*max_decel*((count*timeStep)**2))
+        tfp.x = [pos_x-(speed*t*timeStep+(1/2)*max_decel*((t*timeStep)**2) ) for t in range(count)]
         tfp.x.extend([xmax for i in range(len(fp.t)-count)])
         tfp.y = [pos_y for t in tfp.t]
     elif route in ["BL", "BR"]:
-        ymax = pos_y + (speed*(count*timeStep) + (1/2)*MAX_DECEL*((count*timeStep)**2))
-        tfp.y = [pos_y+speed*t*timeStep+(1/2)*MAX_DECEL*((t*timeStep)**2) for t in range(count)]
+        ymax = pos_y + (speed*(count*timeStep) + (1/2)*max_decel*((count*timeStep)**2))
+        tfp.y = [pos_y+speed*t*timeStep+(1/2)*max_decel*((t*timeStep)**2) for t in range(count)]
         tfp.y.extend([ymax for i in range(len(fp.t)-count)])
         tfp.x = [pos_x for t in tfp.t]
     #ここから追加
     elif route == "LB":
-        xmax = pos_x + speed*(count*timeStep) + (1/2)*MAX_DECEL*((count*timeStep)**2)
-        tfp.x = [pos_x+speed*t*timeStep + (1/2)*MAX_DECEL*((t*timeStep)**2) for t in range(count)]
+        xmax = pos_x + speed*(count*timeStep) + (1/2)*max_decel*((count*timeStep)**2)
+        tfp.x = [pos_x+speed*t*timeStep + (1/2)*max_decel*((t*timeStep)**2) for t in range(count)]
         tfp.x.extend([xmax for i in range(len(fp.t)-count)])
         tfp.y = [pos_y for t in tfp.t]
     elif route == "RB":
-        xmax = pos_x - (speed*(count*timeStep) + (1/2)*MAX_DECEL*((count*timeStep)**2))
-        tfp.x = [pos_x-(speed*t*timeStep+(1/2)*MAX_DECEL*((t*timeStep)**2) ) for t in range(count)]
+        xmax = pos_x - (speed*(count*timeStep) + (1/2)*max_decel*((count*timeStep)**2))
+        tfp.x = [pos_x-(speed*t*timeStep+(1/2)*max_decel*((t*timeStep)**2) ) for t in range(count)]
         tfp.x.extend([xmax for i in range(len(fp.t)-count)])
         tfp.y = [pos_y for t in tfp.t]
     elif route == "TB":
-        ymax = pos_y - (speed*(count*timeStep) + (1/2)*MAX_DECEL*((count*timeStep)**2))
-        tfp.y = [pos_y-(speed*t*timeStep+(1/2)*MAX_DECEL*((t*timeStep)**2) ) for t in range(count)]
+        ymax = pos_y - (speed*(count*timeStep) + (1/2)*max_decel*((count*timeStep)**2))
+        tfp.y = [pos_y-(speed*t*timeStep+(1/2)*max_decel*((t*timeStep)**2) ) for t in range(count)]
         tfp.y.extend([ymax for i in range(len(fp.t)-count)])
         tfp.x = [pos_x for t in tfp.t]
     #ここまで
 
 
-    tfp.s_d = [max(speed+MAX_DECEL*t, 0) for t in fp.t]
-    tfp.s_dd = [MAX_DECEL for t in range(count)]
+    tfp.s_d = [max(speed+max_decel*t, 0) for t in fp.t]
+    tfp.s_dd = [max_decel for t in range(count)]
     tfp.s_dd.extend([0.0 for i in range(len(fp.t)-count)])
     tfp.s_ddd = [0 for t in fp.t]
 
@@ -738,7 +740,8 @@ def check_collision(fp, ob):
     return True
 
 
-def check_paths(fplist, ob, route=None, max_speed=MAX_SPEED, targetPos=None):
+def check_paths(fplist, ob, route=None, max_speed=MAX_SPEED, max_accel=MAX_ACCEL,
+                max_decel=MAX_DECEL, targetPos=None):
     ok_ind = []
     for i, _ in enumerate(fplist):
         if len(fplist[i].t) != len(fplist[i].x):
@@ -748,9 +751,9 @@ def check_paths(fplist, ob, route=None, max_speed=MAX_SPEED, targetPos=None):
             continue
         if any([v < -0.1 for v in fplist[i].s_d]):  #速度がマイナスにならないかチェック
             continue
-        if any([a > MAX_ACCEL for a in fplist[i].s_dd]):  #最大加速度を超えないかチェック
+        if any([a > max_accel for a in fplist[i].s_dd]):  #最大加速度を超えないかチェック
             continue
-        if any([a < MAX_DECEL for a in fplist[i].s_dd]):  #最大減速度を超えないかチェック
+        if any([a < max_decel for a in fplist[i].s_dd]):  #最大減速度を超えないかチェック
             continue
         
         if route in ["BR", "BL"] and fplist[i].s[-1] > targetPos:
@@ -859,7 +862,8 @@ def plot_path(fplist, ob=None):
 
 
 def generate_frenet_frame(objects, c_s, c_s_d, c_s_dd, c_d, mode, route, target_speed=MAX_SPEED, c_d_d=0, c_d_dd=0,\
-                                target_pos=0.0, target_acc=0.0, duration=maxT, simTime=0.0, vehInstance=None):
+                                target_pos=0.0, target_acc=0.0, duration=maxT, simTime=0.0, vehInstance=None,
+                                vehicle_max_speed=MAX_SPEED, vehicle_max_accel=MAX_ACCEL, vehicle_max_decel=MAX_DECEL):
 
     time_sta = time.time()
 
@@ -887,31 +891,32 @@ def generate_frenet_frame(objects, c_s, c_s_d, c_s_dd, c_d, mode, route, target_
     _, _, _, _, csp = generate_target_course(wx, wy)
 
     if mode == "free":
-        fplist = calc_frenet_paths_free(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd)
+        fplist = calc_frenet_paths_free(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, targetSpeed=vehicle_max_speed)
         fplist = interpolatePath(fplist)
         fplist = calc_global_paths(fplist, csp)
-        fplist = check_paths(fplist, ob, route=route, targetPos=target_pos)
+        fplist = check_paths(fplist, ob, route=route, targetPos=target_pos, max_speed=vehicle_max_speed, max_accel=vehicle_max_accel, max_decel=vehicle_max_decel)
 
     elif mode == "follow":
-        fplist = calc_frenet_paths_following(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_pos, target_speed, duration)
+        fplist = calc_frenet_paths_following(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_pos, min(target_speed, vehicle_max_speed), duration)
         fplist = interpolatePath(fplist)
         fplist = calc_global_paths(fplist, csp)
-        fplist = check_paths(fplist, ob)
+        fplist = check_paths(fplist, ob, max_speed=vehicle_max_speed, max_accel=vehicle_max_accel, max_decel=vehicle_max_decel)
 
     elif mode == "yield":
-        fplist = calc_frenet_paths_yield(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_pos, target_speed, duration)
+        fplist = calc_frenet_paths_yield(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_pos, target_speed, duration, max_speed=vehicle_max_speed)
         fplist = interpolatePath(fplist)
         fplist = calc_global_paths(fplist, csp)
-        fplist = check_paths(fplist, ob)
+        fplist = check_paths(fplist, ob, max_speed=vehicle_max_speed, max_accel=vehicle_max_accel, max_decel=vehicle_max_decel)
 
     elif mode == "stop":
         fplist = calc_frenet_paths_stop(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, target_pos)
         fplist = interpolatePath(fplist)
         fplist = calc_global_paths(fplist, csp)
-        fplist = check_paths(fplist, ob)
+        fplist = check_paths(fplist, ob, max_speed=vehicle_max_speed, max_accel=vehicle_max_accel, max_decel=vehicle_max_decel)
         
     elif mode == "turn":
-        fplist = calc_frenet_paths_desired(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, route, duration=maxT)
+        fplist = calc_frenet_paths_desired(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, route, duration=maxT,
+                                            max_speed=vehicle_max_speed, max_accel=vehicle_max_accel, max_decel=vehicle_max_decel)
 
     # plot_path(fplist)
 
