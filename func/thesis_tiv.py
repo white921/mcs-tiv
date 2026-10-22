@@ -18,9 +18,10 @@ def enabled(vehicle):
 
 
 def planned_update_interval(vehicle, legacy_interval):
-    # Table 5.2: trajectory update interval 0.1 s. Negotiation path validity
-    # is separate: do not invalidate an outstanding agreement each 0.1 s.
-    return .1 if enabled(vehicle) else legacy_interval
+    # The simulator/MCM still advances at 0.1 s (Table 5.2).  This is the
+    # *candidate trajectory regeneration* expiry, for which the archived
+    # implementation uses one second.  Agreement-path validity is separate.
+    return 1.0 if enabled(vehicle) else legacy_interval
 
 
 def following_rate(distance, maximum_speed):

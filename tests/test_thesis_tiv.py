@@ -40,7 +40,7 @@ def traci():
 
 
 class ThesisTIVTests(unittest.TestCase):
-    def test_point_one_second_replanning_keeps_small_acceleration(self):
+    def test_point_one_second_trajectory_samples_keep_small_acceleration(self):
         import frenet_three_junction as planner
         with patch.dict(os.environ, {"MCS_TIV_IMPLEMENTATION": "thesis"}):
             paths = planner.calc_frenet_paths_free(0, 5, 0, 0, 0, 0)
@@ -50,9 +50,9 @@ class ThesisTIVTests(unittest.TestCase):
         self.assertGreater((best.s[1] - best.s[0]) / .1, 5)
         self.assertEqual(round(best.s[1], 3) / .1, 5)
 
-    def test_planned_update_interval(self):
+    def test_planned_update_interval_uses_archived_one_second_expiry(self):
         v = vehicle()
-        self.assertEqual(tiv.planned_update_interval(v, 1), .1)
+        self.assertEqual(tiv.planned_update_interval(v, .1), 1)
         v.alpha = 4
         self.assertEqual(tiv.planned_update_interval(v, 1), 1)
 
