@@ -424,7 +424,6 @@ class CAV:
 
         for path in collision_list:
             leadPath = path["path"]
-            desiredID = int(path["collideID"])
 
             # 同車線の車両の場合には無視（先頭の車両が優先権を持つ）
             if traci.vehicle.getLaneIndex(leadPath.vehID) == self.lane:
@@ -531,8 +530,8 @@ class CAV:
                                         if check_duplication == 0:
                                             followVehs_ego_list.append(i.vehID)
                                             followCoefficient1_ego_list.append(co_ego1)
-                                            followCoefficientnew_ego_list.append(co_ego_new * self.plannedPath.s_d[-1])
-                                        print(co_ego_new, "*", self.plannedPath.s_d[-1])
+                                            followCoefficientnew_ego_list.append(co_ego_new * i.s_d[-1])
+                                        print(co_ego_new, "*", i.s_d[-1])
                                         
                                 if (path.x[0] - i.x[0]) < follow_range and i.x[0] < path.x[0] and abs(i.y[0] - path.y[0]) < 1.0:
                                         co_alt1 = (commRange - path.x[0] + i.x[0]) / commRange
@@ -547,8 +546,8 @@ class CAV:
                                             #if leadPath.s_d[-1] == None:
                                             #    leadPath.s_d[-1] = 0
 
-                                            followCoefficientnew_alt_list.append(co_alt_new * leadPath.s_d[-1])
-                                        print(co_alt_new, "*", leadPath.s_d[-1])
+                                            followCoefficientnew_alt_list.append(co_alt_new * i.s_d[-1])
+                                        print(co_alt_new, "*", i.s_d[-1])
                                 if abs(i.x[0] - self.pos_x) < collision_distance and abs(i.y[0] - self.pos_y) < 1.0:
                                     self.collision_counter += 1  
                                 if abs(i.x[0] - self.pos_x) < caution_distance and abs(i.y[0] - self.pos_y) < 1.0:
@@ -650,18 +649,16 @@ class CAV:
                                 utility = d_ego_speed*(1+followCoefficient1_ego) + d_alt_speed*(1+followCoefficient1_alt)
 
                             elif self.alpha == 6:
-                                coeff_ego = (collide_time_ego/10 + R_co * (self.plannedPath.s_d[-1]+followCoefficientnew_ego))
-                                coeff_alt = (collide_time_alt/10 + R_co * followCoefficientnew_alt) #相手車両の方のみ、followCoefficientnew_egoにすでに希望車両の分が含まれているため
+                                coeff_ego = collide_time_ego * timeStep + R_co * (self.plannedPath.s_d[-1] + followCoefficientnew_ego)
+                                coeff_alt = collide_time_alt * timeStep + R_co * (leadPath.s_d[-1] + followCoefficientnew_alt)
                                 utility = coeff_ego - coeff_alt
 
                             #修論提案（性能優先度込み）  alpha = 7
                             elif self.alpha == 7:
-                                coeff_ego = (collide_time_ego/10 + R_co * (self.plannedPath.s_d[-1]+followCoefficientnew_ego)) + R_per * maxAccel  #一旦普通車にのみ値を追加
-                                #coeff_ego = (collide_time_ego/10 + R_co * (self.plannedPath.s_d[-1]+followCoefficientnew_ego)) 
-                                if desiredID % 2 == 0:
-                                    coeff_alt = (collide_time_alt/10 + R_co * followCoefficientnew_alt) + R_per * (maxAccel / 2)#相手車両の方のみ、followCoefficientnew_egoにすでに希望車両の分が含まれているため
-                                else:
-                                    coeff_alt = (collide_time_alt/10 + R_co * followCoefficientnew_alt) + R_per * maxAccel
+                                ego_max_accel = traci.vehicletype.getAccel(self.typeID)
+                                desired_max_accel = traci.vehicletype.getAccel(traci.vehicle.getTypeID(leadPath.vehID))
+                                coeff_ego = collide_time_ego * timeStep + R_co * (self.plannedPath.s_d[-1] + followCoefficientnew_ego) + R_per * ego_max_accel
+                                coeff_alt = collide_time_alt * timeStep + R_co * (leadPath.s_d[-1] + followCoefficientnew_alt) + R_per * desired_max_accel
                                 utility = coeff_ego - coeff_alt
 
 
@@ -1023,4 +1020,3 @@ class CAV:
     # destructor
     def __del__(self):
         print("delete veh:", self.id)
-        

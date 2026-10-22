@@ -2,14 +2,19 @@
 #!/usr/bin/env python
 from __future__ import absolute_import
 from __future__ import print_function
-from distutils.spawn import spawn
-
 import os
 import sys
 import optparse
+import builtins
+from collections import deque
+from contextlib import redirect_stdout
 import numpy as np
 import datetime
 import csv
+
+# Batch experiments normally run without an X display.  Set the backend before
+# importing the animation module, while still allowing callers to override it.
+os.environ.setdefault("MPLBACKEND", "Agg")
 
 # the directory in which this script resides
 THISDIR = os.path.dirname(__file__)
@@ -32,9 +37,14 @@ from sumolib import checkBinary  # noqa
 
 
 simulation_time = 600.0
+bus_share = 0.25
+route_mode = "random"
+output_dir = "./statistics"
 # matplotlibによる描画
 show_animation = False
 import random
+
+SUMMARY_PRINT = builtins.print
 
 vehicle_instance = []
 veh_id = 1
@@ -44,6 +54,9 @@ alpha = 0
 departTime_lane0 = []
 departTime_lane1 = []
 departTime_lane2 = []
+vehicleType_lane0 = deque()
+vehicleType_lane1 = deque()
+vehicleType_lane2 = deque()
 
 count_accept_utility = 0
 count_refuse_utility = 0
@@ -62,11 +75,41 @@ count_BR = [0, 0, 0, 0]
 
 count_Distribution = False
 
+
+def mean_or_nan(values):
+    """Return a mean while keeping an empty category representable in output."""
+    if len(values) == 0:
+        return float("nan")
+    return float(np.mean(values))
+
+
+def build_vehicle_type_schedules(lane_counts, target_bus_share):
+    """Assign the requested bus share over all generated vehicles exactly as possible."""
+    total_vehicles = sum(lane_counts)
+    target_bus_count = int(total_vehicles * target_bus_share + 0.5)
+    bus_counts = [int(count * target_bus_share) for count in lane_counts]
+    lane_order = list(range(len(lane_counts)))
+    random.shuffle(lane_order)
+    lane_order.sort(
+        key=lambda index: lane_counts[index] * target_bus_share - bus_counts[index],
+        reverse=True,
+    )
+    for index in lane_order[:target_bus_count - sum(bus_counts)]:
+        bus_counts[index] += 1
+
+    schedules = []
+    for count, buses in zip(lane_counts, bus_counts):
+        schedule = ["Bus"] * buses + ["Car"] * (count - buses)
+        random.shuffle(schedule)
+        schedules.append(deque(schedule))
+    return schedules
+
 #初期設定（障害物の配置など）
 def set_environment(inflow_0=750, inflow_1=750, inflow_2=750):
     global vehicle_instance
     global veh_id
     global departTime_lane0, departTime_lane1, departTime_lane2
+    global vehicleType_lane0, vehicleType_lane1, vehicleType_lane2
 
     k_0 = int((simulation_time/3600)*inflow_0)
     k_1 = int((simulation_time/3600)*inflow_1)
@@ -82,6 +125,10 @@ def set_environment(inflow_0=750, inflow_1=750, inflow_2=750):
     departTime_lane1 = [round((n*2.0), 1)+0.1 for n in departTime_lane1]
     departTime_lane2 = [round((n*2.0), 1)+0.1 for n in departTime_lane2]
 
+    vehicleType_lane0, vehicleType_lane1, vehicleType_lane2 = build_vehicle_type_schedules(
+        [k_0, k_1, k_2], bus_share
+    )
+
     print(departTime_lane0)
     print(departTime_lane1)
     print(departTime_lane2)
@@ -91,6 +138,7 @@ def add_vehicle(alpha):
     global veh_id
     global veh_id_bus
     global departTime_lane0, departTime_lane1, departTime_lane2
+    global vehicleType_lane0, vehicleType_lane1, vehicleType_lane2
     sumo_time = traci.simulation.getTime()
 
     alpha = int(alpha)
@@ -98,7 +146,7 @@ def add_vehicle(alpha):
     if sumo_time in departTime_lane1:
         # 下から入る車両：BR（下→右）またはBL（下→左）を均等に割り振り
         route_id = random.choice(["BR", "BL"])
-        kind = random.choice(["Bus", "Car", "Car", "Car"])
+        kind = vehicleType_lane1.popleft()
         #kind = "Car"
         if kind == "Car":
             traci.vehicle.add(vehID=str(veh_id), routeID=route_id, typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
@@ -109,7 +157,7 @@ def add_vehicle(alpha):
             elif route_id == "BL":
                 count_BL[1] += 1
         elif kind == "Bus":
-            traci.vehicle.add(vehID=str(veh_id_bus), routeID=route_id, typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
+            traci.vehicle.add(vehID=str(veh_id_bus), routeID=route_id, typeID="CAV_bus", departLane="0", departPos="base", departSpeed="5")
             instance = CAV_bus(veh_id_bus, alpha, withAgree=True)
             veh_id_bus += 2
             if route_id == "BR":
@@ -122,10 +170,10 @@ def add_vehicle(alpha):
     # if sumo_time in departTime_lane0:
     if sumo_time in departTime_lane0:
         # 左から入る車両：LR（左→右）またはLB（左→下）を均等に割り振り
-        route_id = random.choice(["LR", "LB"])
+        route_id = "LR" if route_mode == "eval1" else random.choice(["LR", "LB"])
         #route_id = "LR"
         
-        kind = random.choice(["Bus", "Car", "Car", "Car"])
+        kind = vehicleType_lane0.popleft()
         #kind = "Car"
         if kind == "Car":
             traci.vehicle.add(vehID=str(veh_id), routeID=route_id, typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
@@ -136,7 +184,7 @@ def add_vehicle(alpha):
             elif route_id == "LB":
                 count_LB[1] += 1        
         elif kind == "Bus":
-            traci.vehicle.add(vehID=str(veh_id_bus), routeID=route_id, typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
+            traci.vehicle.add(vehID=str(veh_id_bus), routeID=route_id, typeID="CAV_bus", departLane="0", departPos="base", departSpeed="5")
             instance = CAV_bus(veh_id_bus, alpha, withAgree=True)
             veh_id_bus += 2
             if route_id == "LR":
@@ -148,10 +196,10 @@ def add_vehicle(alpha):
 
     if sumo_time in departTime_lane2:
         # 右から入る車両：RL（右→左）またはRB（右→下）を均等に割り振り
-        route_id = random.choice(["RL", "RB"])
+        route_id = "RL" if route_mode == "eval1" else random.choice(["RL", "RB"])
         #route_id = "RL"
         
-        kind = random.choice(["Bus", "Car", "Car", "Car"])
+        kind = vehicleType_lane2.popleft()
         #kind = "Car"
         if kind == "Car":
             traci.vehicle.add(vehID=str(veh_id), routeID=route_id, typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
@@ -162,7 +210,7 @@ def add_vehicle(alpha):
             elif route_id == "RB":
                 count_RB[1] += 1
         elif kind == "Bus":
-            traci.vehicle.add(vehID=str(veh_id_bus), routeID=route_id, typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
+            traci.vehicle.add(vehID=str(veh_id_bus), routeID=route_id, typeID="CAV_bus", departLane="0", departPos="base", departSpeed="5")
             instance = CAV_bus(veh_id_bus, alpha, withAgree=True)
             veh_id_bus += 2
             if route_id == "RL":
@@ -173,7 +221,7 @@ def add_vehicle(alpha):
         
 
 
-def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750):
+def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False):
     """execute the TraCI control loop"""
     global vehicle_instance
     global count_accept_utility, count_refuse_utility, count_refuse_physics, count_send_PT, count_send_DT, count_send_AT
@@ -181,7 +229,7 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750):
     central_path_server = []
     next_central_path_server = []
     all_speed = []
-    all_speed_after_30s = []
+    all_speed_after_30s = 0
     all_speed_after_60s = []
     all_bus_speed = []
     all_bus_speed_after_30s = 0
@@ -303,7 +351,7 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750):
             if ins.type == "Car":
                 all_speed.append(ins.speed)
                 #if(sumo_time == 30 or sumo_time == 300):
-                if(sumo_time == 300):
+                if sumo_time == simulation_time / 2:
                     all_speed_after_30s = len(all_speed)
                 if(sumo_time == 60):
                     all_speed_after_60s = len(all_speed)
@@ -347,7 +395,7 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750):
             if ins.type == "Bus":
                 all_bus_speed.append(ins.speed)
                 #if(sumo_time == 30 or sumo_time == 300):
-                if(sumo_time == 300):
+                if sumo_time == simulation_time / 2:
                     all_bus_speed_after_30s = len(all_bus_speed)
                 if(sumo_time == 60):
                     all_bus_speed_after_60s = len(all_bus_speed)
@@ -402,7 +450,7 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750):
         add_vehicle(alpha)
 
 
-    with open("./statistics/acceptance_three.csv", "a", encoding='utf-8') as f:
+    with open(os.path.join(output_dir, "acceptance_three.csv"), "a", encoding='utf-8') as f:
         #text = "{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format(seed, alpha, inflow_0, inflow_1, inflow_2, inflow_3, count_accept_utility, count_refuse_utility, count_refuse_physics, count_send_PT, count_send_DT, count_send_AT, "test")
         text = "{},{},{},{},{},{},{},{},{},{},{},{}\n".format("seed", "alpha", "inflow_Left", "inflow_Bottom", "inflow_Right", "accept_utility", "refuse_utility", "refuse_physics", "send_PT", "send_DT", "send_AT", "date_time")
         f.write(text)
@@ -434,17 +482,24 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750):
         text = "{},{},{},{},{},{},{}\n".format("---", "---", "---", "---", "↑All", "---", "---")
         f.write(text)
 
-    print("all_speed :", np.mean(all_speed))
-    print("all_speed (0s ~ 300s) :", np.mean(all_speed[:all_speed_after_30s]))
-    print("all_speed (300s ~ end) :", np.mean(all_speed[all_speed_after_30s:-1]))
-    print("collision :", total_collision_time)
-    print("caution :", total_caution_time)
+    summary_stream = sys.stderr if quiet else sys.stdout
+    all_vehicle_speed = all_speed + all_bus_speed
+    generated_bus_count = sum(count[0] for count in (count_LR, count_LB, count_RB, count_RL, count_BL, count_BR))
+    generated_car_count = sum(count[1] for count in (count_LR, count_LB, count_RB, count_RL, count_BL, count_BR))
+    generated_vehicle_count = generated_bus_count + generated_car_count
+    actual_bus_share = generated_bus_count / generated_vehicle_count if generated_vehicle_count else float("nan")
+    SUMMARY_PRINT(f"vehicle_mix : Bus {generated_bus_count} Car {generated_car_count} bus_rate {actual_bus_share * 100:.2f}%", file=summary_stream)
+    SUMMARY_PRINT("car_speed :", mean_or_nan(all_speed), file=summary_stream)
+    SUMMARY_PRINT("bus_speed :", mean_or_nan(all_bus_speed), file=summary_stream)
+    SUMMARY_PRINT("all_speed :", mean_or_nan(all_vehicle_speed), file=summary_stream)
+    SUMMARY_PRINT("collision :", total_collision_time, file=summary_stream)
+    SUMMARY_PRINT("caution :", total_caution_time, file=summary_stream)
     #print("collision :", CAV.returnCollisionTime())
 
     if(count_Distribution):
         palameter = [alpha, seed, inflow_0, inflow_1, simulation_time, get_followrange, get_parameter, np.mean(cav0_speed), np.mean(cav1_speed), np.mean(all_speed), np.mean(cav0_speed_after_30s), np.mean(cav1_speed_after_30s), np.mean(all_speed_after_30s)]
         #pala_dist = palameter + cav0_dist + cav1_dist
-        with open("./statistics/speed_distribution.csv", "a", encoding='utf-8') as f:
+        with open(os.path.join(output_dir, "speed_distribution.csv"), "a", encoding='utf-8') as f:
             writer = csv.writer(f)
             writer.writerow(palameter)
             writer.writerow(cav0_dist)
@@ -458,22 +513,35 @@ def get_options():
     """define options for this script and interpret the command line"""
     optParser = optparse.OptionParser()
     optParser.add_option("--nogui", action="store_true",default=False, help="run the commandline version of sumo")
+    optParser.add_option("--duration", type="float", default=600.0, help="duration of the simulation")
+    optParser.add_option("--quiet", action="store_true", default=False, help="suppress verbose per-step output")
+    optParser.add_option("--bus-share", type="float", default=0.25, help="CAVbus share (0.0 or 0.25 in the thesis)")
+    optParser.add_option("--route-mode", type="choice", choices=["random", "eval1"], default="random", help="random routes (Eval.2/3) or fixed A/C straight routes (Eval.1)")
+    optParser.add_option("--output-dir", default="./statistics", help="directory for generated statistics")
+    optParser.add_option("--record-fcd", action="store_true", default=False, help="write FCD trajectory XML")
     options, args = optParser.parse_args()
-    return options
+    if len(args) != 5:
+        optParser.error("expected: alpha seed inflow_left inflow_bottom inflow_right")
+    return options, args
 
 
 # this is the main entry point of this script
 if __name__ == "__main__":
     # load whether to run with or without GUI
-    options = get_options()
-    args = sys.argv
-    print(args)
-    alpha = str(args[1])
-    seed = args[2]
+    options, args = get_options()
+    if not 0.0 <= options.bus_share <= 1.0:
+        raise SystemExit("--bus-share must be between 0 and 1")
+    simulation_time = options.duration
+    bus_share = options.bus_share
+    route_mode = options.route_mode
+    output_dir = options.output_dir
+    os.makedirs(output_dir, exist_ok=True)
+    alpha = str(args[0])
+    seed = args[1]
     random.seed(seed)
-    inflow_0 = int(args[3])
-    inflow_1 = int(args[4])
-    inflow_2 = int(args[5])
+    inflow_0 = int(args[2])
+    inflow_1 = int(args[3])
+    inflow_2 = int(args[4])
 
     # this script has been called from the command line. It will start sumo as a server, then connect and run
     if options.nogui:
@@ -482,5 +550,19 @@ if __name__ == "__main__":
         sumoBinary = checkBinary('sumo-gui')
 
     # this is the normal way of using traci. sumo is started as a subprocess and then the python script connects and runs
-    traci.start([sumoBinary, '-c', os.path.join('junction_three.sumocfg')])
-    run(alpha, inflow_0, inflow_1, inflow_2)
+    fcd_output = os.path.join(output_dir, 'sumoStat.xml') if options.record_fcd else os.devnull
+    sumo_command = [sumoBinary, '-c', os.path.join('junction_three.sumocfg'), '--fcd-output', fcd_output]
+    if options.quiet:
+        sumo_command.extend(["--no-step-log", "true"])
+        with open(os.devnull, "w") as devnull:
+            original_print = builtins.print
+            builtins.print = lambda *args, **kwargs: None
+            try:
+                with redirect_stdout(devnull):
+                    traci.start(sumo_command)
+                    run(alpha, inflow_0, inflow_1, inflow_2, quiet=True)
+            finally:
+                builtins.print = original_print
+    else:
+        traci.start(sumo_command)
+        run(alpha, inflow_0, inflow_1, inflow_2)

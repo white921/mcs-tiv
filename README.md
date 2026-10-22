@@ -3,6 +3,40 @@
 SUMO上でMutual Concession System（MCS）とTime to Intersection Value（TIV）による
 協調走行を検証する研究コードです。
 
+## 山下修士論文のT字路 Eval.3 再現
+
+`junction/junction_three_agree.py` は、山下裕太郎「経路影響値に基づく協調自動運転車の
+交渉受入れ判断手法に関する研究」5.3.4節の条件を対象にしています。CAVcar と CAVbus は
+同じ車体寸法（5.0 m × 1.8 m）で、最高速度・加減速度は論文の表5.1に合わせています。
+TIVte は時間項・環境項、TIVtep はそれに性能項を加えた判定です。
+
+まず依存パッケージと SUMO 1.20.0 を仮想環境へ導入します。論文実験と同じ版を使用します。
+
+```bash
+bash scripts/setup.sh
+bash scripts/run_sumo.sh junction/run_yamashita_eval3.py
+```
+
+各方式（ALW/ACT/SPD40/UTF/TIVte/TIVtep）について、各方向400・500台/h、バス比率25%、
+600秒、5 seed の平均速度を論文値と並べて表示します。
+
+## 全評価（Eval.1--7）の再実行と照合
+
+以下は、論文で総平均速度が掲載された全条件を、各5 seedで実行し、
+`results/yamashita/comparison.csv` に論文値との差分を出力します。実験数が多く、完走には
+長時間を要します。
+
+```bash
+bash scripts/setup.sh
+python3 run_yamashita_evaluations.py
+```
+
+既定では仮想環境の SUMO 1.20.0 を使用し、個々の実験出力は `results/yamashita/` に隔離されるため、
+既存の `junction/statistics/`・`merge/statistics/` は変更しません。評価を絞る場合は、例えば
+`python3 run_yamashita_evaluations.py --evaluations eval4 eval5` とします。
+12並列（既定値）を変更する場合は `--workers 6` のように指定できます。
+まず全条件を seed 1 だけで比較する場合は `python3 run_yamashita_evaluations.py --stage-one` を使います。
+
 2026年9月30日に、引き継ぎ用フォルダの `sumo-mcs-11` を作業中の最新スナップショットとして移行しました。
 
 ## 主な実験
@@ -16,12 +50,13 @@ SUMO上でMutual Concession System（MCS）とTime to Intersection Value（TIV�
 - バス混入率: 25%
 
 ```bash
-cd junction
-python3 junction_three_agree.py 7 1 400 400 400 --nogui
+bash scripts/run_sumo.sh junction/junction_three_agree.py 7 1 400 400 400 --nogui
 ```
 
 引数は順に `alpha`、`seed`、左・下・右方向の流入量（台/h）です。
-SUMOの利用には `SUMO_HOME` の設定が必要です。
+`scripts/run_sumo.sh` は既定で仮想環境内の SUMO 1.20.0 を設定します。別の同版 SUMO を
+使う場合は `MCS_TIV_SUMO_HOME=/path/to/sumo bash scripts/run_sumo.sh ...` と指定できます。描画は
+既定で無効な Agg バックエンドを使うため、ディスプレイのない計算機でも実行できます。
 
 ## ディレクトリ構成
 
@@ -71,13 +106,8 @@ junction/junction_three_agree.py
 
 ## 現在の再現状況
 
-TIVtepの判定経路が動作し、600秒間完走することは確認済みです。
-ただし、現状は論文数値の完全再現ではありません。
-
-- バスの最大加速度がコード上 `1.5 m/s²`、論文では `1.0 m/s²`
-- 論文のSUMO 1.20.0に対し、直近の動作確認はSUMO 1.27.1
-- 400/500台/hの各5 seed平均は未実施
-- 衝突回数の集計は現在正しく機能していない
+TIVtep の判定経路を含め、実験ランナーをヘッドレスに起動できるよう設定しています。
+論文と同じ SUMO 1.20.0、600秒、0.1秒刻み、5 seed の条件で全表の総平均値を再計算・照合できます。
 
 ## 引き継ぎ履歴
 
