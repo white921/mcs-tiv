@@ -5,8 +5,9 @@ Each task is one scenario/method/seed combination.  A task owns a copy of the
 source files it can modify at runtime, so several SUMO processes never race on
 route files or historical statistics CSVs.  This runner deliberately keeps the
 paper-facing settings intact: 600 simulated seconds, the documented seed sets,
-0.1-second trajectory refresh in ``thesis`` mode, and per-vehicle 25% bus
-draws where applicable.
+one-second candidate trajectory regeneration in ``thesis`` mode, and
+per-vehicle 25% bus draws where applicable.  SUMO and MCM still advance every
+0.1 seconds.
 """
 
 import argparse
