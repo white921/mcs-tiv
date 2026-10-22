@@ -12,18 +12,19 @@ SUMO上でMutual Concession System（MCS）とTime to Intersection Value（TIV�
 原文との対応、明記されていない処理の仮定、単体テスト、SUMO1.17.0 /
 Python3.9.6による隔離1ケース実行は
 [再現監査](docs/thesis-audit.md)を参照してください。
-以下の従来の直接実行例は固定台数割当等が異なるため、
-今回の論文検証には`scripts/run_thesis_case.py`を使用します。
+評価条件と現行引数の対応は
+[第5章の評価条件](docs/yamashita-evaluations.md)に一元化しています。
+全条件の確認・実行には `run_yamashita_evaluations.py` を使用します。
 
 ## 主な実験
 
-山下研究のT字路・バス25%条件に最も近い実行ファイルは
+山下研究のT字路実験に対応する実行ファイルは
 [`junction/junction_three_agree.py`](junction/junction_three_agree.py) です。
 
 - `alpha=6`: TIVte（時間優先度 + 環境優先度）
 - `alpha=7`: TIVtep（時間優先度 + 環境優先度 + 性能優先度）
 - シミュレーション時間: 600秒
-- バス混入率: 25%
+- バス混入率: Eval.1/2は0%、Eval.3は25%
 
 ```bash
 cd junction
@@ -37,6 +38,18 @@ seed 1〜5を連続実行し、バス込みの全車両平均速度を集計す�
 
 ```bash
 python3 run_three_seeds.py 7 400 400 400 --duration 600 --reference-speed 7.4159
+```
+
+Eval.1・2ではバス0%を指定し、Eval.1だけA・Cを直進に固定します。
+
+```bash
+# Eval.1-3（A/B/C = 600/300/600、TIVte）
+python3 run_three_seeds.py 6 600 300 600 \
+  --duration 600 --bus-share 0 --route-mode eval1 --no-save
+
+# Eval.2-1（A/B/C = 400/400/400、TIVte）
+python3 run_three_seeds.py 6 400 400 400 \
+  --duration 600 --bus-share 0 --route-mode random --no-save
 ```
 
 バスは各車を25%の確率で選ぶのではなく、全流入車両数の25%に最も近い台数をあらかじめ割り当てます。

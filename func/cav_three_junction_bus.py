@@ -4,6 +4,7 @@ import sys
 import numpy as np
 import copy
 import thesis_tiv
+import thesis_baselines
 import time
 
 if 'SUMO_HOME' in os.environ:
@@ -961,10 +962,7 @@ class CAV_bus:
 
                             #道路交通法ベース（直進車両優先） alpha = 2
                             elif self.alpha == 2:
-                                if self.route in ["LR", "BT", "RL", "TB"]:
-                                    utility = 0
-                                else:
-                                    utility = 1
+                                utility = thesis_baselines.act_utility(self.route)
 
                             #PriMa(20%) alpha = 3
                             elif self.alpha == 3:
@@ -1029,7 +1027,7 @@ class CAV_bus:
                                 print("TIV utility:", utility, "=", coeff_ego, "-", coeff_alt)
 
                     # 両車両の加速度の増減が閾値以上であれば道を譲る
-                    if utility > yield_th or (self.status=="yield" and self.leader==leadPath.vehID):
+                    if thesis_baselines.accepts_utility(self.alpha, utility, yield_th) or (self.status=="yield" and self.leader==leadPath.vehID):
                         self.count_accept_utility += 1
 
                         self.pathID += 1

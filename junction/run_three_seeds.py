@@ -31,13 +31,24 @@ def parse_args():
     parser.add_argument("inflow_bottom", type=int)
     parser.add_argument("inflow_right", type=int)
     parser.add_argument("--duration", type=float, default=600.0)
+    parser.add_argument("--bus-share", type=float, default=0.25)
+    parser.add_argument(
+        "--bus-allocation",
+        choices=["fixed", "paper-random25"],
+        default="fixed",
+    )
+    parser.add_argument("--route-mode", choices=["random", "eval1"], default="random")
+    parser.add_argument("--no-save", action="store_true")
     parser.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3, 4, 5])
     parser.add_argument(
         "--reference-speed",
         type=float,
         help="optional paper value used to show the difference from the seed mean",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not 0 <= args.bus_share <= 1:
+        parser.error("--bus-share must be between 0 and 1")
+    return args
 
 
 def parse_run_summary(output, seed):
@@ -115,7 +126,15 @@ def main():
             "--quiet",
             "--duration",
             str(args.duration),
+            "--bus-share",
+            str(args.bus_share),
+            "--bus-allocation",
+            args.bus_allocation,
+            "--route-mode",
+            args.route_mode,
         ]
+        if args.no_save:
+            command.append("--no-save")
         output = run_seed(command, seed, args.duration)
         result = parse_run_summary(output, seed)
         results.append(result)

@@ -5,6 +5,7 @@ import math
 import numpy as np
 import copy
 import thesis_tiv
+import thesis_baselines
 
 if 'SUMO_HOME' in os.environ:
     tools = os.path.join(os.environ['SUMO_HOME'], 'tools')
@@ -685,7 +686,7 @@ class CAV:
                             print("follow_ego :", followVehs_ego, "follow_alt(merge) :", followVehs_alt)
 
                     # 両車両の加速度の増減が閾値以上であれば道を譲る
-                    if utility > yield_th or (self.status=="yield" and self.leader==leadPath.vehID):
+                    if thesis_baselines.accepts_utility(self.alpha, utility, yield_th) or (self.status=="yield" and self.leader==leadPath.vehID):
                         self.count_accept_utility += 1
 
                         self.pathID += 1

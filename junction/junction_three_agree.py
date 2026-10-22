@@ -20,6 +20,7 @@ from cav_three_junction import CAV
 from cav_three_junction_bus import CAV_bus
 from animation_junction import Animation
 from frenet_merge import emergency_stop
+from thesis_scenarios import choose_t_junction_route
 
 # we need to import python modules from the $SUMO_HOME/tools directory
 # If the the environment variable SUMO_HOME is not set, try to locate the python modules relative to this script
@@ -35,6 +36,7 @@ from sumolib import checkBinary  # noqa
 simulation_time = 600.0
 bus_share = 0.25
 bus_allocation = "fixed"
+route_mode = "random"
 diagnostic_stop_time = None
 # matplotlibによる描画
 show_animation = False
@@ -111,6 +113,8 @@ def build_vehicle_type_schedules(lane_counts, target_bus_share):
 
 def select_vehicle_type(schedule):
     """Select a vehicle type without changing the paper's random draw order."""
+    if bus_share <= 0:
+        return "Car"
     draw = random.choice(["Bus", "Car", "Car", "Car"])
     if bus_allocation == "paper-random25":
         return draw
@@ -157,7 +161,7 @@ def add_vehicle(alpha):
     # if sumo_time in departTime_lane1:
     if sumo_time in departTime_lane1:
         # 下から入る車両：BR（下→右）またはBL（下→左）を均等に割り振り
-        route_id = random.choice(["BR", "BL"])
+        route_id = choose_t_junction_route("bottom", route_mode, random.choice)
         kind = select_vehicle_type(vehicleType_lane1)
         #kind = "Car"
         if kind == "Car":
@@ -182,7 +186,7 @@ def add_vehicle(alpha):
     # if sumo_time in departTime_lane0:
     if sumo_time in departTime_lane0:
         # 左から入る車両：LR（左→右）またはLB（左→下）を均等に割り振り
-        route_id = random.choice(["LR", "LB"])
+        route_id = choose_t_junction_route("left", route_mode, random.choice)
         #route_id = "LR"
         kind = select_vehicle_type(vehicleType_lane0)
         #kind = "Car"
@@ -207,7 +211,7 @@ def add_vehicle(alpha):
 
     if sumo_time in departTime_lane2:
         # 右から入る車両：RL（右→左）またはRB（右→下）を均等に割り振り
-        route_id = random.choice(["RL", "RB"])
+        route_id = choose_t_junction_route("right", route_mode, random.choice)
         #route_id = "RL"
         kind = select_vehicle_type(vehicleType_lane2)
         #kind = "Car"
@@ -231,7 +235,7 @@ def add_vehicle(alpha):
         
 
 
-def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False):
+def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False, save_statistics=True):
     """execute the TraCI control loop"""
     global vehicle_instance
     global count_accept_utility, count_refuse_utility, count_refuse_physics, count_send_PT, count_send_DT, count_send_AT
@@ -460,7 +464,8 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False):
         add_vehicle(alpha)
 
 
-    with open("./statistics/acceptance_three.csv", "a", encoding='utf-8') as f:
+    statistics_path = "./statistics/acceptance_three.csv" if save_statistics else os.devnull
+    with open(statistics_path, "a", encoding='utf-8') as f:
         #text = "{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format(seed, alpha, inflow_0, inflow_1, inflow_2, inflow_3, count_accept_utility, count_refuse_utility, count_refuse_physics, count_send_PT, count_send_DT, count_send_AT, "test")
         text = "{},{},{},{},{},{},{},{},{},{},{},{}\n".format("seed", "alpha", "inflow_Left", "inflow_Bottom", "inflow_Right", "accept_utility", "refuse_utility", "refuse_physics", "send_PT", "send_DT", "send_AT", "date_time")
         f.write(text)
@@ -523,7 +528,7 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False):
     print("caution :", total_caution_time, file=summary_stream)
     #print("collision :", CAV.returnCollisionTime())
 
-    if(count_Distribution):
+    if(count_Distribution and save_statistics):
         palameter = [alpha, seed, inflow_0, inflow_1, simulation_time, get_followrange, get_parameter, mean_or_nan(cav0_speed), mean_or_nan(cav1_speed), mean_or_nan(all_speed), mean_or_nan(cav0_speed_after_30s), mean_or_nan(cav1_speed_after_30s), mean_or_nan(all_speed_after_30s)]
         #pala_dist = palameter + cav0_dist + cav1_dist
         with open("./statistics/speed_distribution.csv", "a", encoding='utf-8') as f:
@@ -543,12 +548,19 @@ def get_options():
     optParser.add_option("--duration", type="float", default=600.0, help="duration of the simulation")
     optParser.add_option("--stop-time", type="float", default=None, help="stop early while retaining the full-duration input schedule")
     optParser.add_option("--bus-allocation", type="choice", choices=["fixed", "paper-random25"], default="fixed", help="fixed share or the paper artifact's per-vehicle 25%% draw")
+    optParser.add_option("--bus-share", type="float", default=0.25, help="share of buses from 0 to 1")
+    optParser.add_option("--route-mode", type="choice", choices=["random", "eval1"], default="random", help="unrestricted routes or Eval.1 A/C straight-only routes")
     optParser.add_option("--quiet", action="store_true", default=False, help="suppress verbose per-step output")
+    optParser.add_option("--no-save", action="store_true", default=False, help="do not append the run to statistics CSV")
     options, args = optParser.parse_args()
     if len(args) != 5:
         optParser.error("expected: alpha seed inflow_left inflow_bottom inflow_right")
     if options.stop_time is not None and not 0 < options.stop_time <= options.duration:
         optParser.error("--stop-time must be greater than 0 and no greater than --duration")
+    if not 0 <= options.bus_share <= 1:
+        optParser.error("--bus-share must be between 0 and 1")
+    if options.bus_allocation == "paper-random25" and options.bus_share not in (0.0, 0.25):
+        optParser.error("--bus-allocation paper-random25 requires --bus-share 0 or 0.25")
     return options, args
 
 
@@ -558,7 +570,9 @@ if __name__ == "__main__":
     options, args = get_options()
     simulation_time = options.duration
     diagnostic_stop_time = options.stop_time
+    bus_share = options.bus_share
     bus_allocation = options.bus_allocation
+    route_mode = options.route_mode
     if not options.quiet:
         print(args)
     alpha = str(args[0])
@@ -584,8 +598,8 @@ if __name__ == "__main__":
         with open(os.devnull, "w") as devnull:
             with redirect_stdout(devnull):
                 traci.start(sumo_command)
-                run(alpha, inflow_0, inflow_1, inflow_2, quiet=True)
+                run(alpha, inflow_0, inflow_1, inflow_2, quiet=True, save_statistics=not options.no_save)
                 vehicle_instance.clear()
     else:
         traci.start(sumo_command)
-        run(alpha, inflow_0, inflow_1, inflow_2)
+        run(alpha, inflow_0, inflow_1, inflow_2, save_statistics=not options.no_save)
