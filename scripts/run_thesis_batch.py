@@ -85,16 +85,22 @@ def run_task(task, args):
     destination.mkdir(parents=True, exist_ok=False)
     source, initial_hashes = prepare_source(destination, case)
     sumo_home = args.sumo_home.resolve()
+    if args.deceleration_active and not (case["folder"] == "junction" and case["script"] == "junction_three_agree.py"):
+        raise ValueError("deceleration-active is currently implemented and validated for eval3 (T junction) only")
     env = dict(os.environ,
                SUMO_HOME=str(sumo_home),
                PYTHONPATH=str(sumo_home / "tools"),
                MPLBACKEND="Agg", OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1",
                MCS_TIV_IMPLEMENTATION="thesis",
                MCS_TIV_AUDIT=str(destination / "tiv-audit.json"))
+    if args.deceleration_active:
+        env["MCS_DECELERATION_AUDIT"] = str(destination / "deceleration-audit.json")
     command = [args.python, "-u", case["script"], case["alpha"], str(seed),
                *case["flows"], "--nogui", "--quiet", "--duration", "600",
                "--bus-allocation", "paper-random25"]
     is_three_way = case["folder"] == "junction" and case["script"] == "junction_three_agree.py"
+    if args.deceleration_active:
+        command.append("--deceleration-active")
     if not is_three_way:
         command += ["--bus-share", case["bus_share"]]
         command.append("--no-save")
@@ -104,6 +110,7 @@ def run_task(task, args):
         "case": name, "seed": seed, "command": command,
         "input_duration": 600, "stop_time": args.stop_time or 600,
         "paper_reference_mean_mps": case["reference"],
+        "decision_method": "deceleration-propagation" if args.deceleration_active else "thesis-tiv",
         "source_sha256": initial_hashes,
         "sumo_version": subprocess.check_output([str(sumo_home / "bin" / "sumo"), "--version"], text=True),
         "started_epoch": time.time(),
@@ -125,7 +132,8 @@ def run_task(task, args):
                     source_unchanged=(initial_hashes == source_hashes(source)),
                     all_speed_mps=(float(speed.group(1)) if speed else None),
                     vehicle_mix=([int(mix.group(1)), int(mix.group(2))] if mix else None),
-                    audit_written=(destination / "tiv-audit.json").is_file())
+                    audit_written=(destination / "tiv-audit.json").is_file(),
+                    deceleration_audit_written=(destination / "deceleration-audit.json").is_file())
     (destination / "manifest.json").write_text(json.dumps(manifest, indent=2))
     return manifest
 
@@ -143,6 +151,8 @@ def main():
                         help="smoke test only; retains 600-second input schedule")
     parser.add_argument("--paper", type=Path)
     parser.add_argument("--python", default=sys.executable)
+    parser.add_argument("--deceleration-active", action="store_true",
+                        help="use the proposed deceleration-propagation rule (Eval.3 only)")
     args = parser.parse_args()
     if args.workers < 1:
         parser.error("--workers must be positive")

@@ -43,5 +43,21 @@ python3 junction/junction_three_agree.py 7 1 400 400 400 \
 
 提案判断で走らせる場合は、末尾を`--deceleration-active`に置き換える。
 
+## 再現可能な評価バッチ
+
+T字路Eval.3は、隔離コピー・seedごとの監査ログ・実行manifestを残す
+`scripts/run_thesis_batch.py`で実行できる。以下は提案手法の5 seed本実験である。
+
+```sh
+python3 scripts/run_thesis_batch.py \
+  --sumo-home /path/to/sumo --python python3 \
+  --output results/deceleration-eval3 --cases eval3 --workers 1 \
+  --deceleration-active
+```
+
+各`seed-*`の`manifest.json`に平均速度、`deceleration-audit.json`に各交渉の
+損失・判断・後続車数が残る。現時点でactive実装の対象はT字路Eval.3のみであり、
+Eval.5/7へ一般化する前に十字路・合流の車線関係を同じ予測器で検証する必要がある。
+
 `--duration`は600秒のままにし、`--stop-time`だけで短縮する。論文再現用の
 出力先や統計CSVと同居させない。
