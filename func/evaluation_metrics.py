@@ -16,6 +16,7 @@ AUDIT = os.environ.get("MCS_EVALUATION_AUDIT")
 COUNTS = Counter()
 GROUPS = defaultdict(Counter)
 VEHICLES = {}
+FOLLOWING_VEHICLES = {}
 PENDING = []
 PREDICTION = defaultdict(Counter)
 
@@ -50,6 +51,17 @@ def observe(vehicles, now):
         item["hard_brake_time_s"] += DT if accel <= HARD_BRAKE else 0
         item["stop_time_s"] += DT if speed < STOP_SPEED else 0
         item["free_flow_shortfall_m"] += max(0.0, FREE_FLOW_SPEED - speed) * DT
+        # This is a method-independent follower proxy: both the baseline and
+        # proposal expose ``leader`` through the live CAV controller.
+        if getattr(vehicle, "leader", None):
+            follower = FOLLOWING_VEHICLES.setdefault(vehicle_id, {"group": group, "samples": 0,
+                                                                    "free_flow_shortfall_m": 0.0,
+                                                                    "hard_brake_time_s": 0.0,
+                                                                    "stop_time_s": 0.0})
+            follower["samples"] += 1
+            follower["free_flow_shortfall_m"] += max(0.0, FREE_FLOW_SPEED - speed) * DT
+            follower["hard_brake_time_s"] += DT if accel <= HARD_BRAKE else 0
+            follower["stop_time_s"] += DT if speed < STOP_SPEED else 0
 
     remaining = []
     for event in PENDING:
@@ -127,13 +139,18 @@ def _write_audit():
         groups[name] = {**data,
                         "mean_speed_mps": data["speed_sum"] / data["samples"] if data["samples"] else None}
     by_group = defaultdict(list)
+    following_by_group = defaultdict(list)
     for data in VEHICLES.values():
         by_group[data["group"]].append(data["free_flow_shortfall_m"])
+    for data in FOLLOWING_VEHICLES.values():
+        following_by_group[data["group"]].append(data["free_flow_shortfall_m"])
     result = {"thresholds": {"hard_brake_mps2": HARD_BRAKE, "stop_speed_mps": STOP_SPEED,
                                "free_flow_speed_mps": FREE_FLOW_SPEED},
               "counts": dict(COUNTS), "groups": groups,
               "vehicle_free_flow_shortfall_m": {name: _distribution(values) for name, values in by_group.items()},
               "vehicle_free_flow_shortfall_samples_m": dict(by_group),
+              "following_vehicle_free_flow_shortfall_m": {name: _distribution(values) for name, values in following_by_group.items()},
+              "following_vehicle_free_flow_shortfall_samples_m": dict(following_by_group),
               "prediction_accuracy": {name: _normalise_prediction(data) for name, data in PREDICTION.items()},
               "prediction_accuracy_raw": {name: dict(data) for name, data in PREDICTION.items()}}
     with open(AUDIT, "w") as stream:

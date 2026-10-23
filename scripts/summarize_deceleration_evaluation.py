@@ -81,13 +81,13 @@ def main():
                      "difference_mps": method["all_speed_mps"] - control["all_speed_mps"]})
         # Raw sums are included by the instrumented audit to support pooling.
         proposal_prediction.append(raw_prediction(method_metric, "all"))
-    def groups(items):
+    def groups(items, shortfall_key="vehicle_free_flow_shortfall_samples_m"):
         result = {}
         for group in ("car", "bus"):
             packed = []
             for metric in items:
                 data = metric.get("groups", {}).get(group, {})
-                packed.append({**data, "shortfall": metric.get("vehicle_free_flow_shortfall_samples_m", {}).get(group, [])})
+                packed.append({**data, "shortfall": metric.get(shortfall_key, {}).get(group, [])})
             result[group] = pooled_group(packed)
         return result
     differences = [row["difference_mps"] for row in rows]
@@ -98,6 +98,8 @@ def main():
                         "paired_difference_mean_mps": statistics.mean(differences),
                         "paired_difference_sample_sd_mps": statistics.stdev(differences)},
               "traffic_metrics": {"tivtep": groups(baseline_metrics), "proposal": groups(proposal_metrics)},
+              "following_vehicle_shortfall": {"tivtep": groups(baseline_metrics, "following_vehicle_free_flow_shortfall_samples_m"),
+                                               "proposal": groups(proposal_metrics, "following_vehicle_free_flow_shortfall_samples_m")},
               "proposal_prediction_accuracy": aggregate_prediction(proposal_prediction),
               "proposal_decision_counts": proposal_counts,
               "limitations": ["Prediction accuracy is observed only for the proposal-selected action; it is not a counterfactual outcome test.",

@@ -33,6 +33,7 @@ HTML中の数値はJSONから転記し、推測で補わない。
    - これは「選択した行動の実測との一致」であり、逆判断の実測ではないと明記する。
 5. **安全・局所負担**
    - `traffic_metrics` の強い減速時間率、停止時間率、車両別free-flow shortfallの中央値・p95・最大値を、TIVtepと提案法で並べる。
+   - `following_vehicle_shortfall` は、ライブ制御で前方車を持つ車両に限定した同じ分布であり、後続車への局所負担の比較に使う。
    - free-flow shortfallは `13.89 m/s - 実速度` の積分に基づく代理指標であり、反実仮想距離損失そのものではないと明記する。
 6. **判断差**
    - `proposal_decision_counts` の `decision_agreement`、`decision_disagreement`、`proposal_accept/reject`、`tiv_would_accept/reject` を示す。
