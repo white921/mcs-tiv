@@ -38,7 +38,7 @@ def pooled_group(metrics):
 
 def aggregate_prediction(items):
     total = {"windows": 0, "samples": 0, "absolute_error": 0.0,
-             "squared_error": 0.0, "distance_error": 0.0, "followers": 0.0}
+             "squared_error": 0.0, "distance_error_m": 0.0, "followers": 0.0}
     for item in items:
         for key in total:
             total[key] += item.get(key, 0)
@@ -47,7 +47,7 @@ def aggregate_prediction(items):
     return {"windows": total["windows"], "samples": total["samples"],
             "speed_mae_mps": total["absolute_error"] / total["samples"],
             "speed_rmse_mps": math.sqrt(total["squared_error"] / total["samples"]),
-            "mean_abs_distance_error_m_per_window": total["distance_error"] / total["windows"],
+            "mean_abs_distance_error_m_per_window": total["distance_error_m"] / total["windows"],
             "mean_followers_per_window": total["followers"] / total["windows"]}
 
 
@@ -90,6 +90,20 @@ def main():
                 packed.append({**data, "shortfall": metric.get(shortfall_key, {}).get(group, [])})
             result[group] = pooled_group(packed)
         return result
+
+    def shortfall_distributions(items, key):
+        """Pool only the requested vehicle-level loss samples across seeds."""
+        result = {}
+        for group in ("car", "bus"):
+            values = []
+            for metric in items:
+                values.extend(metric.get(key, {}).get(group, []))
+            result[group] = {"count": len(values),
+                             "mean": statistics.mean(values) if values else None,
+                             "median": percentile(values, .5),
+                             "p95": percentile(values, .95),
+                             "max": max(values) if values else None}
+        return result
     differences = [row["difference_mps"] for row in rows]
     report = {"scope": "Eval.3, alpha=7, inflow=400/400/400, paper-random25, 600 s, paired seeds 1-5",
               "per_seed": rows,
@@ -98,8 +112,8 @@ def main():
                         "paired_difference_mean_mps": statistics.mean(differences),
                         "paired_difference_sample_sd_mps": statistics.stdev(differences)},
               "traffic_metrics": {"tivtep": groups(baseline_metrics), "proposal": groups(proposal_metrics)},
-              "following_vehicle_shortfall": {"tivtep": groups(baseline_metrics, "following_vehicle_free_flow_shortfall_samples_m"),
-                                               "proposal": groups(proposal_metrics, "following_vehicle_free_flow_shortfall_samples_m")},
+              "following_vehicle_shortfall": {"tivtep": shortfall_distributions(baseline_metrics, "following_vehicle_free_flow_shortfall_samples_m"),
+                                               "proposal": shortfall_distributions(proposal_metrics, "following_vehicle_free_flow_shortfall_samples_m")},
               "proposal_prediction_accuracy": aggregate_prediction(proposal_prediction),
               "proposal_decision_counts": proposal_counts,
               "limitations": ["Prediction accuracy is observed only for the proposal-selected action; it is not a counterfactual outcome test.",
