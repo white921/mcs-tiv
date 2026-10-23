@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="予備実験由来の固定係数に頼らず、通信で得たリアルタイムの交通状態から後続車両への影響を計算するMCS交渉判断手法の説明資料">
-  <title>リアルタイム交通状態に基づく後続車両影響評価｜MCS-TIV 卒論説明資料</title>
+  <meta name="description" content="既存の軌道生成と速度指示を再利用し、承諾・拒否それぞれの10秒間の減速・回復と双方の後続車列の累積損失を比較するMCS交渉判断手法の説明資料">
+  <title>10秒間の累積損失で交渉を判断する｜MCS-TIV 卒論説明資料</title>
   <script>
     window.MathJax = {
       tex: {
@@ -469,8 +469,24 @@
     .sim-controls label { font-weight: 800; }
     .sim-controls input { width: 100%; accent-color: var(--green); }
 
+    .example-notice {
+      padding: 14px 18px;
+      border-radius: 14px;
+      background: var(--blue-soft);
+      font-size: 0.9rem;
+    }
+
+    .simulation-scroll,
+    .table-scroll {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    .simulation-scroll { border-radius: var(--radius); }
+
     .simulation-road {
       position: relative;
+      min-width: 640px;
       min-height: 250px;
       overflow: hidden;
       border-radius: var(--radius);
@@ -584,6 +600,15 @@
       font-size: 0.9rem;
     }
 
+    caption {
+      padding: 0 0 12px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-align: left;
+    }
+
+    .table-scroll table { min-width: 560px; }
+
     th, td {
       padding: 13px 14px;
       border-bottom: 1px solid var(--line);
@@ -661,7 +686,7 @@
       .grid-2,
       .grid-3,
       .formula-grid,
-      .implementation-grid { grid-template-columns: 1fr; }
+      .implementation-grid { grid-template-columns: minmax(0, 1fr); }
       .chain { flex-direction: column; }
       .arrow { transform: rotate(90deg); }
       .clip-row { grid-template-columns: 1fr; gap: 4px; }
@@ -670,16 +695,13 @@
     }
 
     @media (max-width: 620px) {
-      .topbar-inner { grid-template-columns: 1fr auto; }
+      .topbar-inner { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+      .brand { white-space: normal; overflow-wrap: anywhere; }
       .progress-track { grid-column: 1 / -1; grid-row: 2; margin-bottom: 8px; }
       .slide { min-height: auto; padding: 28px 20px; border-radius: 22px; }
       .symbol-list { grid-template-columns: 1fr; gap: 4px; }
       .symbol-list dt { width: fit-content; }
       .sim-controls { grid-template-columns: 1fr; gap: 4px; }
-      .sim-car { width: 54px; }
-      .sim-car-body { font-size: 0.66rem; }
-      .sim-speed { font-size: 0.64rem; }
-      .sim-gap { font-size: 0.58rem; padding-inline: 2px; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -723,8 +745,9 @@
   <main class="page-shell">
     <section class="slide hero" id="slide-1" data-title="研究目的">
       <div class="slide-number">01 / RESEARCH PURPOSE</div>
-      <h1>後続車両への影響を<br>リアルタイムに計算する。</h1>
-      <p class="lead">MCSで交渉を受け入れたときの影響を、あらかじめ作った距離係数ではなく、通信で得た現在の車間・速度・予定軌道・車両性能からその場で推定する。減速伝播は、その影響を因果的に計算するための手段である。</p>
+      <h1>10秒後だけでなく、<br>10秒間の損失を比べる。</h1>
+      <p class="lead">既存の走行ロジックを使い、交渉を承諾した場合・拒否した場合の速度変化を予測する。要求車・受入判断車と双方の後続車列について、途中の減速から回復までを評価する。</p>
+      <p class="lead" style="margin-top:24px;font-size:0.88rem">2026年10月23日 方針更新｜研究設計資料・提案手法の実験結果ではない</p>
     </section>
 
     <section class="slide" id="slide-2" data-title="論文TIV">
@@ -745,7 +768,7 @@
         <article class="card amber">
           <small>ENVIRONMENTAL TERM</small>
           <h3>後続環境  \(E_R\)</h3>
-          <p>10秒後の速度と、距離から求めた係数を掛けて合計する。</p>
+          <p>共有軌道の終端速度と距離係数を掛けて合計する。10秒分の軌道なら10秒後の速度。</p>
           <div class="formula">\[E_R(P)=\sum_i v_i(H)R(X_i)\]</div>
         </article>
         <article class="card blue">
@@ -754,7 +777,8 @@
           <p>加速性能が低い車両ほどTIVを小さくして、判断上優先しやすくする。</p>
         </article>
       </div>
-      <p class="takeaway">本研究では、このTIVを出発点として、後続車両の影響を表す環境項 \(E_R\) の算出方法に注目する。</p>
+      <p class="takeaway">山下さんも将来の速度を使っている。今回は「終端の状態」から「区間全体の損失」へ、後続影響の評価を広げる。</p>
+      <p class="speaker-note"><strong>説明の要点：</strong>TIVはTrajectory Influence Value。衝突確率ではなく、交通効率を考えて軌道を優先する評価値である。環境項には交渉車自身も含む。根拠は山下論文4.2節・4.2.1節。</p>
     </section>
 
     <section class="slide" id="slide-3" data-title="問題点とアプローチ">
@@ -763,7 +787,7 @@
       <div class="road-scene" aria-label="交渉車と3台の後続車が並ぶ車列">
         <div class="direction">進行方向 →</div>
         <div class="vehicle-row">
-          <div class="vehicle"><span>後続3</span><span class="sub">直接は見ない</span></div>
+          <div class="vehicle"><span>後続3</span><span class="sub">後続2に反応</span></div>
           <div class="vehicle"><span>後続2</span><span class="sub">後続1に反応</span></div>
           <div class="vehicle"><span>後続1</span><span class="sub">交渉車に反応</span></div>
           <div class="vehicle leader"><span>交渉車</span><span class="sub">速度変更の起点</span></div>
@@ -771,190 +795,127 @@
       </div>
       <div class="grid-2" style="margin-top:18px">
         <article class="card red">
-          <small>問題点</small>
-          <h3>予備実験から \(R(X)\) を定義</h3>
-          <p>交渉車からの距離を固定関数へ入力し、現在の交通状態でも同じ影響関係が成り立つものとして評価する。</p>
+          <small>終端速度の限界</small>
+          <h3>途中で減速しても、最後に戻る</h3>
+          <p>10秒後の速度が同じでも、ずっと走れた車と、減速してから回復した車では損失が違う。終端速度項だけではこの違いを捉えられない。</p>
         </article>
         <article class="card accent">
-          <small>提案アプローチ</small>
-          <h3>受信した現在状態から毎回計算</h3>
-          <p>車間・速度・予定軌道・加減速性能を使い、先行車の変化によって後続車が実際に速度計画を変えるかを逐次推定する。</p>
+          <small>距離係数から速度変化へ</small>
+          <h3>どの車に、いつ影響が届くか</h3>
+          <p>予備実験由来の \(R(X)\) だけで影響を見積もらず、現在の車間・速度・予定軌道・性能から、後続車の減速と回復を予測する。</p>
         </article>
       </div>
-      <p class="takeaway">そこで固定距離係数 \(R(X)\) を、隣接車間の減速伝播と速度回復を逐次計算した後続影響へ置き換える。</p>
-      <p class="speaker-note"><strong>説明の要点：</strong>TIVそのものを否定する研究ではない。TIVの環境項が固定係数に依存する点を問題とし、その計算方法を動的にする。</p>
+      <p class="takeaway">変更点は2つ。途中の損失を積み重ねることと、後続への影響を速度変化として追うこと。</p>
+      <p class="speaker-note"><strong>説明の要点：</strong>TIVそのものを否定する研究ではない。環境項が終端速度と固定形の距離係数に依存する点に注目し、交通状態に応じた評価へ発展させる。係数の値が常に同じという意味ではなく、距離を影響へ変換する関数形が固定されている。</p>
     </section>
 
-    <section class="slide" id="slide-4" data-title="アルゴリズムの方針">
-      <div class="slide-number">04 / ALGORITHM POLICY</div>
-      <h2>後続影響を、隣り合う車両の<br>速度変化として順番に追う。</h2>
-      <div class="grid-3">
+    <section class="slide" id="slide-4" data-title="承諾と拒否の条件">
+      <div class="slide-number">04 / ACCEPT AND REJECT</div>
+      <h2>拒否したら、双方とも<br>元のplannedを維持する。</h2>
+      <p>要求車をA、受入判断車をBとし、同じ現在状態から2つの場合を考える。</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>ケース</th><th>要求車A</th><th>受入判断車B</th><th>後続車列</th></tr></thead>
+          <tbody>
+            <tr><td><strong>承諾</strong></td><td>要求したdesired</td><td>譲るためのalternative</td><td>それぞれ変更後の先行車に追従</td></tr>
+            <tr><td><strong>拒否</strong></td><td>元のplanned</td><td>元のplanned</td><td>それぞれ元の先行車計画に追従</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid-2" style="margin-top:24px">
         <article class="card blue">
-          <small>01 / DEFINE</small>
-          <h3>「影響が伝わった」を定義</h3>
-          <p>受入れ候補で後続車が予定速度を維持できず、拒否候補より追加の減速が生じた状態とする。</p>
+          <small>KEEP THE MCS FRAMEWORK</small>
+          <h3>交渉の仕組みは維持</h3>
+          <p>代替軌道の可否確認、合意待ち、有効期限、成立後の切り替えは既存どおり。代替軌道を作れない場合は承諾しない。</p>
         </article>
         <article class="card accent">
-          <small>02 / LOCAL CHECK</small>
-          <h3>まず1台後ろを判定</h3>
-          <p>現在の車間・速度・予定軌道・加減速性能から、直前の車両に対して安全に走れる速度を求める。</p>
-        </article>
-        <article class="card amber">
-          <small>03 / PROPAGATE</small>
-          <h3>結果を次の車両へ渡す</h3>
-          <p>各候補で更新した後続車を次の先行車として同じ判定を繰り返し、受入れと拒否の速度差が消えた地点で止める。</p>
+          <small>BOTH PLATOONS</small>
+          <h3>両側の損失を合計</h3>
+          <p>A・B自身と双方の後続車を評価する。一方だけを利益、もう一方だけを損失として扱わず、各ケースの総損失を比べる。</p>
         </article>
       </div>
-      <div class="chain" style="margin-top:24px">
-        <div class="flow-step"><small>INPUT</small><strong>受入れ・拒否の候補軌道</strong></div>
-        <div class="arrow">→</div>
-        <div class="flow-step"><small>JUDGE</small><strong>予定速度を維持できるか</strong></div>
-        <div class="arrow">→</div>
-        <div class="flow-step"><small>UPDATE</small><strong>必要なら速度を下げる</strong></div>
-        <div class="arrow">→</div>
-        <div class="flow-step"><small>REPEAT</small><strong>さらに1台後ろへ</strong></div>
-      </div>
-      <p class="takeaway">この判定に必要なのが、「現在の車間で安全に走れる最大速度」である。次のスライドでは、その安全速度を停止条件から求める。</p>
-      <p class="speaker-note"><strong>説明の要点：</strong>距離そのものを影響量とはしない。候補軌道によって後続車の速度計画が実際に変わったときだけ、減速が伝わったと数える。</p>
+      <p class="takeaway">拒否は「逆向きの譲歩を成立させる」ことではない。元の計画を保った場合にも損失はあり得る。</p>
+      <p class="speaker-note"><strong>説明の要点：</strong>距離そのものを影響量とはしない。候補によって後続車の速度変化がどう変わるかを追う。表は交渉結果による起点の違いであり、10秒間の再計画を禁止するものではない。合意待ちがある場合は、予測上の実行開始時刻も合わせる。</p>
     </section>
 
-    <section class="slide" id="slide-5" data-title="安全速度">
-      <div class="slide-number">05 / SAFE FOLLOWING SPEED</div>
-      <h2>先行車両がきつめのブレーキをかけたときに、<br>安全に止まれる速度を求める。</h2>
-      <div class="formula-grid">
-        <div>
-          <div class="braking-diagram" aria-label="最低車間、反応距離、制動距離の構成">
-            <h3>停止に必要な空間</h3>
-            <div class="distance-line">
-              <span class="distance-part gap"></span>
-              <span class="distance-part reaction"></span>
-              <span class="distance-part brake"></span>
-            </div>
-            <div class="distance-labels">
-              <span>最低車間<br>\(D_0\)</span>
-              <span>反応中の移動<br>\(\tau v_i\)</span>
-              <span>制動距離の差<br>\(\frac{v_i^2}{2b_i}-\frac{v_{i-1}^2}{2b_{i-1}}\)</span>
-            </div>
-          </div>
-          <div class="formula" style="margin-top:16px">
-            \[
-              g_i \ge D_0+\tau v_i+
-              \frac{v_i^2}{2b_i}-
-              \frac{v_{i-1}^2}{2b_{i-1}}
-            \]
-            <p class="caption">現在の車間が、最低車間・反応距離・制動距離の差を上回れば安全に停止できる。</p>
-          </div>
-        </div>
-        <div>
-          <div class="formula primary">
-            \[
-              v_i^{\mathrm{safe}}
-              =-b_i\tau+
-              \sqrt{
-                (b_i\tau)^2+
-                2b_i\left(
-                  g_i-D_0+
-                  \frac{v_{i-1}^2}{2b_{i-1}}
-                \right)
-              }
-            \]
-            <p class="caption">停止条件を後続車の速度 \(v_i\) について解いた、現在許される最大速度。</p>
-          </div>
-          <dl class="symbol-list" style="margin-top:16px">
-            <dt>\(g_i\)</dt><dd>先行車と後続車の現在の純車間</dd>
-            <dt>\(D_0\)</dt><dd>停止後にも残したい最低車間</dd>
-            <dt>\(\tau\)</dt><dd>後続車が減速を始めるまでの反応時間</dd>
-            <dt>\(b_i, b_{i-1}\)</dt><dd>後続車と先行車について、軌道計算で許容する最大減速度の大きさ</dd>
-          </dl>
-        </div>
+    <section class="slide" id="slide-5" data-title="既存の速度生成を再利用">
+      <div class="slide-number">05 / REUSE THE DRIVING LOGIC</div>
+      <h2>走り方は既存のまま。<br>予測と評価への使い方を追加する。</h2>
+      <div class="chain">
+        <div class="flow-step"><small>GENERATE</small><strong>Frenetで軌道候補を生成</strong></div>
+        <div class="arrow">→</div>
+        <div class="flow-step"><small>CHECK</small><strong>性能制約・衝突を確認</strong></div>
+        <div class="arrow">→</div>
+        <div class="flow-step"><small>SELECT</small><strong>既存コストで候補選択</strong></div>
+        <div class="arrow">→</div>
+        <div class="flow-step"><small>CONTROL</small><strong>位置差と加減速制限で速度指示</strong></div>
       </div>
-      <p class="takeaway">固定的な影響度を与えるのではなく、現在の車間・速度・軌道計算で許容する最大減速度から、後続車がいま何m/sまでなら安全かを毎時刻計算する。</p>
-    </section>
-
-    <section class="slide" id="slide-6" data-title="速度更新">
-      <div class="slide-number">06 / DECELERATION AND RECOVERY</div>
-      <h2>減速だけでなく、影響が消えた後の<br>速度回復まで追う。</h2>
-      <div class="formula">
-        \[
-          v_i^{\mathrm{target}}(k+1)
-          =\min\left(
-            v_i^{\mathrm{planned}}(k+1),
-            v_i^{\mathrm{safe}}(k)
-          \right)
-        \]
-        <p class="caption">安全だからといって、元のFrenet予定速度より勝手に速くしない。</p>
-      </div>
-      <div class="formula primary" style="margin-top:14px">
-        \[
-          \begin{aligned}
-            v_i^{\min}(k+1)&=\max\!\left(0,\,v_i(k)-b_i\Delta t\right),\\
-            v_i^{\max}(k+1)&=v_i(k)+a_i\Delta t
-          \end{aligned}
-        \]
-        <p class="caption">ここでの \(b_i\) は、軌道計算で許容する最大減速度であり、1ステップ後の速度の下限を決める。\(v_i^{\min}(k+1)\le v_i(k+1)\le v_i^{\max}(k+1)\)。</p>
-      </div>
-      <div class="formula" style="margin-top:14px">
-        \[
-          v_i(k+1)=
-          \begin{cases}
-            v_i^{\min}(k+1) &
-              \left(v_i^{\mathrm{target}}(k+1)\lt v_i^{\min}(k+1)\right)\\
-            v_i^{\mathrm{target}}(k+1) &
-              \left(v_i^{\min}(k+1)\le v_i^{\mathrm{target}}(k+1)\le v_i^{\max}(k+1)\right)\\
-            v_i^{\max}(k+1) &
-              \left(v_i^{\mathrm{target}}(k+1)>v_i^{\max}(k+1)\right)
-          \end{cases}
-        \]
-        <p class="caption">目標速度が上下限の内側ならそのまま使い、外側なら到達可能な下限または上限まで動かす。</p>
-      </div>
-      <div class="grid-2" style="margin-top:18px">
+      <div class="grid-2" style="margin-top:24px">
         <article class="card blue">
-          <small>INDEX &amp; TIME</small>
-          <dl class="symbol-list">
-            <dt>\(i\)</dt><dd>車列内の車両番号。\(i-1\) は1台前の先行車</dd>
-            <dt>\(k\)</dt><dd>予測計算の時刻ステップ番号</dd>
-            <dt>\(\Delta t\)</dt><dd>1ステップの時間幅［秒］</dd>
-            <dt>\(v_i(k)\)</dt><dd>時刻 \(k\) における車両 \(i\) の予測速度［m/s］</dd>
-          </dl>
+          <small>REUSE</small>
+          <h3>速度の決め方を揃える</h3>
+          <p>新しい安全速度式や追従モデルは作らない。最速の候補を独自に選ぶのでもなく、既存の候補選択・速度指示まで再利用する。</p>
         </article>
-        <article class="card amber">
-          <small>SPEED &amp; PERFORMANCE</small>
-          <dl class="symbol-list">
-            <dt>\(v_i^{\mathrm{planned}}\)</dt><dd>減速影響がなければ予定軌道で出す速度</dd>
-            <dt>\(v_i^{\mathrm{safe}}\)</dt><dd>先行車がきつめのブレーキをかけても安全に止まれる最大速度</dd>
-            <dt>\(v_i^{\mathrm{target}}\)</dt><dd>planned速度とsafe速度の小さい方</dd>
-            <dt>\(a_i\)</dt><dd>車両 \(i\) の最大加速度［m/s²］</dd>
-            <dt>\(b_i\)</dt><dd>車両 \(i\) の軌道計算で許容する最大減速度の大きさ［m/s²］</dd>
-            <dt>\(v_i^{\min},v_i^{\max}\)</dt><dd>車両性能上、次のステップで到達できる速度の下限と上限</dd>
-          </dl>
+        <article class="card accent">
+          <small>ADD</small>
+          <h3>コピーした状態で先を計算</h3>
+          <p>承諾・拒否ごとに先行車の変化を反映し、後続車の計画と速度を予測する。予測中にSUMOの実車へ指令を出さない。</p>
         </article>
       </div>
-      <p class="takeaway">同じ \(b_i\) でも役割は異なる。\(v_i^{\mathrm{safe}}\) では停止距離から安全な速度上限を求め、\(v_i^{\min}\) では1ステップで許容する減速量を求める。快適減速度ではなく、軌道計算上の制約値として扱う。</p>
+      <p class="takeaway">既存の軌道生成器は使える。ただし、2ケースの車列予測と損失集計を組み立てる処理は新しく必要。</p>
+      <p class="speaker-note"><strong>説明の要点：</strong>軌道内の速度を読むだけでは、位置差から計算して加減速制限をかける実際の速度指示とずれることがある。既存のチェックを維持するが、それだけで安全を保証したことにはしない。実走行との誤差と安全関連の挙動は別途検証する。</p>
+    </section>
+
+    <section class="slide" id="slide-6" data-title="損失の基準">
+      <div class="slide-number">06 / REFERENCE AND LOSS</div>
+      <h2>「相手がいなければ走れた速度」<br>との差を損失として見る。</h2>
+      <div class="grid-2">
+        <article class="card blue">
+          <small>REFERENCE</small>
+          <h3>基準速度 \(v_i^{\mathrm{ref}}(t)\)</h3>
+          <p>この交渉相手との干渉がなければ走れた速度。現在の速度、車種性能、道路制約、関係のない先行車などは保つ。</p>
+        </article>
+        <article class="card amber">
+          <small>EACH SCENARIO</small>
+          <h3>予測速度 \(v_i^q(t)\)</h3>
+          <p>承諾または拒否を条件に、既存の走行ロジックで予測した速度。減速が届く時刻と、その後の回復を含む。</p>
+        </article>
+      </div>
+      <div class="formula primary" style="margin-top:24px">
+        \[
+          \text{時刻 }t\text{ の速度低下}
+          =v_i^{\mathrm{ref}}(t)-v_i^q(t)
+        \]
+        <p class="caption">両ケースで同じ基準・対象車両・時間区間を使う。全員の基準を最高速度や一定速度にするわけではない。</p>
+      </div>
+      <p class="takeaway">同じ10 m/sへ戻っても、途中で長く減速した方が損失は大きい。減速量だけでなく継続時間も数える。</p>
+      <p class="speaker-note"><strong>説明の要点：</strong>後続車の基準は、直前の車を消すことではなく、交渉による減速がなかった先行車に追従する動きとして考える。基準速度列の具体的な作り方は設計確認事項。基準より速い値が出ても、利益扱いや無条件のゼロ切り捨てで隠さず整合性を確認する。</p>
     </section>
 
     <section class="slide" id="slide-7" data-title="伝播例">
-      <div class="slide-number">07 / LOCAL ROLLOUT</div>
-      <h2>先頭から順に計算し、<br>変化がなくなった車両で止める。</h2>
+      <div class="slide-number">07 / ILLUSTRATIVE SPEED PROFILES</div>
+      <h2>最後の速度は同じでも、<br>途中で失った距離は違う。</h2>
+      <p class="example-notice"><strong>概念説明用の架空例：</strong>速度列は減速・回復の違いを見せるために設定したもの。Frenetによる予測値やSUMOの実験結果ではなく、伝播計算の精度を示すものでもない。</p>
       <div class="sim-controls">
-        <label for="time-slider">予測時刻 <span id="time-label">0.0秒</span></label>
-        <input id="time-slider" type="range" min="0" max="100" value="0" step="1" aria-label="予測時刻">
+        <label for="time-slider">例の時刻 <span id="time-label">0.0秒</span></label>
+        <input id="time-slider" type="range" min="0" max="100" value="0" step="1" aria-label="例の時刻" aria-valuetext="0.0秒">
       </div>
-      <div class="simulation-road" id="simulation-road" aria-label="減速伝播の説明用シミュレーション">
-        <div class="sim-road-note">固定縮尺｜10 m/sで進む基準座標｜↔ は純車間</div>
+      <div class="simulation-scroll">
+      <div class="simulation-road" id="simulation-road" aria-label="架空の速度列による減速と回復の説明">
+        <div class="sim-road-note">固定縮尺｜この例の基準は10 m/s｜↔ は純車間｜車の絵は識別用</div>
         <div class="lane"></div>
         <div id="sim-cars"></div>
       </div>
-      <div class="sim-summary" id="sim-summary" aria-live="polite">後続車の速度計画はまだ変わっていません。</div>
-      <table>
-        <thead><tr><th>車両</th><th>追加減速の開始</th><th>最大速度低下</th><th>10秒間の時間損失</th></tr></thead>
-        <tbody>
-          <tr><td>後続1</td><td>0.9秒</td><td>3.60 m/s</td><td>1.50秒</td></tr>
-          <tr><td>後続2</td><td>2.1秒</td><td>1.94 m/s</td><td>0.89秒</td></tr>
-          <tr><td>後続3</td><td>4.0秒</td><td>0.67 m/s</td><td>0.33秒</td></tr>
-          <tr><td>後続4</td><td>10秒以内になし</td><td>0</td><td>0</td></tr>
-        </tbody>
-      </table>
-      <p class="speaker-note"><strong>説明用条件：</strong>初速10m/s、純車間25m、起点車は10→4m/sへ減速、\(H=10\)秒、\(\Delta t=0.1\)秒。研究結果ではなく、計算の意味を確かめる例。</p>
+      </div>
+      <div class="sim-summary" id="sim-summary" aria-live="polite">例の時刻を動かすと、速度と累積損失が変わります。</div>
+      <div class="table-scroll">
+        <table>
+          <caption>架空例の10秒間の集計（スライダーによらない全区間の値）</caption>
+          <thead><tr><th>車両</th><th>設定上の減速開始</th><th>最大速度低下</th><th>10秒後の速度</th><th>距離損失</th></tr></thead>
+          <tbody id="sim-metrics"></tbody>
+        </table>
+      </div>
+      <p class="speaker-note"><strong>説明用条件：</strong>初速・基準速度10 m/s、純車間25 m、車長5 m、起点車は10→4→10 m/s。\(H=10\)秒、刻み0.1秒で位置と距離損失を台形積分する。これは片側の車列の例であり、承諾・拒否の比較結果ではない。実装では既存走行ロジックから各ケースの速度列を得る。</p>
     </section>
 
     <section class="slide" id="slide-8" data-title="影響量">
@@ -963,23 +924,24 @@
       <div class="grid-2">
         <article class="card">
           <small>ONE VEHICLE</small>
-          <h3>車両ごとの時間損失</h3>
+          <h3>車両ごとの距離損失</h3>
           <div class="formula">
             \[
-              D_i^q=\int_0^H\left(1-\frac{v_i^q(t)}{v_i^{\mathrm{free}}}\right)dt
+              D_i^q=\int_0^{10}\left(v_i^{\mathrm{ref}}(t)-v_i^q(t)\right)dt
             \]
           </div>
-          <p>自由走行10m/sに対して8m/sで10秒走るなら、\((1-8/10)\times10=2\)秒の損失。</p>
+          <p>例えば基準10 m/sに対して8 m/sが10秒続くなら、\((10-8)\times10=20\) m。速度低下の大きさと長さをまとめて数える。</p>
         </article>
         <article class="card accent">
-          <small>ACCEPT VS REJECT</small>
-          <h3>受け入れによって増える総損失</h3>
+          <small>BOTH PLATOONS</small>
+          <h3>両側の車両について合計</h3>
           <div class="formula">
             \[
-              I_{\mathrm{prop}}=\sum_i\left(D_i^{\mathrm{accept}}-D_i^{\mathrm{reject}}\right)
+              L_q=\sum_{i\in\mathcal V}D_i^q,
+              \quad q\in\{\mathrm{accept},\mathrm{reject}\}
             \]
           </div>
-          <p>正なら受け入れで悪化、負なら受け入れで改善。単位はvehicle-seconds。</p>
+          <p>\(\mathcal V\) はA・B自身と双方の後続車。同じ車を二重に数えず、両ケースで同じ対象と時間窓を使う。</p>
         </article>
       </div>
       <div class="chain">
@@ -987,36 +949,33 @@
         <div class="arrow">→</div>
         <div class="flow-step"><small>ROLL OUT</small><strong>隣接車間で10秒予測</strong></div>
         <div class="arrow">→</div>
-        <div class="flow-step"><small>COMPARE</small><strong>受入れ−拒否の損失差</strong></div>
+        <div class="flow-step"><small>COMPARE</small><strong>両ケースの総損失を比較</strong></div>
       </div>
-      <p class="takeaway">速度低下の大きさと継続時間を同時に数えるため、短い小減速と長い停止を区別できる。</p>
-      <p class="speaker-note"><strong>説明の要点：</strong>10秒後の速度を単独で使うのではない。10秒は速度低下を積算する上限であり、途中で影響が消えた場合は自然終了、消えない場合は打切りと記録する。</p>
+      <p class="takeaway">「10秒後に何m/sか」ではなく、「10秒間でどれだけ進めなくなったか」を評価する。</p>
+      <p class="speaker-note"><strong>初期検証用の計算案：</strong>この非正規化の式の単位はmであり、遅延秒数や衝突確率ではない。正規化の有無は未確定。刻み0.1秒では100区間を積算する。一瞬速度が一致しても、その後の状態が同じとは限らないため、そこで予測を打ち切らない。</p>
     </section>
 
     <section class="slide" id="slide-9" data-title="提案式">
       <div class="slide-number">09 / PROPOSED DECISION</div>
-      <h2>性能項を別に足さず、<br>減速と回復の結果として評価する。</h2>
+      <h2>承諾と拒否のうち、<br>総損失が小さい方を選びたい。</h2>
       <div class="formula primary">
         \[
           \boxed{
-            S_{\mathrm{prop}}
-            =
-            \left(\Delta t_{\mathrm{pl}}-\Delta t_{\mathrm{de}}\right)
-            -\lambda I_{\mathrm{prop}}
+            S_{\mathrm{loss}}=L_{\mathrm{reject}}-L_{\mathrm{accept}}
           }
         \]
-        <p class="caption">\(S_{\mathrm{prop}}\ge0\) なら要求を受け入れ、負なら拒否する。安全に成立しない候補は、この比較より前に除外する。</p>
+        <p class="caption">正なら承諾側、負なら拒否側の損失が小さい。同値・僅差の規則は要確認。実行可能な代替軌道があることは比較の前提。</p>
       </div>
       <div class="grid-2" style="margin-top:18px">
         <article class="card blue">
-          <small>\(\lambda\) AND \(\alpha\)</small>
-          <h3>役割は論文の \(\alpha\) の後継</h3>
-          <p>どちらも後続環境を判断へ反映する重み。ただし、\(\alpha\) は速度×距離係数、\(\lambda\) は時間損失差へ掛けるため、同じ数値を流用できない。</p>
+          <small>AGREED DIRECTION</small>
+          <h3>走行制御ではなく評価を変える</h3>
+          <p>減速・回復にはCar/Busの加減速性能を反映する。速度生成器や既存の物理的な可否確認を、損失関数で置き換えない。</p>
         </article>
         <article class="card amber">
-          <small>NO DOUBLE COUNTING</small>
-          <h3>独立した \(\beta a_{\max}\) は外す</h3>
-          <p>加速度・減速度はロールアウト内で速度変化と回復時間を変え、すでに \(I_{\mathrm{prop}}\) へ反映される。</p>
+          <small>TO BE DECIDED</small>
+          <h3>元のTIV項との組み合わせ</h3>
+          <p>到達時間項・独立性能項を残すか、損失だけで決めるかは未確定。単位が変わるため、元の重みをそのまま流用しない。</p>
         </article>
       </div>
       <table>
@@ -1024,11 +983,10 @@
         <tbody>
           <tr><td>論文TIVte</td><td>固定 \(R(X)\)</td><td>なし</td><td>論文比較</td></tr>
           <tr><td>論文TIVtep</td><td>固定 \(R(X)\)</td><td>あり</td><td>論文比較</td></tr>
-          <tr><td><strong>提案Prop</strong></td><td>動的減速伝播</td><td>なし</td><td>主提案</td></tr>
-          <tr><td>Prop+Performance</td><td>動的減速伝播</td><td>あり</td><td>二重評価の検証</td></tr>
+          <tr><td><strong>提案の方向</strong></td><td>10秒間の車列の累積損失</td><td>要確認</td><td>承諾・拒否の比較</td></tr>
         </tbody>
       </table>
-      <p class="speaker-note"><strong>説明の要点：</strong>「性能項を消した」のではなく、性能を事前の優先ルールから、今回の交通状態で実際に生じる速度低下と回復時間の計算へ移した。</p>
+      <p class="speaker-note"><strong>説明の要点：</strong>車両性能は速度変化と回復時間に効く。ただし、それを予測に使うことと、判断で別の性能優先項を残すことは別の選択である。基準の作り方・正規化・既存項・同値規則を確認してから最終式を確定する。</p>
     </section>
 
     <section class="slide" id="slide-10" data-title="実装と検証">
@@ -1037,34 +995,34 @@
       <div class="implementation-grid">
         <article class="card">
           <small>PHASE 1</small>
-          <h3>純粋計算</h3>
-          <p><code>build_local_platoon()</code><br><code>rollout_platoon()</code></p>
+          <h3>既存処理を分離</h3>
+          <p>コピーした状態で軌道生成・選択・速度指示を計算する。</p>
         </article>
         <article class="card">
           <small>PHASE 2</small>
-          <h3>単体検証</h3>
-          <p>4〜5台の車列で符号、安全性、自然終了、Car/Bus差を確認。</p>
+          <h3>車列と損失を検証</h3>
+          <p>両ケースの速度列、積算、Car/Bus差、副作用なしを確認。</p>
         </article>
         <article class="card">
           <small>PHASE 3</small>
-          <h3>MCM入力</h3>
-          <p>road/lane、時刻、連番、加減速性能を通信情報へ追加。</p>
+          <h3>判断を変えず比較</h3>
+          <p>元のTIVで走行し、新しい予測と実速度の差を記録する。</p>
         </article>
         <article class="card accent">
           <small>PHASE 4</small>
-          <h3>TIV統合</h3>
-          <p>固定環境項と切替可能にし、同一条件・複数seedで比較。</p>
+          <h3>判断へ接続</h3>
+          <p>評価式を確定し、明示的な切替で新手法を検証する。</p>
         </article>
       </div>
       <div class="chain">
-        <div class="flow-step"><small>UNCHANGED</small><strong>0.1秒ごとのFrenet再計画</strong></div>
+        <div class="flow-step"><small>UNCHANGED</small><strong>0.1秒の状態更新・MCM交換</strong></div>
         <div class="arrow">→</div>
         <div class="flow-step"><small>ADDED</small><strong>交渉時の局所伝播ロールアウト</strong></div>
         <div class="arrow">→</div>
         <div class="flow-step"><small>UNCHANGED</small><strong>次の0.1秒だけ速度指令</strong></div>
       </div>
-      <p class="takeaway">伝播計算は後続車を強制制御するためではなく、交渉を受け入れた場合の影響を判断前に見積もるために使う。</p>
-      <p class="speaker-note"><strong>現在地：</strong>このページは研究設計資料。現行 <code>func/thesis_tiv.py</code> には、逐次的な減速伝播・速度回復ロールアウトはまだ実装されていない。</p>
+      <p class="takeaway">候補軌道の再生成期限は1秒。先行車の変化などによる期限前の再計画も保持し、毎0.1秒で無条件に全生成しない。</p>
+      <p class="speaker-note"><strong>現在地：</strong>伝播計算は後続車を強制制御するためではなく、判断前に影響を見積もるためのもの。2026年10月23日の本資料更新時点では設計段階であり、車列予測の実装・検証完了を意味しない。再現実験の環境とは分離して開発する。</p>
     </section>
 
     <section class="slide" id="slide-11" data-title="評価の全体像">
@@ -1073,12 +1031,12 @@
       <div class="grid-2">
         <article class="card blue">
           <small>01 / VALIDITY</small>
-          <h3>伝播計算は設計どおりか</h3>
+          <h3>予測と実走行はどれくらい違うか</h3>
           <ul class="check-list">
-            <li>受入れと拒否の差の符号</li>
-            <li>安全車間と加減速上下限</li>
-            <li>影響台数・自然終了・範囲外打切り</li>
-            <li>vehicle-seconds集計の単位と整合性</li>
+            <li>1・5・10秒先の速度誤差と比較件数</li>
+            <li>10秒間の速度列と距離損失の整合性</li>
+            <li>再計画・別交渉が起きたケースの分類</li>
+            <li>選ばれたケースだけを実走行と比較</li>
           </ul>
         </article>
         <article class="card accent">
@@ -1089,7 +1047,7 @@
             <li>停止回数・最大減速度</li>
             <li>最小車間・TTC・衝突</li>
             <li>ALW / ACT / SPD / UTF / TIVte・TIVtep / Propの比較</li>
-            <li>\(\lambda\) 感度とProp / Prop+Performanceの差</li>
+            <li>新手法の適用率と既存判定への復帰率</li>
           </ul>
         </article>
         <article class="card amber">
@@ -1098,22 +1056,23 @@
           <ul class="check-list">
             <li>交渉判断1回の計算時間</li>
             <li>後続車数 \(N\) と実行step数</li>
-            <li>早期終了率と最悪時間</li>
+            <li>Frenet再生成回数と最悪時間</li>
             <li>メモリ使用量とスケーリング</li>
           </ul>
         </article>
         <article class="card red">
           <small>04 / COMMUNICATION</small>
-          <h3>情報が古い・欠ける場合も安定するか</h3>
+          <h3>必要な情報で判断できるか</h3>
           <ul class="check-list">
-            <li>理想通信との判断一致率</li>
-            <li>遅延・ゆらぎ・欠損・更新周期</li>
-            <li>古いMCMの検出と安全側処理</li>
-            <li>通信条件による交通指標の劣化</li>
+            <li>送受信側の時刻と評価窓の整合</li>
+            <li>軌道ID・車両ID・スコアの対応</li>
+            <li>古いMCMと欠損時の復帰処理</li>
+            <li>追加遅延・欠損への耐性は拡張評価</li>
           </ul>
         </article>
       </div>
-      <p class="takeaway">同じモデルで予測と走行を行った一致だけを「予測精度」としない。計算の整合性、交通流の改善、実時間性、通信耐性を別々に示す。</p>
+      <p class="takeaway">予測誤差は山下さんの手法にもあり得る。既存処理の再利用で一致を保証せず、実速度との誤差と判断への影響を測る。</p>
+      <p class="speaker-note"><strong>検証上の注意：</strong>選ばれなかったケースは同じ走行ログでは観測できない。別の検証実行が必要である。基準速度も反実仮想なので、基準を固定して実速度を代入した損失との比較は条件付き評価とする。既存カウンタのゼロだけで安全確認済みとしない。</p>
     </section>
 
     <section class="slide" id="slide-12" data-title="計算量の評価">
@@ -1123,29 +1082,30 @@
         \[
           K=\frac{H}{\Delta t}=\frac{10}{0.1}=100,
           \qquad
-          C_{\mathrm{rollout}}\approx 2NK
+          C_{\mathrm{pred}}\approx 2NK\,c_{\mathrm{step}}
+          +C_{\mathrm{replan}}+C_{\mathrm{ref}}
         \]
-        <p class="caption">\(N\)は影響候補の後続車両数。係数2は受入れ・拒否の2候補を比較するため。</p>
+        <p class="caption">概算の分解。\(N\)は両側の対象車両数、\(c_{\mathrm{step}}\)は1台1ステップの更新費用。2ケースに加え、再計画と基準速度の計算費用も必要。</p>
       </div>
       <div class="grid-2" style="margin-top:18px">
         <article class="card">
-          <small>LIGHTWEIGHT UPDATE</small>
-          <h3>1stepで行うのは一次元更新</h3>
+          <small>REUSE WITH MEASUREMENT</small>
+          <h3>既存処理の費用を含める</h3>
           <ul class="plain-list">
-            <li>車間・安全速度の計算</li>
-            <li>速度の上下限処理</li>
-            <li>位置更新と時間損失の加算</li>
-            <li>Frenet軌道の全候補生成は行わない</li>
+            <li>現在状態と先行車情報の更新</li>
+            <li>必要時のFrenet生成・衝突確認</li>
+            <li>候補選択・速度指示相当の計算</li>
+            <li>位置更新と距離損失の加算</li>
           </ul>
         </article>
         <article class="card amber">
-          <small>EARLY TERMINATION</small>
-          <h3>100stepは上限とする</h3>
+          <small>CONTROL THE COST</small>
+          <h3>精度を崩さず計算を減らす</h3>
           <ul class="plain-list">
-            <li>受入れと拒否の速度差が消えた</li>
-            <li>次の後続車に影響が伝わらない</li>
-            <li>通信範囲や予測時間の上限に達した</li>
-            <li>交渉が発生したときだけ実行する</li>
+            <li>対象車列を局所的に構成する</li>
+            <li>条件が同じ計算結果を再利用する</li>
+            <li>予測から別の交渉予測を再帰させない</li>
+            <li>一瞬の速度一致だけで打ち切らない</li>
           </ul>
         </article>
       </div>
@@ -1154,15 +1114,15 @@
         <tbody>
           <tr><td>判断時間</td><td>0.1秒の制御周期に対して遅すぎないか</td><td>中央値・p95・p99・最大値</td></tr>
           <tr><td>\(N\) と実行step数</td><td>車列長と予測時間に対する伸び方を確認する</td><td>\(N\)別・\(H\)別のスケーリング</td></tr>
-          <tr><td>終了理由</td><td>毎回100stepまで計算していないか</td><td>自然終了・範囲外・時間打切りの割合</td></tr>
+          <tr><td>再生成回数と対象外件数</td><td>重い処理と予測できない条件を分ける</td><td>回数・費用・フォールバック理由</td></tr>
         </tbody>
       </table>
-      <p class="takeaway">100msは減速伝播だけの予算ではなく、軌道生成や衝突判定も含む制御全体の周期。伝播計算がその一部として十分短いことを実測で示す。</p>
+      <p class="takeaway">100msは制御全体の周期。既存の生成器を使うため、「単純な一次元更新だけで軽い」とは決めつけず、実測する。</p>
     </section>
 
     <section class="slide" id="slide-13" data-title="通信と実験条件">
       <div class="slide-number">13 / COMMUNICATION ROBUSTNESS</div>
-      <h2>まず理想通信で効果を確かめ、<br>次に情報の古さと欠損を加える。</h2>
+      <h2>今ある情報だけで予測し、<br>時刻を揃えて損失を比べる。</h2>
       <div class="grid-2">
         <article class="card accent">
           <small>BASELINE</small>
@@ -1175,27 +1135,27 @@
           </ul>
         </article>
         <article class="card red">
-          <small>ROBUSTNESS</small>
-          <h3>応用層で加える条件</h3>
+          <small>REQUIRED FOR THE PROPOSAL</small>
+          <h3>追加する情報は設計する</h3>
           <ul class="check-list">
-            <li>更新周期の低下</li>
-            <li>追加遅延と遅延のゆらぎ</li>
-            <li>メッセージ欠損</li>
-            <li>古い・順序が入れ替わったMCM</li>
+            <li>各側で計算した承諾・拒否の損失</li>
+            <li>対象車両IDと軌道ID</li>
+            <li>生成時刻と共通の評価窓</li>
+            <li>予測の有効性・情報不足の理由</li>
           </ul>
         </article>
       </div>
       <div class="chain">
-        <div class="flow-step"><small>COMPARE</small><strong>理想通信との判断一致率</strong></div>
+        <div class="flow-step"><small>LOCAL INPUT</small><strong>自車・センサー・受信MCM</strong></div>
         <div class="arrow">→</div>
-        <div class="flow-step"><small>SAFETY</small><strong>情報不足時の安全側処理率</strong></div>
+        <div class="flow-step"><small>FALLBACK</small><strong>予測不能なら既存判定へ</strong></div>
         <div class="arrow">→</div>
-        <div class="flow-step"><small>TRAFFIC</small><strong>平均速度・timeLossの劣化</strong></div>
+        <div class="flow-step"><small>VERIFY</small><strong>適用率・誤差・交通効率を記録</strong></div>
       </div>
       <div class="final-box" style="margin-top:22px">
-        <p>同一の流入量・車両比率について同じ複数seedを用い、固定TIVと動的Propを比較する。交通流の改善だけでなく、安全性、計算時間、通信条件に対する安定性まで揃って提案手法を評価する。</p>
+        <p>走り方は既存のまま、10秒間の車列の損失で判断を改善する。同一の流入・車種条件と複数seedで比較し、交通効率だけでなく予測誤差・安全関連の挙動・計算時間も確かめる。</p>
       </div>
-      <p class="speaker-note"><strong>注意：</strong>ここで追加するのはSUMO/TraCI上の応用層通信モデルであり、DSRCやC-V2Xの物理・MAC層自体を再現するものではない。</p>
+      <p class="speaker-note"><strong>注意：</strong>通信外の全車両や未来のSUMO状態を予測入力にしない。送信・受信で時刻が違うため、合計スコアだけで窓を合わせられるか確認する。追加遅延・ゆらぎ・欠損は拡張評価の候補であり、行う場合もDSRCやC-V2Xの物理・MAC層の再現とは区別する。</p>
     </section>
   </main>
 
@@ -1243,39 +1203,59 @@
 
       const dt = 0.1;
       const steps = 100;
-      const vehicleCount = 5;
-      const minimumGap = 5;
-      const reactionTime = 1.5;
-      const brake = 5;
-      const acceleration = 3;
+      const referenceSpeed = 10;
+      // Hand-authored illustrative profiles, not a car-following predictor.
+      // The research predictor will reuse the existing Python driving logic.
+      const profiles = [
+        { name: '起点車', start: 0, bottom: 2, recovery: 3, end: 6, drop: 6 },
+        { name: '後続1', start: 0.9, bottom: 2.9, recovery: 3.6, end: 7.2, drop: 3.6 },
+        { name: '後続2', start: 2.1, bottom: 4.1, recovery: 4.8, end: 8.2, drop: 1.94 },
+        { name: '後続3', start: 4, bottom: 6, recovery: 6.7, end: 9.7, drop: 0.67 },
+        { name: '後続4', start: 0, bottom: 0, recovery: 0, end: 0, drop: 0 }
+      ];
+      const vehicleCount = profiles.length;
       const vehicleLength = 5;
       const positions = Array.from({ length: vehicleCount }, () => Array(steps + 1).fill(0));
-      const speeds = Array.from({ length: vehicleCount }, () => Array(steps + 1).fill(10));
+      const losses = Array.from({ length: vehicleCount }, () => Array(steps + 1).fill(0));
 
+      function exampleSpeed(profile, time) {
+        if (profile.drop === 0 || time <= profile.start || time >= profile.end) return referenceSpeed;
+        if (time < profile.bottom) {
+          return referenceSpeed - profile.drop * (time - profile.start) / (profile.bottom - profile.start);
+        }
+        if (time <= profile.recovery) return referenceSpeed - profile.drop;
+        return referenceSpeed - profile.drop * (profile.end - time) / (profile.end - profile.recovery);
+      }
+
+      const speeds = profiles.map(profile =>
+        Array.from({ length: steps + 1 }, (_, k) => exampleSpeed(profile, k * dt))
+      );
       for (let i = 0; i < vehicleCount; i++) positions[i][0] = -30 * i;
 
       for (let k = 0; k < steps; k++) {
-        const time = k * dt;
-        const leaderNext = time < 2
-          ? Math.max(4, speeds[0][k] - 3 * dt)
-          : (time < 3 ? 4 : Math.min(10, speeds[0][k] + 2 * dt));
-        speeds[0][k + 1] = leaderNext;
-        positions[0][k + 1] = positions[0][k] + (speeds[0][k] + leaderNext) / 2 * dt;
-
-        for (let i = 1; i < vehicleCount; i++) {
-          const gap = positions[i - 1][k] - positions[i][k] - vehicleLength;
-          const leaderSpeed = speeds[i - 1][k];
-          const radicand = (brake * reactionTime) ** 2
-            + 2 * brake * (Math.max(0, gap - minimumGap) + leaderSpeed ** 2 / (2 * brake));
-          const safeSpeed = Math.max(0, -brake * reactionTime + Math.sqrt(radicand));
-          const lower = Math.max(0, speeds[i][k] - brake * dt);
-          const upper = speeds[i][k] + acceleration * dt;
-          const target = Math.min(10, safeSpeed);
-          const followingNext = Math.min(upper, Math.max(lower, target));
-          speeds[i][k + 1] = followingNext;
-          positions[i][k + 1] = positions[i][k] + (speeds[i][k] + followingNext) / 2 * dt;
+        for (let i = 0; i < vehicleCount; i++) {
+          const averageSpeed = (speeds[i][k] + speeds[i][k + 1]) / 2;
+          positions[i][k + 1] = positions[i][k] + averageSpeed * dt;
+          losses[i][k + 1] = losses[i][k] + (referenceSpeed - averageSpeed) * dt;
         }
       }
+
+      const metrics = document.getElementById('sim-metrics');
+      profiles.forEach((profile, index) => {
+        const row = document.createElement('tr');
+        [
+          profile.name,
+          profile.drop === 0 ? '10秒以内になし' : `${profile.start.toFixed(1)}秒`,
+          `${(referenceSpeed - Math.min(...speeds[index])).toFixed(2)} m/s`,
+          `${speeds[index][steps].toFixed(2)} m/s`,
+          `${losses[index][steps].toFixed(2)} m`
+        ].forEach(value => {
+          const cell = document.createElement('td');
+          cell.textContent = value;
+          row.appendChild(cell);
+        });
+        metrics.appendChild(row);
+      });
 
       const slider = document.getElementById('time-slider');
       const timeLabel = document.getElementById('time-label');
@@ -1302,8 +1282,9 @@
 
       function renderSimulation(index) {
         timeLabel.textContent = `${(index * dt).toFixed(1)}秒`;
+        slider.setAttribute('aria-valuetext', timeLabel.textContent);
         const currentPositions = positions.map(series => series[index]);
-        const referencePosition = 10 * index * dt;
+        const referencePosition = referenceSpeed * index * dt;
         const relativePositions = currentPositions.map(position => position - referencePosition);
         const displayMinimum = -132;
         const displayMaximum = 12;
@@ -1312,15 +1293,16 @@
 
         carNodes.forEach((node, vehicleIndex) => {
           const left = toDisplayLeft(relativePositions[vehicleIndex]);
-          const speedLoss = 10 - speeds[vehicleIndex][index];
+          const speedLoss = referenceSpeed - speeds[vehicleIndex][index];
           const affected = vehicleIndex > 0 && speedLoss > 0.05;
           if (affected) affectedCount += 1;
           node.style.left = `${left}%`;
           node.classList.toggle('affected', affected);
           node.querySelector('.sim-speed').textContent = `${speeds[vehicleIndex][index].toFixed(2)} m/s`;
           node.querySelector('.sim-state').textContent = vehicleIndex === 0
-            ? '候補軌道'
-            : (affected ? `−${speedLoss.toFixed(2)} m/s` : '速度変更なし');
+            ? '設定した速度'
+            : (affected ? `−${speedLoss.toFixed(2)} m/s`
+              : (losses[vehicleIndex][index] > 0.05 ? '回復済み' : '速度変更なし'));
         });
 
         gapNodes.forEach((node, gapIndex) => {
@@ -1332,9 +1314,10 @@
           node.classList.toggle('changed', Math.abs(gap - 25) > 0.05);
         });
 
-        summary.textContent = affectedCount === 0
-          ? '後続車の速度計画はまだ変わっていません。'
-          : `この時点で、元のplanned速度から変更された後続車は${affectedCount}台です。`;
+        const totalLoss = losses.reduce((sum, series) => sum + series[index], 0);
+        summary.textContent = index === steps
+          ? `全車が10 m/sに回復しても、この例の5台の累積距離損失は${totalLoss.toFixed(2)} m残ります。`
+          : `この時点で基準より遅い後続車は${affectedCount}台。起点車を含む5台の累積距離損失は${totalLoss.toFixed(2)} mです。`;
       }
 
       slider.addEventListener('input', () => renderSimulation(Number(slider.value)));
