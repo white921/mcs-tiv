@@ -33,23 +33,25 @@ class DecelerationLossTests(unittest.TestCase):
     def test_shadow_does_not_mutate_live_paths_or_decision_state(self):
         def path(veh, kind, speeds):
             return NS(vehID=veh, type=kind, pathID=veh + "_path",
-                      t=[0.0, 5.0, 10.0], s_d=speeds)
+                      t=[0.0, 5.0, 10.0], s_d=speeds,
+                      x=[0.0, 40.0, 80.0], y=[0.0, 0.0, 0.0])
         sender_planned = path("a", "planned", [8, 8, 8])
-        desired = path("a", "desired", [9, 9, 9])
+        desired = path("a", "desired", [13, 13, 13])
         receiver_planned = path("b", "planned", [8, 8, 8])
-        alternative = path("b", "alter", [6, 6, 6])
+        alternative = path("b", "alter", [8, 8, 8])
         receiver = NS(id="b", plannedPath=receiver_planned,
                       receivedPaths=[sender_planned], status="free")
         prediction.configure("shadow")
         before = (list(receiver_planned.s_d), list(desired.s_d), receiver.status)
         record = prediction.record_shadow(receiver, desired, alternative, 0.0)
-        self.assertEqual(record["status"], "direct-cars-only")
+        self.assertEqual(record["status"], "evaluated")
         self.assertEqual(before, (receiver_planned.s_d, desired.s_d, receiver.status))
         prediction.configure("off")
 
     def test_shadow_uses_newest_sender_planned_packet(self):
         def path(veh, kind, times, speeds, name):
-            return NS(vehID=veh, type=kind, pathID=name, t=times, s_d=speeds)
+            return NS(vehID=veh, type=kind, pathID=name, t=times, s_d=speeds,
+                      x=[8 * time for time in times], y=[0.0 for _ in times])
         old = path("a", "planned", [0.0, 5.0, 10.0], [1, 1, 1], "old")
         new = path("a", "planned", [1.0, 6.0, 11.0], [8, 8, 8], "new")
         desired = path("a", "desired", [1.0, 6.0, 11.0], [9, 9, 9], "desired")
@@ -58,8 +60,40 @@ class DecelerationLossTests(unittest.TestCase):
         receiver = NS(id="b", plannedPath=planned, receivedPaths=[old, new])
         prediction.configure("shadow")
         record = prediction.record_shadow(receiver, desired, alternative, 1.0)
-        self.assertEqual(record["status"], "direct-cars-only")
+        self.assertEqual(record["status"], "evaluated")
         prediction.configure("off")
+
+    def test_shadow_propagates_lead_deceleration_to_a_follower(self):
+        def path(veh, kind, x0, speeds):
+            times = [0.0, 5.0, 10.0]
+            return NS(vehID=veh, type=kind, pathID=veh + kind,
+                      t=times, s_d=speeds,
+                      x=[x0 + 8 * time for time in times], y=[0.0] * 3)
+        sender_planned = path("a", "planned", 20, [8, 8, 8])
+        desired = path("a", "desired", 20, [8, 8, 8])
+        receiver_planned = path("b", "planned", 10, [8, 8, 8])
+        alternative = path("b", "alter", 10, [0, 0, 0])
+        follower = path("c", "planned", 0, [8, 8, 8])
+        receiver = NS(id="b", plannedPath=receiver_planned,
+                      receivedPaths=[sender_planned, follower])
+        result = prediction.evaluate(receiver, desired, alternative, 0.0)
+        self.assertEqual(result["follower_count"], 1)
+        self.assertIn("c", result["vehicle_ids"])
+
+    def test_active_decision_is_available_only_in_active_mode(self):
+        def path(veh, kind, speeds):
+            return NS(vehID=veh, type=kind, pathID=veh + kind,
+                      t=[0.0, 5.0, 10.0], s_d=speeds,
+                      x=[0.0, 40.0, 80.0], y=[0.0, 0.0, 0.0])
+        sender = path("a", "planned", [8, 8, 8])
+        desired = path("a", "desired", [13, 13, 13])
+        planned = path("b", "planned", [8, 8, 8])
+        alternative = path("b", "alter", [8, 8, 8])
+        receiver = NS(id="b", plannedPath=planned, receivedPaths=[sender])
+        prediction.configure("active")
+        self.assertTrue(prediction.active_decision(receiver, desired, alternative, 0.0))
+        prediction.configure("off")
+        self.assertIsNone(prediction.active_decision(receiver, desired, alternative, 0.0))
 
 
 if __name__ == "__main__":

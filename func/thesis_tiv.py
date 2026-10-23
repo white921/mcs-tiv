@@ -190,20 +190,27 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
         # implementation and never changes the decision below.
         deceleration_prediction.record_shadow(
             vehicle, desired, vehicle.alter_straight_path, vehicle.simTime)
-        received = getattr(desired, "tiv_by_receiver", {}).get(vehicle.id)
-        if received is None:
-            # No receiver-side fallback; retry on the next MCM.
-            vehicle.alter_straight_path = None
-            COUNTS["missing_sender_tiv"] += 1
-            continue
-        if received["sender"] != desired.vehID or received["path_id"] != desired.pathID:
-            raise ValueError("TIV belongs to a different trajectory")
-        planned = score(vehicle, vehicle.plannedPath, received["point"],
-                        traci.vehicle.getAllowedSpeed(vehicle.id),
-                        traci.vehicletype.getAccel(vehicle.typeID))
-        # Fig.4.2 says >=; two unreachable paths are not an arrival-time tie.
-        accept = bool(math.isfinite(received["value"])
-                      and planned["value"] >= received["value"])
+        accept = deceleration_prediction.active_decision(
+            vehicle, desired, vehicle.alter_straight_path, vehicle.simTime)
+        if accept is None:
+            received = getattr(desired, "tiv_by_receiver", {}).get(vehicle.id)
+            if received is None:
+                # No receiver-side fallback; retry on the next MCM.
+                vehicle.alter_straight_path = None
+                COUNTS["missing_sender_tiv"] += 1
+                continue
+            if received["sender"] != desired.vehID or received["path_id"] != desired.pathID:
+                raise ValueError("TIV belongs to a different trajectory")
+            planned = score(vehicle, vehicle.plannedPath, received["point"],
+                            traci.vehicle.getAllowedSpeed(vehicle.id),
+                            traci.vehicletype.getAccel(vehicle.typeID))
+            # Fig.4.2 says >=; two unreachable paths are not an arrival-time tie.
+            accept = bool(math.isfinite(received["value"])
+                          and planned["value"] >= received["value"])
+        else:
+            COUNTS["deceleration_active_decisions"] += 1
+            planned = {"value": None, "source": "deceleration-propagation"}
+            received = {"value": None, "source": "deceleration-propagation"}
         COUNTS["receiver_tiv_comparisons"] += 1
         COUNTS["accepted" if accept else "rejected"] += 1
         if len(EXAMPLES) < 100:

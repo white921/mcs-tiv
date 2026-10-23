@@ -554,6 +554,8 @@ def get_options():
     optParser.add_option("--no-save", action="store_true", default=False, help="do not append the run to statistics CSV")
     optParser.add_option("--deceleration-shadow", action="store_true", default=False,
                          help="record read-only deceleration-propagation comparisons")
+    optParser.add_option("--deceleration-active", action="store_true", default=False,
+                         help="experimentally use deceleration-propagation decisions")
     options, args = optParser.parse_args()
     if len(args) != 5:
         optParser.error("expected: alpha seed inflow_left inflow_bottom inflow_right")
@@ -570,12 +572,13 @@ def get_options():
 if __name__ == "__main__":
     # load whether to run with or without GUI
     options, args = get_options()
-    if options.deceleration_shadow:
-        if os.environ.get("MCS_DECELERATION_MODE", "off") not in ("off", "shadow"):
-            raise ValueError("--deceleration-shadow requires shadow-compatible mode")
-        os.environ["MCS_DECELERATION_MODE"] = "shadow"
+    if options.deceleration_shadow or options.deceleration_active:
+        selected_mode = "active" if options.deceleration_active else "shadow"
+        if os.environ.get("MCS_DECELERATION_MODE", "off") not in ("off", selected_mode):
+            raise ValueError("requested deceleration mode conflicts with MCS_DECELERATION_MODE")
+        os.environ["MCS_DECELERATION_MODE"] = selected_mode
         import deceleration_prediction
-        deceleration_prediction.configure("shadow")
+        deceleration_prediction.configure(selected_mode)
     simulation_time = options.duration
     diagnostic_stop_time = options.stop_time
     bus_share = options.bus_share
