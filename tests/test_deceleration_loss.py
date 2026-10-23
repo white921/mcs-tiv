@@ -79,6 +79,8 @@ class DecelerationLossTests(unittest.TestCase):
         result = prediction.evaluate(receiver, desired, alternative, 0.0)
         self.assertEqual(result["follower_count"], 1)
         self.assertIn("c", result["vehicle_ids"])
+        self.assertEqual(result["replan_interval_s"], 1.0)
+        self.assertEqual(result["follower_replans"], 10)
 
     def test_active_decision_is_available_only_in_active_mode(self):
         def path(veh, kind, speeds):

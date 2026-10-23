@@ -17,6 +17,8 @@ from deceleration_loss import SpeedProfile, decision_margin
 
 DT = 0.1
 HORIZON = 10.0
+REPLAN_INTERVAL = 1.0
+REPLAN_STEPS = int(round(REPLAN_INTERVAL / DT))
 MAX_ACCEL = 3.0
 MAX_DECEL = 5.0
 HEADWAY = 1.5
@@ -105,19 +107,32 @@ def _followers(leader_id, leader_path, candidates, now, excluded):
 
 
 def _propagate_follower(vehicle_id, base, leader, gap):
-    """Predict a follower on the CAV's 0.1 s grid with its accel/decel caps."""
+    """Predict a follower with 1 s replans and 0.1 s state integration.
+
+    At each one-second boundary a target speed is taken from the vehicle's
+    baseline CAV trajectory and a fresh bounded-acceleration segment is made.
+    Between boundaries the segment is executed at SUMO's 0.1 s cadence.  A
+    short-gap brake overrides that segment immediately, just as safety must
+    override a stale candidate path in the live controller.
+    """
     speeds = [base.speeds[0]]
     current_gap = max(0.0, gap)
-    for index in range(100):
+    for start in range(0, 100, REPLAN_STEPS):
+        end = min(start + REPLAN_STEPS, 100)
+        duration = (end - start) * DT
         current = speeds[-1]
-        leader_speed = leader.speeds[index]
-        desired_gap = STANDSTILL_GAP + HEADWAY * current
-        if current_gap < desired_gap:
-            next_speed = max(0.0, current - MAX_DECEL * DT)
-        else:
-            next_speed = min(base.speeds[index + 1], current + MAX_ACCEL * DT)
-        current_gap = max(0.0, current_gap + (leader_speed - next_speed) * DT)
-        speeds.append(next_speed)
+        target = base.speeds[end]
+        planned_accel = max(-MAX_DECEL, min(MAX_ACCEL, (target - current) / duration))
+        for index in range(start, end):
+            current = speeds[-1]
+            leader_speed = leader.speeds[index]
+            desired_gap = STANDSTILL_GAP + HEADWAY * current
+            if current_gap < desired_gap:
+                next_speed = max(0.0, current - MAX_DECEL * DT)
+            else:
+                next_speed = max(0.0, current + planned_accel * DT)
+            current_gap = max(0.0, current_gap + (leader_speed - next_speed) * DT)
+            speeds.append(next_speed)
     return SpeedProfile(vehicle_id, base.times, tuple(speeds))
 
 
@@ -159,6 +174,8 @@ def evaluate(receiver, desired, alternative, now):
     result = decision_margin(reject, accept, reject)
     return {**result, "vehicle_ids": sorted(reject),
             "follower_count": max(0, len(reject) - 2),
+            "replan_interval_s": REPLAN_INTERVAL,
+            "follower_replans": max(0, len(reject) - 2) * int(HORIZON / REPLAN_INTERVAL),
             "decision": "accept" if result["reject_minus_accept_m"] >= 0 else "reject"}
 
 
