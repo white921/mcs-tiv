@@ -119,7 +119,7 @@ def main():
               "limitations": ["Prediction accuracy is observed only for the proposal-selected action; it is not a counterfactual outcome test.",
                               "The same-event TIV comparison counts decision disagreements, but cannot establish which alternative would have been better without branch replay.",
                               "Free-flow shortfall is a distributional proxy, not the proposal's counterfactual distance-loss definition."]}
-    args.output.mkdir(parents=True, exist_ok=False)
+    args.output.mkdir(parents=True, exist_ok=True)
     (args.output / "evaluation-report.json").write_text(json.dumps(report, indent=2))
     lines = ["# Eval.3: TIVtep と減速伝播提案法の比較", "", report["scope"], "",
              "## 平均速度", "", "| 指標 | TIVtep | 提案法 | 差 |", "|---|---:|---:|---:|"]
@@ -127,7 +127,41 @@ def main():
     lines.append(f"| 平均速度 [m/s] | {speed['tivtep_mean_mps']:.4f} | {speed['proposal_mean_mps']:.4f} | {speed['paired_difference_mean_mps']:+.4f} |")
     lines += ["", "## Seed別", "", "| seed | TIVtep | 提案法 | 差 |", "|---:|---:|---:|---:|"]
     lines += [f"| {row['seed']} | {row['tivtep_speed_mps']:.4f} | {row['proposal_speed_mps']:.4f} | {row['difference_mps']:+.4f} |" for row in rows]
-    lines += ["", "## 計測済みの安全・分布指標", "", "JSONの `traffic_metrics`、`proposal_prediction_accuracy`、`proposal_decision_counts` をHTML化の一次データとする。", "", "## 限界", ""]
+    prediction = report["proposal_prediction_accuracy"]
+    lines += ["", "## 提案法の10秒予測と実測", "",
+              "選択された承諾または拒否後の実測との比較であり、逆判断の反実仮想ではない。", "",
+              "| 予測窓 | 速度サンプル | 速度MAE [m/s] | 速度RMSE [m/s] | 10秒累積距離の絶対誤差 [m] | 平均後続車数 |",
+              "|---:|---:|---:|---:|---:|---:|",
+              f"| {prediction['windows']} | {prediction['samples']} | {prediction['speed_mae_mps']:.4f} | {prediction['speed_rmse_mps']:.4f} | {prediction['mean_abs_distance_error_m_per_window']:.4f} | {prediction['mean_followers_per_window']:.4f} |",
+              "", "## 急減速・停止・全車両shortfall", "",
+              "強い減速は加速度 -3.0 m/s² 以下、停止は速度 0.1 m/s 未満。shortfall は自由流13.89 m/sとの差を積分した代理指標。", "",
+              "| 車種 | 指標 | TIVtep | 提案法 |", "|---|---|---:|---:|"]
+    for group, label in (("car", "乗用車"), ("bus", "バス")):
+        tiv = report["traffic_metrics"]["tivtep"][group]
+        proposal = report["traffic_metrics"]["proposal"][group]
+        lines += [f"| {label} | 強い減速時間率 | {tiv['hard_brake_rate']:.4%} | {proposal['hard_brake_rate']:.4%} |",
+                  f"| {label} | 停止時間率 | {tiv['stop_rate']:.4%} | {proposal['stop_rate']:.4%} |",
+                  f"| {label} | shortfall 中央値 [m] | {tiv['free_flow_shortfall_m']['median']:.2f} | {proposal['free_flow_shortfall_m']['median']:.2f} |",
+                  f"| {label} | shortfall p95 [m] | {tiv['free_flow_shortfall_m']['p95']:.2f} | {proposal['free_flow_shortfall_m']['p95']:.2f} |"]
+    lines += ["", "## 後続車のshortfall分布", "",
+              "ライブ制御中に前方車を持った車両だけを抽出した分布。反実仮想の距離損失ではない。", "",
+              "| 車種 | 指標 | TIVtep | 提案法 |", "|---|---|---:|---:|"]
+    for group, label in (("car", "乗用車"), ("bus", "バス")):
+        tiv = report["following_vehicle_shortfall"]["tivtep"][group]
+        proposal = report["following_vehicle_shortfall"]["proposal"][group]
+        lines += [f"| {label} | 車両数 | {tiv['count']} | {proposal['count']} |",
+                  f"| {label} | 平均 [m] | {tiv['mean']:.2f} | {proposal['mean']:.2f} |",
+                  f"| {label} | 中央値 [m] | {tiv['median']:.2f} | {proposal['median']:.2f} |",
+                  f"| {label} | p95 [m] | {tiv['p95']:.2f} | {proposal['p95']:.2f} |"]
+    decisions = report["proposal_decision_counts"]
+    lines += ["", "## 同一イベントでの判断差（簡易比較）", "",
+              "| 指標 | 件数 |", "|---|---:|"]
+    lines += [f"| 提案法の承諾 | {decisions.get('proposal_accept', 0)} |",
+              f"| 提案法の拒否 | {decisions.get('proposal_reject', 0)} |",
+              f"| 同一イベントでTIVtepと一致 | {decisions.get('decision_agreement', 0)} |",
+              f"| 同一イベントでTIVtepと不一致 | {decisions.get('decision_disagreement', 0)} |",
+              f"| TIVtep比較不能 | {decisions.get('tiv_comparison_unavailable', 0)} |",
+              "", "## 限界", ""]
     lines += [f"- {item}" for item in report["limitations"]]
     (args.output / "evaluation-report.md").write_text("\n".join(lines) + "\n")
 
