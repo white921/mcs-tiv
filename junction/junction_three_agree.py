@@ -552,6 +552,8 @@ def get_options():
     optParser.add_option("--route-mode", type="choice", choices=["random", "eval1"], default="random", help="unrestricted routes or Eval.1 A/C straight-only routes")
     optParser.add_option("--quiet", action="store_true", default=False, help="suppress verbose per-step output")
     optParser.add_option("--no-save", action="store_true", default=False, help="do not append the run to statistics CSV")
+    optParser.add_option("--deceleration-shadow", action="store_true", default=False,
+                         help="record read-only deceleration-propagation comparisons")
     options, args = optParser.parse_args()
     if len(args) != 5:
         optParser.error("expected: alpha seed inflow_left inflow_bottom inflow_right")
@@ -568,6 +570,12 @@ def get_options():
 if __name__ == "__main__":
     # load whether to run with or without GUI
     options, args = get_options()
+    if options.deceleration_shadow:
+        if os.environ.get("MCS_DECELERATION_MODE", "off") not in ("off", "shadow"):
+            raise ValueError("--deceleration-shadow requires shadow-compatible mode")
+        os.environ["MCS_DECELERATION_MODE"] = "shadow"
+        import deceleration_prediction
+        deceleration_prediction.configure("shadow")
     simulation_time = options.duration
     diagnostic_stop_time = options.stop_time
     bus_share = options.bus_share

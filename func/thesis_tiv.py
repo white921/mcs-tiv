@@ -5,6 +5,7 @@ import json
 import math
 import os
 from collections import Counter
+import deceleration_prediction
 
 COUNTS = Counter()
 EXAMPLES = []
@@ -184,6 +185,11 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             vehicle.alter_straight_path = selected
         if not vehicle.alter_straight_path:
             continue
+        # Shadow mode is intentionally read-only: it observes the same
+        # physically feasible alternative considered by the baseline TIV
+        # implementation and never changes the decision below.
+        deceleration_prediction.record_shadow(
+            vehicle, desired, vehicle.alter_straight_path, vehicle.simTime)
         received = getattr(desired, "tiv_by_receiver", {}).get(vehicle.id)
         if received is None:
             # No receiver-side fallback; retry on the next MCM.
