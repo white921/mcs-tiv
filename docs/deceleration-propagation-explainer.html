@@ -1157,6 +1157,77 @@
       </div>
       <p class="speaker-note"><strong>注意：</strong>通信外の全車両や未来のSUMO状態を予測入力にしない。送信・受信で時刻が違うため、合計スコアだけで窓を合わせられるか確認する。追加遅延・ゆらぎ・欠損は拡張評価の候補であり、行う場合もDSRCやC-V2Xの物理・MAC層の再現とは区別する。</p>
     </section>
+
+    <section class="slide" id="slide-14" data-title="Eval.3 実行結果">
+      <div class="slide-number">14 / EVAL.3 RESULT</div>
+      <h2>より直接的な判断根拠へ置換しても、<br>全体平均速度の変化は <span style="color:var(--amber)">−2.8%</span> にとどまった。</h2>
+      <div class="grid-3">
+        <article class="card blue">
+          <small>CONTROL / YAMASHITA TIVTEP</small>
+          <h3>7.5843 m/s</h3>
+          <p>昨日の<code>fix/reproduction-paper</code>再現実験。提案ブランチの分岐元であり、同一のEval.3条件・同一5 seedを使う対照である。</p>
+        </article>
+        <article class="card accent">
+          <small>PROPOSAL / DECELERATION PROPAGATION</small>
+          <h3>7.3724 m/s</h3>
+          <p>承諾／拒否について、要求車・判断車・後続車列を10秒予測して累積距離損失で判断した結果。</p>
+        </article>
+        <article class="card amber">
+          <small>PAIRED DIFFERENCE</small>
+          <h3>−0.2120 m/s</h3>
+          <p>対照比−2.79%。本研究では、この程度の全体速度変化を許容し、判断根拠の直接性を重視する。</p>
+        </article>
+      </div>
+      <table style="margin-top:22px">
+        <thead><tr><th>seed</th><th>山下TIVtep [m/s]</th><th>提案手法 [m/s]</th><th>提案−TIVtep [m/s]</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>7.3867</td><td>7.3797</td><td>−0.0070</td></tr>
+          <tr><td>2</td><td>7.9353</td><td>7.2308</td><td>−0.7045</td></tr>
+          <tr><td>3</td><td>7.5424</td><td>7.6833</td><td>+0.1408</td></tr>
+          <tr><td>4</td><td>7.4352</td><td>7.5017</td><td>+0.0665</td></tr>
+          <tr><td>5</td><td>7.6220</td><td>7.0665</td><td>−0.5555</td></tr>
+          <tr><th>平均</th><th>7.5843</th><th>7.3724</th><th>−0.2120</th></tr>
+        </tbody>
+      </table>
+      <p class="takeaway">この結果は「提案手法が交通流を改善した」ことを示すものではない。一方、後続車列と途中の減速・回復を扱う判断へ変更しても、Eval.3のマクロな平均速度を大きく損なわなかったことを示す。</p>
+    </section>
+
+    <section class="slide" id="slide-15" data-title="何を比較し、何が未計測か">
+      <div class="slide-number">15 / INTERPRETATION &amp; NEXT MEASUREMENTS</div>
+      <h2>今回比較したのは交通流の平均値。<br>次は、判断根拠の良さを実測する。</h2>
+      <div class="grid-2">
+        <article class="card accent">
+          <small>MEASURED IN THIS RUN</small>
+          <h3>実装が機能したこと</h3>
+          <ul class="check-list">
+            <li>Eval.3、600秒、α=7、流入400×3、paper-random25、seed 1〜5で対照した。</li>
+            <li>提案手法は4,511回の交渉を試行し、3,808回（84.4%）で10秒予測を完了した。</li>
+            <li>後続車プロファイルを13,471台ぶん作成した。予測不能な703回（15.6%）は既存TIVtepへフォールバックした。</li>
+            <li>5 seedすべて完走し、collision / caution は0だった。</li>
+          </ul>
+        </article>
+        <article class="card blue">
+          <small>WHY THE RATIONALE IS MORE DIRECT</small>
+          <h3>山下手法との判断根拠の違い</h3>
+          <ul class="plain-list">
+            <li><strong>山下TIVtep:</strong> 実験で定めた車間距離重みと終端速度の加重和で、後続影響を近似する。</li>
+            <li><strong>提案手法:</strong> 通信で観測した後続車列を使い、承諾／拒否ごとに10秒の速度変化を積分して比較する。</li>
+            <li>終端速度が同じでも、途中で生じた急減速・回復の損失を残せる。</li>
+          </ul>
+        </article>
+      </div>
+      <table style="margin-top:22px">
+        <thead><tr><th>次に測る指標</th><th>何が分かるか</th><th>今回のログだけで数値化できるか</th></tr></thead>
+        <tbody>
+          <tr><td>予測速度列と、その後10秒の実測速度列のMAE / RMSE</td><td>提案予測が実際の挙動をどれほど説明できるか</td><td>不可。判断時の予測列と実測追跡ログを追加保存する必要がある。</td></tr>
+          <tr><td>10秒累積距離損失の予測誤差</td><td>損失比較という判断根拠の妥当性</td><td>不可。同上。</td></tr>
+          <tr><td>急減速回数・急減速時間、停止時間</td><td>平均速度に隠れる乗り心地・局所的な悪化</td><td>不可。0.1秒の加速度・停止状態を集計する必要がある。</td></tr>
+          <tr><td>車両別・後続車別の損失分布（中央値・p95）</td><td>損失を特定車列へ押し付けていないか</td><td>不可。車両単位の累積損失ログを追加する必要がある。</td></tr>
+          <tr><td>判断が異なった交渉の反実仮想比較</td><td>同じ交渉で、承諾／拒否のどちらが実際に良いか</td><td>不可。判断時点からSUMO状態を2枝で再実行する必要がある。</td></tr>
+        </tbody>
+      </table>
+      <p class="takeaway">現時点で言える結論は、「より直接的・説明可能な判断根拠を導入しても、全体交通性能は許容範囲で維持された」。予測精度・急減速・損失分布を計測すれば、この判断根拠がどれだけ優れているかを数値で示せる。</p>
+    </section>
   </main>
 
   <script>
