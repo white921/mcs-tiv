@@ -21,6 +21,7 @@ from cav_three_junction_bus import CAV_bus
 from animation_junction import Animation
 from frenet_merge import emergency_stop
 from thesis_scenarios import choose_t_junction_route
+import evaluation_metrics
 
 # we need to import python modules from the $SUMO_HOME/tools directory
 # If the the environment variable SUMO_HOME is not set, try to locate the python modules relative to this script
@@ -451,6 +452,11 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False, save_sta
 
             if(count_Distribution and sumo_time > 30):
                 cav0_dist[int(round(ins.speed,1)*10)] += 1
+
+        # Record actual 0.1-second motion after all controllers have updated.
+        # This is a no-op unless MCS_EVALUATION_AUDIT is configured.
+        evaluation_metrics.observe(
+            [ins for ins in vehicle_instance if ins.id in running_list], sumo_time)
 
         #車両インスタンスを削除
         if poplist:

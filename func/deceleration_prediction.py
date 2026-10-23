@@ -14,6 +14,7 @@ import os
 from collections import Counter
 
 from deceleration_loss import SpeedProfile, decision_margin
+import evaluation_metrics
 
 DT = 0.1
 HORIZON = 10.0
@@ -157,8 +158,8 @@ def _case_profiles(roots, candidates, now):
     return profiles
 
 
-def evaluate(receiver, desired, alternative, now):
-    """Evaluate accept/reject with every detectable following queue."""
+def _evaluate_detail(receiver, desired, alternative, now):
+    """Return the comparison and both case profiles for instrumentation."""
     sender_id, receiver_id = str(desired.vehID), str(receiver.id)
     candidates = _latest_planned(receiver)
     sender_planned = candidates.get(sender_id)
@@ -172,11 +173,17 @@ def evaluate(receiver, desired, alternative, now):
     if set(reject) != set(accept):
         raise ValueError("counterfactual cases select different follower sets")
     result = decision_margin(reject, accept, reject)
-    return {**result, "vehicle_ids": sorted(reject),
-            "follower_count": max(0, len(reject) - 2),
-            "replan_interval_s": REPLAN_INTERVAL,
-            "follower_replans": max(0, len(reject) - 2) * int(HORIZON / REPLAN_INTERVAL),
-            "decision": "accept" if result["reject_minus_accept_m"] >= 0 else "reject"}
+    result = {**result, "vehicle_ids": sorted(reject),
+              "follower_count": max(0, len(reject) - 2),
+              "replan_interval_s": REPLAN_INTERVAL,
+              "follower_replans": max(0, len(reject) - 2) * int(HORIZON / REPLAN_INTERVAL),
+              "decision": "accept" if result["reject_minus_accept_m"] >= 0 else "reject"}
+    return result, accept, reject
+
+
+def evaluate(receiver, desired, alternative, now):
+    """Evaluate accept/reject with every detectable following queue."""
+    return _evaluate_detail(receiver, desired, alternative, now)[0]
 
 
 def _record_evaluation(receiver, desired, alternative, now, mode):
@@ -185,7 +192,7 @@ def _record_evaluation(receiver, desired, alternative, now, mode):
         return None
     COUNTS[mode + "_attempts"] += 1
     try:
-        result = evaluate(receiver, desired, alternative, now)
+        result, accept_profiles, reject_profiles = _evaluate_detail(receiver, desired, alternative, now)
     except (AttributeError, IndexError, TypeError, ValueError, ZeroDivisionError) as error:
         COUNTS[mode + "_unsupported"] += 1
         record = {"time": now, "receiver": str(receiver.id),
@@ -194,6 +201,9 @@ def _record_evaluation(receiver, desired, alternative, now, mode):
     else:
         COUNTS[mode + "_evaluations"] += 1
         COUNTS["follower_profiles"] += result["follower_count"]
+        if mode == "active":
+            chosen_profiles = accept_profiles if result["decision"] == "accept" else reject_profiles
+            evaluation_metrics.register_prediction(now, result["decision"], result["follower_count"], chosen_profiles)
         record = {"time": now, "receiver": str(receiver.id), "sender": str(desired.vehID),
                   "desired_path_id": desired.pathID, "alternative_path_id": alternative.pathID,
                   "status": "evaluated", "predictor": "10s-kinematic-following",
@@ -218,6 +228,15 @@ def active_decision(receiver, desired, alternative, now):
     if record is None or record["status"] != "evaluated":
         return None
     return record["decision"] == "accept"
+
+
+def record_tiv_comparison(proposal_accept, tiv_accept):
+    """Count whether the active proposal would differ from TIV at this event."""
+    if MODE != "active":
+        return
+    COUNTS["proposal_accept" if proposal_accept else "proposal_reject"] += 1
+    COUNTS["tiv_would_accept" if tiv_accept else "tiv_would_reject"] += 1
+    COUNTS["decision_agreement" if proposal_accept == tiv_accept else "decision_disagreement"] += 1
 
 
 def _write_audit():

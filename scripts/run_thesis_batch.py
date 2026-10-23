@@ -92,7 +92,8 @@ def run_task(task, args):
                PYTHONPATH=str(sumo_home / "tools"),
                MPLBACKEND="Agg", OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1",
                MCS_TIV_IMPLEMENTATION="thesis",
-               MCS_TIV_AUDIT=str(destination / "tiv-audit.json"))
+               MCS_TIV_AUDIT=str(destination / "tiv-audit.json"),
+               MCS_EVALUATION_AUDIT=str(destination / "evaluation-metrics.json"))
     if args.deceleration_active:
         env["MCS_DECELERATION_AUDIT"] = str(destination / "deceleration-audit.json")
     command = [args.python, "-u", case["script"], case["alpha"], str(seed),
@@ -133,6 +134,7 @@ def run_task(task, args):
                     all_speed_mps=(float(speed.group(1)) if speed else None),
                     vehicle_mix=([int(mix.group(1)), int(mix.group(2))] if mix else None),
                     audit_written=(destination / "tiv-audit.json").is_file(),
+                    evaluation_metrics_written=(destination / "evaluation-metrics.json").is_file(),
                     deceleration_audit_written=(destination / "deceleration-audit.json").is_file())
     (destination / "manifest.json").write_text(json.dumps(manifest, indent=2))
     return manifest

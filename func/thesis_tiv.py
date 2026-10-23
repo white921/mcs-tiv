@@ -208,6 +208,18 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             accept = bool(math.isfinite(received["value"])
                           and planned["value"] >= received["value"])
         else:
+            # Measure the TIV decision on exactly the same event.  It is
+            # audit-only: the proposal decision above remains authoritative.
+            received_tiv = getattr(desired, "tiv_by_receiver", {}).get(vehicle.id)
+            if received_tiv is not None:
+                planned_tiv = score(vehicle, vehicle.plannedPath, received_tiv["point"],
+                                    traci.vehicle.getAllowedSpeed(vehicle.id),
+                                    traci.vehicletype.getAccel(vehicle.typeID))
+                tiv_accept = bool(math.isfinite(received_tiv["value"])
+                                  and planned_tiv["value"] >= received_tiv["value"])
+                deceleration_prediction.record_tiv_comparison(accept, tiv_accept)
+            else:
+                deceleration_prediction.COUNTS["tiv_comparison_unavailable"] += 1
             COUNTS["deceleration_active_decisions"] += 1
             planned = {"value": None, "source": "deceleration-propagation"}
             received = {"value": None, "source": "deceleration-propagation"}
