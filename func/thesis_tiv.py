@@ -6,6 +6,7 @@ import math
 import os
 from collections import Counter
 import deceleration_prediction
+import diagnostic_trace
 import evaluation_metrics
 
 COUNTS = Counter()
@@ -158,6 +159,9 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
     if vehicle.WithAgreementPhase and vehicle.isWaitAgree:
         if vehicle.waitPath.pathID in desired_ids:
             return
+        diagnostic_trace.record_negotiation(
+            vehicle, vehicle.waitPath, "cancelled",
+            reason="desired_path_disappeared")
         vehicle.isWaitAgree = False
         vehicle.waitAgreeID = []
         vehicle.receiveAgreeID = []
@@ -178,9 +182,17 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
         # during that interval; a new path ID remains immediately eligible.
         if deceleration_prediction.active_decision_is_locked(
                 vehicle, desired, vehicle.simTime):
+            diagnostic_trace.record_negotiation(
+                vehicle, desired, "suppressed", reason="decision_locked",
+                collision=collision)
             continue
+        diagnostic_trace.record_negotiation(
+            vehicle, desired, "started", collision=collision)
         alternatives = vehicle.generateAlterPath(collision, obstacles)
         if not alternatives:
+            diagnostic_trace.record_negotiation(
+                vehicle, desired, "decision", accept=False,
+                reason="no_feasible_alternative", collision=collision)
             vehicle.yetJudgedList.append(desired.pathID)
             vehicle.count_refuse_physics += 1
             COUNTS["no_feasible_alternative"] += 1
@@ -191,6 +203,9 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
         else:
             vehicle.alter_straight_path = selected
         if not vehicle.alter_straight_path:
+            diagnostic_trace.record_negotiation(
+                vehicle, desired, "deferred", reason="no_selected_alternative",
+                collision=collision)
             continue
         # Shadow mode is intentionally read-only: it observes the same
         # physically feasible alternative considered by the baseline TIV
@@ -203,6 +218,9 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             received = getattr(desired, "tiv_by_receiver", {}).get(vehicle.id)
             if received is None:
                 # No receiver-side fallback; retry on the next MCM.
+                diagnostic_trace.record_negotiation(
+                    vehicle, desired, "deferred", reason="missing_sender_tiv",
+                    collision=collision)
                 vehicle.alter_straight_path = None
                 COUNTS["missing_sender_tiv"] += 1
                 continue
@@ -261,6 +279,11 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
                     })
         COUNTS["receiver_tiv_comparisons"] += 1
         COUNTS["accepted" if accept else "rejected"] += 1
+        diagnostic_trace.record_negotiation(
+            vehicle, desired, "decision", accept=accept,
+            reason=prediction_method, collision=collision,
+            details={"sender_tiv": received.get("value"),
+                     "receiver_tiv": planned.get("value")})
         if len(EXAMPLES) < 100:
             EXAMPLES.append({"receiver": vehicle.id, "sender": desired.vehID,
                              "time": vehicle.simTime, "received": received,
@@ -281,6 +304,11 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             vehicle.receiveAgreeID.append(vehicle.id)
             vehicle.isWaitAgree = True
             vehicle.waitPath = desired
+            diagnostic_trace.record_negotiation(
+                vehicle, desired, "waiting_for_agreement", accept=True,
+                reason=prediction_method, collision=collision,
+                details={"expected_agreement_ids": vehicle.waitAgreeID,
+                         "received_agreement_ids": vehicle.receiveAgreeID})
             return
         vehicle.alter_straight_path.type = "planned"
         vehicle.plannedPath = vehicle.alter_straight_path
@@ -289,6 +317,9 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
         vehicle.leader = desired.vehID
         vehicle.leadPath = desired
         vehicle.isPathValid = True
+        diagnostic_trace.record_negotiation(
+            vehicle, desired, "applied", accept=True,
+            reason=prediction_method, collision=collision)
 
 
 def _write_audit():

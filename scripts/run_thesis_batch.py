@@ -17,6 +17,7 @@ import concurrent.futures
 import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import re
 import shutil
@@ -65,8 +66,26 @@ def source_hashes(source):
     return {
         str(path.relative_to(source)): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in source.rglob("*")
-        if path.is_file() and path.suffix in (".py", ".xml", ".sumocfg")
+        if (path.is_file() and "statistics" not in path.parts
+            and path.suffix in (".py", ".xml", ".sumocfg"))
     }
+
+
+def git_metadata():
+    """Return reproducibility metadata without making a run depend on Git."""
+    try:
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True,
+            stderr=subprocess.DEVNULL).strip()
+        branch = subprocess.check_output(
+            ["git", "branch", "--show-current"], cwd=ROOT, text=True,
+            stderr=subprocess.DEVNULL).strip()
+        dirty = bool(subprocess.check_output(
+            ["git", "status", "--porcelain"], cwd=ROOT, text=True,
+            stderr=subprocess.DEVNULL).strip())
+        return {"commit": commit, "branch": branch or None, "dirty": dirty}
+    except (OSError, subprocess.CalledProcessError):
+        return {"commit": None, "branch": None, "dirty": None}
 
 
 def prepare_source(destination, case):
@@ -87,6 +106,7 @@ def run_task(task, args):
     destination.mkdir(parents=True, exist_ok=False)
     source, initial_hashes = prepare_source(destination, case)
     sumo_home = args.sumo_home.resolve()
+    is_three_way = case["folder"] == "junction" and case["script"] == "junction_three_agree.py"
     env = dict(os.environ,
                SUMO_HOME=str(sumo_home),
                PYTHONPATH=str(sumo_home / "tools"),
@@ -95,12 +115,17 @@ def run_task(task, args):
                MCS_TIV_AUDIT=str(destination / "tiv-audit.json"),
                MCS_EVALUATION_AUDIT=str(destination / "evaluation-metrics.json"),
                MCS_PREDICTION_EVENT_AUDIT=str(destination / "prediction-events.jsonl"))
+    if args.diagnostic_traces and is_three_way:
+        env.update(
+            MCS_VEHICLE_STATE_AUDIT=str(destination / "vehicle-states.jsonl"),
+            MCS_CONFLICT_AUDIT=str(destination / "conflicts.jsonl"),
+            MCS_NEGOTIATION_AUDIT=str(destination / "negotiations.jsonl"),
+            MCS_RUNTIME_AUDIT=str(destination / "runtime.jsonl"))
     if args.deceleration_active:
         env["MCS_DECELERATION_AUDIT"] = str(destination / "deceleration-audit.json")
     command = [args.python, "-u", case["script"], case["alpha"], str(seed),
                *case["flows"], "--nogui", "--quiet", "--duration", str(args.duration),
                "--bus-allocation", args.bus_allocation]
-    is_three_way = case["folder"] == "junction" and case["script"] == "junction_three_agree.py"
     if args.deceleration_active:
         command.append("--deceleration-active")
     if not is_three_way:
@@ -115,7 +140,13 @@ def run_task(task, args):
         "bus_allocation": args.bus_allocation,
         "bus_share": case["bus_share"],
         "decision_method": "deceleration-propagation" if args.deceleration_active else "thesis-tiv",
+        "diagnostic_traces_requested": args.diagnostic_traces,
+        "diagnostic_traces_enabled": bool(args.diagnostic_traces and is_three_way),
+        "trace_schema_version": 1 if args.diagnostic_traces and is_three_way else None,
         "source_sha256": initial_hashes,
+        "git": git_metadata(),
+        "python_version": sys.version,
+        "platform": platform.platform(),
         "sumo_version": subprocess.check_output([str(sumo_home / "bin" / "sumo"), "--version"], text=True),
         "started_epoch": time.time(),
     }
@@ -139,7 +170,11 @@ def run_task(task, args):
                     audit_written=(destination / "tiv-audit.json").is_file(),
                     evaluation_metrics_written=(destination / "evaluation-metrics.json").is_file(),
                     prediction_event_audit_written=(destination / "prediction-events.jsonl").is_file(),
-                    deceleration_audit_written=(destination / "deceleration-audit.json").is_file())
+                    deceleration_audit_written=(destination / "deceleration-audit.json").is_file(),
+                    vehicle_state_audit_written=(destination / "vehicle-states.jsonl").is_file(),
+                    conflict_audit_written=(destination / "conflicts.jsonl").is_file(),
+                    negotiation_audit_written=(destination / "negotiations.jsonl").is_file(),
+                    runtime_audit_written=(destination / "runtime.jsonl").is_file())
     (destination / "manifest.json").write_text(json.dumps(manifest, indent=2))
     return manifest
 
@@ -164,6 +199,8 @@ def main():
                              "paper-random25 only for original-artifact reproduction")
     parser.add_argument("--deceleration-active", action="store_true",
                         help="use the proposed deceleration-propagation rule")
+    parser.add_argument("--diagnostic-traces", action="store_true",
+                        help="write Eval.3 replay/conflict/negotiation/runtime JSONL traces")
     args = parser.parse_args()
     if args.workers < 1:
         parser.error("--workers must be positive")

@@ -61,5 +61,24 @@ python3 scripts/run_thesis_batch.py \
 損失・判断・後続車数が残る。現時点でactive実装の対象はT字路Eval.3のみであり、
 Eval.5/7へ一般化する前に十字路・合流の車線関係を同じ予測器で検証する必要がある。
 
-`--duration`は600秒のままにし、`--stop-time`だけで短縮する。論文再現用の
-出力先や統計CSVと同居させない。
+振る舞い調査用の300秒実験では`--diagnostic-traces`を付ける。
+
+```sh
+python3 scripts/run_thesis_batch.py \
+  --sumo-home /path/to/sumo --python python3 \
+  --output results/deceleration-eval3-diagnostic \
+  --cases eval3 --workers 1 --duration 300 \
+  --deceleration-active --diagnostic-traces
+```
+
+各`seed-*`に次の追加ログが残る。車両状態は0.1秒ごとの1行に、
+その時点で走行中の全車両をまとめるため、300秒で約3,000フレームになる。
+
+- `vehicle-states.jsonl`: 座標、速度、加速度、走行車線、前方車、車間、軌道ID、交渉待ち状態
+- `conflicts.jsonl`: 競合2台の実位置、経路、競合点、予測通過時刻、PET、判定理由
+- `negotiations.jsonl`: 開始、判断、合意待ち、適用、取消とその理由
+- `runtime.jsonl`: SUMOステップ、経路更新、競合判定、車両制御などのステップ別実時間
+- `manifest.json`: Gitコミット・ブランチ・dirty状態、Python/SUMO/OS、seed、条件、各ログの生成結果
+
+上記は観測フックのみで、交渉判断、軌道生成、速度制御を変更しない。
+論文の最終評価では`--duration 600`を使い、論文再現用の出力先や統計CSVと同居させない。

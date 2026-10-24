@@ -6,7 +6,8 @@ from __future__ import print_function
 import os
 import sys
 import optparse
-from collections import deque
+import time
+from collections import defaultdict, deque
 from contextlib import redirect_stdout
 import numpy as np
 import datetime
@@ -22,6 +23,7 @@ from animation_junction import Animation
 from frenet_merge import emergency_stop
 from thesis_scenarios import choose_t_junction_route
 import evaluation_metrics
+import diagnostic_trace
 
 # we need to import python modules from the $SUMO_HOME/tools directory
 # If the the environment variable SUMO_HOME is not set, try to locate the python modules relative to this script
@@ -276,6 +278,7 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False, save_sta
     get_followrange = 0
 
     #初期設定（障害物の配置など）
+    diagnostic_trace.initialize()
     set_environment(inflow_0, inflow_1, inflow_2)
     file = alpha + '_' + str(inflow_0) + '_' + str(inflow_1) + '_' + str(inflow_2)
     animator = Animation(file)
@@ -283,7 +286,11 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False, save_sta
     #シミュレーション開始
     run_until = diagnostic_stop_time if diagnostic_stop_time is not None else simulation_time
     while sumo_time < run_until:
+        step_started = time.perf_counter()
+        phase_seconds = defaultdict(float)
+        phase_started = time.perf_counter()
         traci.simulationStep()
+        phase_seconds["sumo_step"] += time.perf_counter() - phase_started
         sumo_time = traci.simulation.getTime()
         print("\nTIME:", sumo_time)
         if sumo_time % 20 == 0:
@@ -301,6 +308,7 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False, save_sta
         print([i.pathID for i in central_path_server])
         print([i.type for i in central_path_server])
         #CAV各車両の動作
+        controller_started = time.perf_counter()
         for index, ins in enumerate(vehicle_instance):
             # シミュレーション範囲を出た車両をリスト化
             if ins.id in arrived_list:
@@ -311,19 +319,24 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False, save_sta
                 continue
 
             #他車両の情報を収集
+            phase_started = time.perf_counter()
             ins.receiveMCM(central_path_server)
 
             #自車両の情報（位置や速度）を更新
             ins.updateStatus(running_list)
+            phase_seconds["receive_and_status"] += time.perf_counter() - phase_started
             if ins.leadPath:
                 print("\tvehid:", ins.id, "status", ins.status, "current speed", '{:.5g}'.format(ins.speed), "route", ins.route, "road", ins.road, "leader", ins.leader, "pos x,y", '{:.5g}'.format(ins.pos_x), '{:.5g}'.format(ins.pos_y), "leadPath", ins.leadPath.pathID)
             else:
                 print("\tvehid:", ins.id, "status", ins.status, "current speed", '{:.5g}'.format(ins.speed), "route", ins.route, "road", ins.road, "leader", ins.leader, "pos x,y", '{:.5g}'.format(ins.pos_x), '{:.5g}'.format(ins.pos_y))
 
             #自車両の経路を更新
+            phase_started = time.perf_counter()
             ins.updatePlannedPath(ob)
+            phase_seconds["planned_path_update"] += time.perf_counter() - phase_started
 
             #自車両の希望経路を更新
+            phase_started = time.perf_counter()
             if ins.status not in ["lanechange"]:
                 ins.updateDesiredPath(ob)
 
@@ -344,18 +357,21 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False, save_sta
                     ins.desiredPaths = None
                     ins.status = "lanechange"
                     print("\tchange to desired path")
+            phase_seconds["desired_path_and_conflicts"] += time.perf_counter() - phase_started
 
             # SUMO上での車線変更
             #if ins.status == "lanechange":
                 #ins.judgeAndDoLaneChange()
 
             #予定経路に基づき速度調整
+            phase_started = time.perf_counter()
             ins.executionDrive()
 
             #経路情報を集中サーバーへ送信
             ins.sendMCM(next_central_path_server)
 
             ins.checkPassJunction()
+            phase_seconds["drive_publish_and_pass_check"] += time.perf_counter() - phase_started
 
             au, ru, rp, sp, sd, sa = ins.getStatistics()
             count_accept_utility += au
@@ -452,15 +468,20 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False, save_sta
 
             if(count_Distribution and sumo_time > 30):
                 cav0_dist[int(round(ins.speed,1)*10)] += 1
+        phase_seconds["controller_loop_total"] = time.perf_counter() - controller_started
 
         # Record actual 0.1-second motion after all controllers have updated.
         # This is a no-op unless MCS_EVALUATION_AUDIT is configured.
+        phase_started = time.perf_counter()
         observed = [ins for ins in vehicle_instance if ins.id in running_list]
         evaluation_metrics.observe(
             observed, sumo_time,
             {str(ins.id): traci.vehicle.getAllowedSpeed(ins.id) for ins in observed})
+        diagnostic_trace.record_vehicle_states(observed, sumo_time, traci)
+        phase_seconds["metrics_and_state_trace"] += time.perf_counter() - phase_started
 
         #車両インスタンスを削除
+        phase_started = time.perf_counter()
         if poplist:
             for i in sorted(poplist, reverse=True):
                 vehicle_instance.pop(i)
@@ -470,6 +491,10 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False, save_sta
 
         # 車両の新規流入
         add_vehicle(alpha)
+        phase_seconds["cleanup_animation_and_arrivals"] += time.perf_counter() - phase_started
+        diagnostic_trace.record_runtime(
+            sumo_time, phase_seconds, len(observed),
+            time.perf_counter() - step_started)
 
 
     statistics_path = "./statistics/acceptance_three.csv" if save_statistics else os.devnull

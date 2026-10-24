@@ -4,6 +4,7 @@ import sys
 import numpy as np
 import copy
 import thesis_tiv
+import diagnostic_trace
 import thesis_baselines
 import time
 
@@ -271,6 +272,7 @@ class CAV_bus:
             self.receiveAgreeID.sort()
             print("\tagree wait id", self.waitAgreeID, "receive id", self.receiveAgreeID)
             if self.waitAgreeID == self.receiveAgreeID:
+                agreed_path = self.waitPath
                 print("\talter to", self.waitPath.pathID)
                 self.alter_straight_path.type = "planned"
                 self.plannedPath = self.alter_straight_path
@@ -284,9 +286,16 @@ class CAV_bus:
                 self.waitAgreeID = []
                 self.receiveAgreeID = []
                 self.waitPath = None
+                diagnostic_trace.record_negotiation(
+                    self, agreed_path, "applied", accept=True,
+                    reason="all_agreements_received")
 
         # 期限切れの代替経路を削除
         if self.alter_straight_path and round(self.simTime - self.alter_straight_path.t[0], 2) >= pathValidTime:
+            if self.isWaitAgree and self.waitPath:
+                diagnostic_trace.record_negotiation(
+                    self, self.waitPath, "cancelled",
+                    reason="alternative_path_expired")
             self.alter_straight_path = None
             self.isWaitAgree = False
             self.waitAgreeID = []
@@ -403,6 +412,8 @@ class CAV_bus:
             t_last = min(len(own_path.x)-startItr_own, len(x.x)-startItr_x)-1
 
             isCollide = False
+            collision_reason = None
+            pet_s = None
             dict = {"path": None, "collide_x": None, "collide_y" : None, "speed" : None, "duration" : None}
 
             # 重複し得ない経路は計算量削減のため衝突判定を省略
@@ -558,6 +569,8 @@ class CAV_bus:
                         print("collide at", own_path.pathID, own_path.type, "other", x.pathID, x.type, "time", x.t[startItr_x+i], \
                             "PET", abs(own_passtime - other_passtime))
                         isCollide = True
+                        collision_reason = "pet"
+                        pet_s = abs(own_passtime - other_passtime)
                         dict["path"] = x
                         dict["collideID"] = x.vehID
                         dict["collide_x"] = collision_point[0]
@@ -598,6 +611,7 @@ class CAV_bus:
                                 isCollide = True
 
                     if isCollide:
+                        collision_reason = "trajectory_proximity"
                         # print("collide at", own_path.pathID, own_path.type, "other", x.pathID, x.type, "time", x.t[startItr_x+i],\
                         #     "own_pos (", own_pos_x, ",", own_pos_y, ") other_pos (", other_pos_x, ",", other_pos_y, ")")
 
@@ -610,6 +624,13 @@ class CAV_bus:
                         break
             
             if isCollide:
+                diagnostic_trace.record_conflict(
+                    self, own_path, x, dict, traci,
+                    own_pass_time=own_passtime,
+                    other_pass_time=other_passtime,
+                    pet_s=pet_s,
+                    reason=collision_reason,
+                    check_type=s_type)
                 collision_list.append(dict)
             else:
                 notCollision_list.append(x)
