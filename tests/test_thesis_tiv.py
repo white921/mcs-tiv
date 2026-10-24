@@ -184,6 +184,15 @@ class ThesisTIVTests(unittest.TestCase):
         self.assertEqual(v.count_refuse_physics, 1)
         api.vehicle.getAllowedSpeed.assert_not_called()
 
+    def test_active_duplicate_decision_skips_same_desired_path(self):
+        v, _, collisions = self.decision()
+        with patch.object(tiv.deceleration_prediction,
+                          "active_decision_is_locked", return_value=True):
+            tiv.judge_yield(v, collisions, [], traci())
+        v.generateAlterPath.assert_not_called()
+        self.assertEqual(v.count_accept_utility, 0)
+        self.assertEqual(v.count_refuse_utility, 0)
+
     def test_missing_sender_value_no_fallback_no_permanent_rejection(self):
         v, desired, collisions = self.decision()
         desired.tiv_by_receiver = {}

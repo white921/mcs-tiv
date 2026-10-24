@@ -20,6 +20,7 @@ from cav_merge2512 import CAV
 from cav_merge2512_bus import CAV_bus
 from animation_merge import Animation
 from frenet_merge import emergency_stop
+import evaluation_metrics
 
 # we need to import python modules from the $SUMO_HOME/tools directory
 # If the the environment variable SUMO_HOME is not set, try to locate the python modules relative to this script
@@ -364,6 +365,13 @@ def run(alpha='0.0', inflow_0=750, inflow_1=750, quiet=False, save_statistics=Tr
                 if ins.typeID in ("CAV_1", "CAV_1_bus"):
                     cav1_dist[int(round(ins.speed,1)*10)] += 1
 
+        # Record actual 0.1-second motion after all controllers have updated.
+        # This is a no-op unless MCS_EVALUATION_AUDIT is configured.
+        observed = [ins for ins in vehicle_instance if ins.id in running_list]
+        evaluation_metrics.observe(
+            observed, sumo_time,
+            {str(ins.id): traci.vehicle.getAllowedSpeed(ins.id) for ins in observed})
+
         #車両インスタンスを削除
         if poplist:
             for i in sorted(poplist, reverse=True):
@@ -464,6 +472,10 @@ def get_options():
     optParser.add_option("--bus-share", type="float", default=0.0, help="share of buses from 0 to 1")
     optParser.add_option("--quiet", action="store_true", default=False, help="suppress verbose per-step output")
     optParser.add_option("--no-save", action="store_true", default=False, help="do not append the run to statistics CSV")
+    optParser.add_option("--deceleration-shadow", action="store_true", default=False,
+                         help="record read-only deceleration-propagation comparisons")
+    optParser.add_option("--deceleration-active", action="store_true", default=False,
+                         help="experimentally use deceleration-propagation decisions")
     options, args = optParser.parse_args()
     if len(args) != 4:
         optParser.error("expected: alpha seed inflow_requesting inflow_accepting")
@@ -480,6 +492,13 @@ def get_options():
 if __name__ == "__main__":
     # load whether to run with or without GUI
     options, args = get_options()
+    if options.deceleration_shadow or options.deceleration_active:
+        selected_mode = "active" if options.deceleration_active else "shadow"
+        if os.environ.get("MCS_DECELERATION_MODE", "off") not in ("off", selected_mode):
+            raise ValueError("requested deceleration mode conflicts with MCS_DECELERATION_MODE")
+        os.environ["MCS_DECELERATION_MODE"] = selected_mode
+        import deceleration_prediction
+        deceleration_prediction.configure(selected_mode)
     simulation_time = options.duration
     diagnostic_stop_time = options.stop_time
     bus_share = options.bus_share

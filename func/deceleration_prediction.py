@@ -28,6 +28,10 @@ LANE_TOLERANCE = 2.0
 
 COUNTS = Counter()
 RECORDS = []
+# A desired MCM is normally regenerated every second.  Keep an active
+# proposal decision for that one planning interval so the 0.1 s SUMO loop does
+# not repeatedly negotiate the very same desired path.
+ACTIVE_DECISION_UNTIL = {}
 MODE = os.environ.get("MCS_DECELERATION_MODE", "off")
 if MODE not in ("off", "shadow", "active"):
     raise ValueError("MCS_DECELERATION_MODE must be off, shadow, or active")
@@ -39,6 +43,24 @@ def configure(mode):
     if mode not in ("off", "shadow", "active"):
         raise ValueError("MCS_DECELERATION_MODE must be off, shadow, or active")
     MODE = mode
+    ACTIVE_DECISION_UNTIL.clear()
+
+
+def active_decision_is_locked(receiver, desired, now):
+    """Whether this receiver already decided this desired MCM this second.
+
+    This is deliberately only an active-control guard.  Shadow measurements
+    remain able to observe every incoming packet, while the live proposal
+    avoids re-applying a decision until the CAV planning interval expires.
+    A new desired path ID is a new negotiation and is never locked out.
+    """
+    if MODE != "active":
+        return False
+    key = (str(receiver.id), str(desired.vehID), str(desired.pathID))
+    locked = now < ACTIVE_DECISION_UNTIL.get(key, float("-inf"))
+    if locked:
+        COUNTS["active_duplicate_decisions_suppressed"] += 1
+    return locked
 
 
 def _value_at(times, values, moment):
@@ -186,6 +208,28 @@ def evaluate(receiver, desired, alternative, now):
     return _evaluate_detail(receiver, desired, alternative, now)[0]
 
 
+def direct_tiv_profiles(receiver, desired, alternative, now, decision):
+    """Return the two trajectories TIVtep actually has when it decides.
+
+    TIVtep does not forecast a following queue.  Its prediction-accuracy log
+    must therefore be labelled as the direct sender/receiver scope rather
+    than pretending that absent follower forecasts are accurate.
+    """
+    sender_id, receiver_id = str(desired.vehID), str(receiver.id)
+    candidates = _latest_planned(receiver)
+    sender_planned = candidates.get(sender_id)
+    if sender_planned is None:
+        raise ValueError("sender planned trajectory is unavailable")
+    if decision == "accept":
+        roots = {sender_id: desired, receiver_id: alternative}
+    elif decision == "reject":
+        roots = {sender_id: sender_planned, receiver_id: receiver.plannedPath}
+    else:
+        raise ValueError("decision must be accept or reject")
+    return {vehicle_id: _profile(path, vehicle_id, now)
+            for vehicle_id, path in roots.items()}
+
+
 def _record_evaluation(receiver, desired, alternative, now, mode):
     """Evaluate and audit a proposal decision without mutating vehicle state."""
     if MODE != mode:
@@ -203,7 +247,22 @@ def _record_evaluation(receiver, desired, alternative, now, mode):
         COUNTS["follower_profiles"] += result["follower_count"]
         if mode == "active":
             chosen_profiles = accept_profiles if result["decision"] == "accept" else reject_profiles
-            evaluation_metrics.register_prediction(now, result["decision"], result["follower_count"], chosen_profiles)
+            actor_ids = [str(desired.vehID), str(receiver.id)]
+            evaluation_metrics.register_prediction(
+                now, result["decision"], result["follower_count"], chosen_profiles,
+                metadata={
+                    "method": "deceleration-propagation",
+                    "predictor": "10s-kinematic-following",
+                    "receiver_id": str(receiver.id), "sender_id": str(desired.vehID),
+                    "desired_path_id": str(desired.pathID),
+                    "alternative_path_id": str(alternative.pathID),
+                    "actor_vehicle_ids": actor_ids,
+                    "follower_vehicle_ids": sorted(set(chosen_profiles) - set(actor_ids)),
+                    "prediction_scope": "sender_receiver_and_detected_followers",
+                    "accept_loss_m": result["accept_loss_m"],
+                    "reject_loss_m": result["reject_loss_m"],
+                    "decision_margin_m": result["reject_minus_accept_m"],
+                })
         record = {"time": now, "receiver": str(receiver.id), "sender": str(desired.vehID),
                   "desired_path_id": desired.pathID, "alternative_path_id": alternative.pathID,
                   "status": "evaluated", "predictor": "10s-kinematic-following",
@@ -227,6 +286,8 @@ def active_decision(receiver, desired, alternative, now):
     record = _record_evaluation(receiver, desired, alternative, now, "active")
     if record is None or record["status"] != "evaluated":
         return None
+    key = (str(receiver.id), str(desired.vehID), str(desired.pathID))
+    ACTIVE_DECISION_UNTIL[key] = now + REPLAN_INTERVAL
     return record["decision"] == "accept"
 
 

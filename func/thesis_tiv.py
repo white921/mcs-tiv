@@ -6,6 +6,7 @@ import math
 import os
 from collections import Counter
 import deceleration_prediction
+import evaluation_metrics
 
 COUNTS = Counter()
 EXAMPLES = []
@@ -172,6 +173,12 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             continue
         if desired.pathID in vehicle.yetJudgedList:
             continue
+        # The live simulator advances at 0.1 s, but a CAV desired path is
+        # valid for one second.  Do not re-negotiate an already decided path
+        # during that interval; a new path ID remains immediately eligible.
+        if deceleration_prediction.active_decision_is_locked(
+                vehicle, desired, vehicle.simTime):
+            continue
         alternatives = vehicle.generateAlterPath(collision, obstacles)
         if not alternatives:
             vehicle.yetJudgedList.append(desired.pathID)
@@ -207,6 +214,7 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             # Fig.4.2 says >=; two unreachable paths are not an arrival-time tie.
             accept = bool(math.isfinite(received["value"])
                           and planned["value"] >= received["value"])
+            prediction_method = "thesis-tiv-fallback"
         else:
             # Measure the TIV decision on exactly the same event.  It is
             # audit-only: the proposal decision above remains authoritative.
@@ -223,6 +231,34 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             COUNTS["deceleration_active_decisions"] += 1
             planned = {"value": None, "source": "deceleration-propagation"}
             received = {"value": None, "source": "deceleration-propagation"}
+            prediction_method = "deceleration-propagation"
+        # TIVtep's directly available prediction is the selected sender and
+        # receiver MCM trajectory.  Record it for baseline runs and proposal
+        # fallbacks; the active proposal has already registered its richer
+        # queue prediction above.
+        if prediction_method != "deceleration-propagation":
+            try:
+                tiv_profiles = deceleration_prediction.direct_tiv_profiles(
+                    vehicle, desired, vehicle.alter_straight_path,
+                    vehicle.simTime, "accept" if accept else "reject")
+            except (AttributeError, IndexError, TypeError, ValueError, ZeroDivisionError) as error:
+                COUNTS["tiv_prediction_log_unsupported"] += 1
+                COUNTS["tiv_prediction_log_error_" + type(error).__name__] += 1
+            else:
+                evaluation_metrics.register_prediction(
+                    vehicle.simTime, "accept" if accept else "reject", 0, tiv_profiles,
+                    metadata={
+                        "method": prediction_method,
+                        "predictor": "selected-transmitted-direct-trajectories",
+                        "receiver_id": str(vehicle.id), "sender_id": str(desired.vehID),
+                        "desired_path_id": str(desired.pathID),
+                        "alternative_path_id": str(vehicle.alter_straight_path.pathID),
+                        "actor_vehicle_ids": [str(desired.vehID), str(vehicle.id)],
+                        "follower_vehicle_ids": [],
+                        "prediction_scope": "sender_receiver_only",
+                        "sender_tiv": received.get("value"),
+                        "receiver_tiv": planned.get("value"),
+                    })
         COUNTS["receiver_tiv_comparisons"] += 1
         COUNTS["accepted" if accept else "rejected"] += 1
         if len(EXAMPLES) < 100:

@@ -4,10 +4,12 @@
 Each task is one scenario/method/seed combination.  A task owns a copy of the
 source files it can modify at runtime, so several SUMO processes never race on
 route files or historical statistics CSVs.  This runner deliberately keeps the
-paper-facing settings intact: 600 simulated seconds, the documented seed sets,
-one-second candidate trajectory regeneration in ``thesis`` mode, and
-per-vehicle 25% bus draws where applicable.  SUMO and MCM still advance every
-0.1 seconds.
+comparison settings fixed: an explicitly selected simulated duration (600 s
+for final evaluation or 300 s for diagnostics), the documented seed sets,
+one-second candidate trajectory regeneration in ``thesis`` mode, and a fixed
+25% bus composition where applicable.  SUMO and MCM still advance every 0.1
+seconds.  ``paper-random25`` remains available only when reproducing the
+original artifact's per-vehicle random draw.
 """
 
 import argparse
@@ -85,20 +87,19 @@ def run_task(task, args):
     destination.mkdir(parents=True, exist_ok=False)
     source, initial_hashes = prepare_source(destination, case)
     sumo_home = args.sumo_home.resolve()
-    if args.deceleration_active and not (case["folder"] == "junction" and case["script"] == "junction_three_agree.py"):
-        raise ValueError("deceleration-active is currently implemented and validated for eval3 (T junction) only")
     env = dict(os.environ,
                SUMO_HOME=str(sumo_home),
                PYTHONPATH=str(sumo_home / "tools"),
                MPLBACKEND="Agg", OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1",
                MCS_TIV_IMPLEMENTATION="thesis",
                MCS_TIV_AUDIT=str(destination / "tiv-audit.json"),
-               MCS_EVALUATION_AUDIT=str(destination / "evaluation-metrics.json"))
+               MCS_EVALUATION_AUDIT=str(destination / "evaluation-metrics.json"),
+               MCS_PREDICTION_EVENT_AUDIT=str(destination / "prediction-events.jsonl"))
     if args.deceleration_active:
         env["MCS_DECELERATION_AUDIT"] = str(destination / "deceleration-audit.json")
     command = [args.python, "-u", case["script"], case["alpha"], str(seed),
-               *case["flows"], "--nogui", "--quiet", "--duration", "600",
-               "--bus-allocation", "paper-random25"]
+               *case["flows"], "--nogui", "--quiet", "--duration", str(args.duration),
+               "--bus-allocation", args.bus_allocation]
     is_three_way = case["folder"] == "junction" and case["script"] == "junction_three_agree.py"
     if args.deceleration_active:
         command.append("--deceleration-active")
@@ -109,8 +110,10 @@ def run_task(task, args):
         command += ["--stop-time", str(args.stop_time)]
     manifest = {
         "case": name, "seed": seed, "command": command,
-        "input_duration": 600, "stop_time": args.stop_time or 600,
+        "input_duration": args.duration, "stop_time": args.stop_time or args.duration,
         "paper_reference_mean_mps": case["reference"],
+        "bus_allocation": args.bus_allocation,
+        "bus_share": case["bus_share"],
         "decision_method": "deceleration-propagation" if args.deceleration_active else "thesis-tiv",
         "source_sha256": initial_hashes,
         "sumo_version": subprocess.check_output([str(sumo_home / "bin" / "sumo"), "--version"], text=True),
@@ -135,6 +138,7 @@ def run_task(task, args):
                     vehicle_mix=([int(mix.group(1)), int(mix.group(2))] if mix else None),
                     audit_written=(destination / "tiv-audit.json").is_file(),
                     evaluation_metrics_written=(destination / "evaluation-metrics.json").is_file(),
+                    prediction_event_audit_written=(destination / "prediction-events.jsonl").is_file(),
                     deceleration_audit_written=(destination / "deceleration-audit.json").is_file())
     (destination / "manifest.json").write_text(json.dumps(manifest, indent=2))
     return manifest
@@ -149,19 +153,26 @@ def main():
                         help="independent SUMO tasks; use 3-4, not all CPU threads")
     parser.add_argument("--seeds-per-case", type=int,
                         help="run only this many leading documented seeds per case (smoke tests)")
+    parser.add_argument("--duration", type=float, default=600,
+                        help="scenario duration in seconds (300 for diagnostic comparisons; default: 600)")
     parser.add_argument("--stop-time", type=float,
                         help="smoke test only; retains 600-second input schedule")
     parser.add_argument("--paper", type=Path)
     parser.add_argument("--python", default=sys.executable)
+    parser.add_argument("--bus-allocation", choices=("fixed", "paper-random25"), default="fixed",
+                        help="fixed composition for method comparison (default); "
+                             "paper-random25 only for original-artifact reproduction")
     parser.add_argument("--deceleration-active", action="store_true",
-                        help="use the proposed deceleration-propagation rule (Eval.3 only)")
+                        help="use the proposed deceleration-propagation rule")
     args = parser.parse_args()
     if args.workers < 1:
         parser.error("--workers must be positive")
     if args.seeds_per_case is not None and args.seeds_per_case < 1:
         parser.error("--seeds-per-case must be positive")
-    if args.stop_time is not None and not 0 < args.stop_time <= 600:
-        parser.error("--stop-time must be in (0, 600]")
+    if not 0 < args.duration <= 600:
+        parser.error("--duration must be in (0, 600]")
+    if args.stop_time is not None and not 0 < args.stop_time <= args.duration:
+        parser.error("--stop-time must be in (0, --duration]")
     if not (args.sumo_home / "bin" / "sumo").is_file() or not (args.sumo_home / "tools" / "traci").is_dir():
         parser.error("--sumo-home must contain bin/sumo and tools/traci")
     if args.paper is not None and not args.paper.is_file():

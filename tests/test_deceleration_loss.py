@@ -97,6 +97,24 @@ class DecelerationLossTests(unittest.TestCase):
         prediction.configure("off")
         self.assertIsNone(prediction.active_decision(receiver, desired, alternative, 0.0))
 
+    def test_active_decision_locks_only_the_same_desired_path_for_one_second(self):
+        def path(veh, kind, name, speeds):
+            return NS(vehID=veh, type=kind, pathID=name,
+                      t=[0.0, 5.0, 10.0], s_d=speeds,
+                      x=[0.0, 40.0, 80.0], y=[0.0, 0.0, 0.0])
+        sender = path("a", "planned", "a_planned", [8, 8, 8])
+        desired = path("a", "desired", "a_desired_1", [13, 13, 13])
+        planned = path("b", "planned", "b_planned", [8, 8, 8])
+        alternative = path("b", "alter", "b_alter", [8, 8, 8])
+        receiver = NS(id="b", plannedPath=planned, receivedPaths=[sender])
+        prediction.configure("active")
+        prediction.active_decision(receiver, desired, alternative, 0.0)
+        self.assertTrue(prediction.active_decision_is_locked(receiver, desired, 0.9))
+        self.assertFalse(prediction.active_decision_is_locked(receiver, desired, 1.0))
+        newer_desired = path("a", "desired", "a_desired_2", [13, 13, 13])
+        self.assertFalse(prediction.active_decision_is_locked(receiver, newer_desired, 0.1))
+        prediction.configure("off")
+
 
 if __name__ == "__main__":
     unittest.main()

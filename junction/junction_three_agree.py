@@ -455,8 +455,10 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False, save_sta
 
         # Record actual 0.1-second motion after all controllers have updated.
         # This is a no-op unless MCS_EVALUATION_AUDIT is configured.
+        observed = [ins for ins in vehicle_instance if ins.id in running_list]
         evaluation_metrics.observe(
-            [ins for ins in vehicle_instance if ins.id in running_list], sumo_time)
+            observed, sumo_time,
+            {str(ins.id): traci.vehicle.getAllowedSpeed(ins.id) for ins in observed})
 
         #車両インスタンスを削除
         if poplist:

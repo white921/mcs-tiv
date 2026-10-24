@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a machine-readable and Markdown comparison from two Eval.3 runs."""
+"""Create a machine-readable and Markdown comparison from paired paper runs."""
 import argparse
 import json
 import math
@@ -56,24 +56,44 @@ def raw_prediction(metrics, key):
     return data
 
 
+def bus_allocation_label(rows):
+    """Return the allocation policy recorded by every paired run."""
+    policies = set()
+    for row in rows:
+        command = row.get("command", [])
+        try:
+            policies.add(command[command.index("--bus-allocation") + 1])
+        except (ValueError, IndexError):
+            policies.add("unrecorded")
+    if len(policies) != 1:
+        raise ValueError("paired runs use different or ambiguous bus-allocation policies: " + repr(policies))
+    policy = policies.pop()
+    return "fixed 25% bus composition" if policy == "fixed" else policy
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", type=Path, required=True)
     parser.add_argument("--proposal", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--case", choices=("eval3", "eval5", "eval7"), default="eval3")
     args = parser.parse_args()
     baseline, proposal = read_summary(args.baseline), read_summary(args.proposal)
     seeds = sorted(set(baseline) & set(proposal), key=int)
+    baseline_allocation = bus_allocation_label([baseline[seed] for seed in seeds])
+    proposal_allocation = bus_allocation_label([proposal[seed] for seed in seeds])
+    if baseline_allocation != proposal_allocation:
+        raise ValueError("baseline and proposal use different bus-allocation policies")
     rows, baseline_metrics, proposal_metrics = [], [], []
     proposal_prediction = []
     proposal_counts = {}
     for seed in seeds:
         control, method = baseline[seed], proposal[seed]
-        control_metric = json.loads((args.baseline / "eval3" / f"seed-{seed}" / "evaluation-metrics.json").read_text())
-        method_metric = json.loads((args.proposal / "eval3" / f"seed-{seed}" / "evaluation-metrics.json").read_text())
+        control_metric = json.loads((args.baseline / args.case / f"seed-{seed}" / "evaluation-metrics.json").read_text())
+        method_metric = json.loads((args.proposal / args.case / f"seed-{seed}" / "evaluation-metrics.json").read_text())
         baseline_metrics.append(control_metric)
         proposal_metrics.append(method_metric)
-        audit = json.loads((args.proposal / "eval3" / f"seed-{seed}" / "deceleration-audit.json").read_text())
+        audit = json.loads((args.proposal / args.case / f"seed-{seed}" / "deceleration-audit.json").read_text())
         for name, value in audit["counts"].items():
             proposal_counts[name] = proposal_counts.get(name, 0) + value
         rows.append({"seed": int(seed), "tivtep_speed_mps": control["all_speed_mps"],
@@ -105,7 +125,10 @@ def main():
                              "max": max(values) if values else None}
         return result
     differences = [row["difference_mps"] for row in rows]
-    report = {"scope": "Eval.3, alpha=7, inflow=400/400/400, paper-random25, 600 s, paired seeds 1-5",
+    conditions = {"eval3": "alpha=7, inflow=400/400/400, 600 s, paired seeds 1-5",
+                  "eval5": "alpha=7, inflow=300/300/300/300, 600 s, paired seeds 1-5",
+                  "eval7": "alpha=7, merge inflow=1000/1000, 600 s, paired seeds 1/2/3/7/11"}
+    report = {"scope": f"{args.case.title()}, {conditions[args.case]}, {baseline_allocation}",
               "per_seed": rows,
               "speed": {"tivtep_mean_mps": statistics.mean(row["tivtep_speed_mps"] for row in rows),
                         "proposal_mean_mps": statistics.mean(row["proposal_speed_mps"] for row in rows),
@@ -114,6 +137,8 @@ def main():
               "traffic_metrics": {"tivtep": groups(baseline_metrics), "proposal": groups(proposal_metrics)},
               "following_vehicle_shortfall": {"tivtep": shortfall_distributions(baseline_metrics, "following_vehicle_free_flow_shortfall_samples_m"),
                                                "proposal": shortfall_distributions(proposal_metrics, "following_vehicle_free_flow_shortfall_samples_m")},
+              "net_free_flow_distance_delta": {"tivtep": shortfall_distributions(baseline_metrics, "vehicle_net_free_flow_distance_delta_samples_m"),
+                                                 "proposal": shortfall_distributions(proposal_metrics, "vehicle_net_free_flow_distance_delta_samples_m")},
               "proposal_prediction_accuracy": aggregate_prediction(proposal_prediction),
               "proposal_decision_counts": proposal_counts,
               "limitations": ["Prediction accuracy is observed only for the proposal-selected action; it is not a counterfactual outcome test.",
@@ -121,7 +146,7 @@ def main():
                               "Free-flow shortfall is a distributional proxy, not the proposal's counterfactual distance-loss definition."]}
     args.output.mkdir(parents=True, exist_ok=True)
     (args.output / "evaluation-report.json").write_text(json.dumps(report, indent=2))
-    lines = ["# Eval.3: TIVtep と減速伝播提案法の比較", "", report["scope"], "",
+    lines = [f"# {args.case.title()}: TIVtep と減速伝播提案法の比較", "", report["scope"], "",
              "## 平均速度", "", "| 指標 | TIVtep | 提案法 | 差 |", "|---|---:|---:|---:|"]
     speed = report["speed"]
     lines.append(f"| 平均速度 [m/s] | {speed['tivtep_mean_mps']:.4f} | {speed['proposal_mean_mps']:.4f} | {speed['paired_difference_mean_mps']:+.4f} |")
@@ -134,7 +159,7 @@ def main():
               "|---:|---:|---:|---:|---:|---:|",
               f"| {prediction['windows']} | {prediction['samples']} | {prediction['speed_mae_mps']:.4f} | {prediction['speed_rmse_mps']:.4f} | {prediction['mean_abs_distance_error_m_per_window']:.4f} | {prediction['mean_followers_per_window']:.4f} |",
               "", "## 急減速・停止・全車両shortfall", "",
-              "強い減速は加速度 -3.0 m/s² 以下、停止は速度 0.1 m/s 未満。shortfall は自由流13.89 m/sとの差を積分した代理指標。", "",
+              "強い減速は加速度 -3.0 m/s² 以下、停止は速度 0.1 m/s 未満。shortfall は各時刻のSUMO許容速度（道路・車種上限込み）との差を積分した代理指標。", "",
               "| 車種 | 指標 | TIVtep | 提案法 |", "|---|---|---:|---:|"]
     for group, label in (("car", "乗用車"), ("bus", "バス")):
         tiv = report["traffic_metrics"]["tivtep"][group]
@@ -153,6 +178,16 @@ def main():
                   f"| {label} | 平均 [m] | {tiv['mean']:.2f} | {proposal['mean']:.2f} |",
                   f"| {label} | 中央値 [m] | {tiv['median']:.2f} | {proposal['median']:.2f} |",
                   f"| {label} | p95 [m] | {tiv['p95']:.2f} | {proposal['p95']:.2f} |"]
+    net = report["net_free_flow_distance_delta"]
+    if any(net[method][group]["count"] for method in ("tivtep", "proposal") for group in ("car", "bus")):
+        lines += ["", "## 許容速度に対する純距離差", "",
+                  "正は許容速度を上回った距離、負は下回った距離。shortfallとは異なり符号を保持する。", "",
+                  "| 車種 | 指標 | TIVtep | 提案法 |", "|---|---|---:|---:|"]
+        for group, label in (("car", "乗用車"), ("bus", "バス")):
+            tiv, proposal = net["tivtep"][group], net["proposal"][group]
+            lines += [f"| {label} | 平均 [m] | {tiv['mean']:.2f} | {proposal['mean']:.2f} |",
+                      f"| {label} | 中央値 [m] | {tiv['median']:.2f} | {proposal['median']:.2f} |",
+                      f"| {label} | p95 [m] | {tiv['p95']:.2f} | {proposal['p95']:.2f} |"]
     decisions = report["proposal_decision_counts"]
     lines += ["", "## 同一イベントでの判断差（簡易比較）", "",
               "| 指標 | 件数 |", "|---|---:|"]
