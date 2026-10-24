@@ -1,0 +1,58 @@
+TIME: 20.0 14:54:27.681457 alpha 7 seed 2 inflow_0 400 inflow_1 400
+TIME: 40.0 14:56:56.796440 alpha 7 seed 2 inflow_0 400 inflow_1 400
+TIME: 60.0 14:59:47.065539 alpha 7 seed 2 inflow_0 400 inflow_1 400
+TIME: 80.0 15:05:55.093031 alpha 7 seed 2 inflow_0 400 inflow_1 400
+TIME: 100.0 15:09:58.043351 alpha 7 seed 2 inflow_0 400 inflow_1 400
+TIME: 120.0 15:12:28.752963 alpha 7 seed 2 inflow_0 400 inflow_1 400
+TIME: 140.0 15:15:03.978914 alpha 7 seed 2 inflow_0 400 inflow_1 400
+TIME: 160.0 15:18:24.233550 alpha 7 seed 2 inflow_0 400 inflow_1 400
+TIME: 180.0 15:21:43.918952 alpha 7 seed 2 inflow_0 400 inflow_1 400
+TIME: 200.0 15:24:46.091603 alpha 7 seed 2 inflow_0 400 inflow_1 400
+TIME: 220.0 15:27:42.846065 alpha 7 seed 2 inflow_0 400 inflow_1 400
+TIME: 240.0 15:29:57.071764 alpha 7 seed 2 inflow_0 400 inflow_1 400
+TIME: 260.0 15:34:25.915220 alpha 7 seed 2 inflow_0 400 inflow_1 400
+TIME: 280.0 15:37:49.538226 alpha 7 seed 2 inflow_0 400 inflow_1 400
+TIME: 300.0 15:39:28.611044 alpha 7 seed 2 inflow_0 400 inflow_1 400
+TIME: 320.0 15:40:21.344087 alpha 7 seed 2 inflow_0 400 inflow_1 400
+TIME: 340.0 15:42:27.081334 alpha 7 seed 2 inflow_0 400 inflow_1 400
+TIME: 360.0 15:43:35.892876 alpha 7 seed 2 inflow_0 400 inflow_1 400
+Traceback (most recent call last):
+Interrupt signal received, trying to exit gracefully.
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed2/junction/junction_three_agree.py", line 569, in <module>
+    run(alpha, inflow_0, inflow_1, inflow_2, quiet=True)
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed2/junction/junction_three_agree.py", line 308, in run
+    ins.updatePlannedPath(ob)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed2/junction/../func/cav_three_junction.py", line 286, in updatePlannedPath
+    path_candidates = self.generatePlannedPath(ob=ob)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed2/junction/../func/cav_three_junction.py", line 1276, in generatePlannedPath
+    path_candidates = generate_frenet_frame(objects=ob, c_s=c_s, c_s_d=self.speed, c_s_dd=self.accel, c_d=0.0,\
+                                    target_speed=maxSpeed, mode="free", route=self.route, simTime=self.simTime, vehInstance=self)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed2/junction/../PathPlanning/FrenetOptimalTrajectory/frenet_three_junction.py", line 895, in generate_frenet_frame
+    fplist = calc_global_paths(fplist, csp)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed2/junction/../PathPlanning/FrenetOptimalTrajectory/frenet_three_junction.py", line 699, in calc_global_paths
+    ix, iy = csp.calc_position(fp.s[i])
+             ~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed2/PathPlanning/FrenetOptimalTrajectory/../CubicSpline/cubic_spline_planner.py", line 152, in calc_position
+    x = self.sx.calc(s)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed2/PathPlanning/FrenetOptimalTrajectory/../CubicSpline/cubic_spline_planner.py", line 55, in calc
+    i = self.__search_index(t)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed2/PathPlanning/FrenetOptimalTrajectory/../CubicSpline/cubic_spline_planner.py", line 94, in __search_index
+    def __search_index(self, x):
+    
+KeyboardInterrupt
+delete veh: 157
+delete veh: 163
+delete veh: 165
+delete veh: 167
+delete veh: 169
+delete veh: 171
+delete veh: 173
+delete veh: 175
+delete veh: 177
+delete veh: 179
+delete veh: 181
+delete veh: 183
+Error: tcpip::Socket::recvAndCheck @ recv: peer shutdown
+Quitting (on error).

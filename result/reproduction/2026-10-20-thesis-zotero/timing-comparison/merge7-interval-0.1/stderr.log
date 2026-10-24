@@ -1,0 +1,31 @@
+TIME: 20.0 15:19:59.557856 alpha 7 seed 2 inflow_0 1000 inflow_1 1000
+Traceback (most recent call last):
+  File "/Users/shige/Documents/重野研/卒論研究/mcs-tiv/scripts/benchmark_thesis_cases.py", line 161, in <module>
+    worker(args)
+  File "/Users/shige/Documents/重野研/卒論研究/mcs-tiv/scripts/benchmark_thesis_cases.py", line 66, in worker
+    runpy.run_path(str(source / folder / script), run_name="__main__")
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/runpy.py", line 268, in run_path
+    return _run_module_code(code, init_globals, run_name,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/runpy.py", line 97, in _run_module_code
+    _run_code(code, mod_globals, init_globals,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-20-thesis-zotero/timing-comparison/merge7-interval-0.1/source/merge/merge_agree2512.py", line 511, in <module>
+    run(alpha, inflow_0, inflow_1, quiet=True, save_statistics=not options.no_save)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-20-thesis-zotero/timing-comparison/merge7-interval-0.1/source/merge/merge_agree2512.py", line 287, in run
+    ins.updatePlannedPath(ob)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-20-thesis-zotero/timing-comparison/merge7-interval-0.1/source/func/cav_merge2512.py", line 249, in updatePlannedPath
+    path_candidates = self.generatePlannedPath(ob=ob)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-20-thesis-zotero/timing-comparison/merge7-interval-0.1/source/func/cav_merge2512.py", line 883, in generatePlannedPath
+    path_candidates = generate_frenet_frame(objects=ob, c_s=self.pos_x, c_s_d=self.speed, c_s_dd=self.accel, c_d=self.pos_y,\
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-20-thesis-zotero/timing-comparison/merge7-interval-0.1/source/PathPlanning/FrenetOptimalTrajectory/frenet_merge_car.py", line 645, in generate_frenet_frame
+    _, _, _, _, csp = generate_target_course(wx, wy)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-20-thesis-zotero/timing-comparison/merge7-interval-0.1/source/PathPlanning/FrenetOptimalTrajectory/frenet_merge_car.py", line 562, in generate_target_course
+    rk.append(csp.calc_curvature(i_s))
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-20-thesis-zotero/timing-comparison/merge7-interval-0.1/source/PathPlanning/FrenetOptimalTrajectory/../CubicSpline/cubic_spline_planner.py", line 163, in calc_curvature
+    dy = self.sy.calcd(s)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-20-thesis-zotero/timing-comparison/merge7-interval-0.1/source/PathPlanning/FrenetOptimalTrajectory/../CubicSpline/cubic_spline_planner.py", line 76, in calcd
+    result = self.b[i] + 2.0 * self.c[i] * dx + 3.0 * self.d[i] * dx ** 2.0
+KeyboardInterrupt
+Error: tcpip::Socket::recvAndCheck @ recv: peer shutdown
+Quitting (on error).

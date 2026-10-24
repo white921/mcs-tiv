@@ -1,0 +1,105 @@
+--- ./sumo-mcs-11/func/cav_three_junction_bus.py	2025-12-13 11:11:42
++++ ./sumo-mcs-11-paper-model/func/cav_three_junction_bus.py	2026-10-19 14:12:07
+@@ -12,10 +12,10 @@
+     sys.exit("please declare environment variable 'SUMO_HOME'")
+ import traci  # noqa
+ sys.path.append("../PathPlanning/FrenetOptimalTrajectory/")
+-from frenet_three_junction import generate_frenet_frame, emergency_stop
++from frenet_three_junction_bus import generate_frenet_frame, emergency_stop
+ 
+ maxSpeed = 11.11 # [m/s]
+-maxAccel = 1.5 # [m/ss]
++maxAccel = 1.0 # [m/ss] Table 5.1 in the thesis
+ maxDecel = -3.0 # [m/ss]
+ sensorRange = 200 # [m]
+ commRange = 200 # [m]
+@@ -1472,4 +1472,4 @@
+     # destructor
+     def __del__(self):
+         print("delete veh:", self.id)
+-        
+\ No newline at end of file
++        
+--- ./sumo-mcs-11/func/cav_four_junction_bus.py	2026-01-05 09:13:58
++++ ./sumo-mcs-11-paper-model/func/cav_four_junction_bus.py	2026-10-19 14:12:07
+@@ -12,7 +12,7 @@
+     sys.exit("please declare environment variable 'SUMO_HOME'")
+ import traci  # noqa
+ sys.path.append("../PathPlanning/FrenetOptimalTrajectory/")
+-from frenet_four_junction import generate_frenet_frame, emergency_stop
++from frenet_four_junction_bus import generate_frenet_frame, emergency_stop
+ 
+ maxSpeed = 11.11 # [m/s]
+ maxAccel = 1.0 # [m/ss]
+@@ -1473,4 +1473,4 @@
+     # destructor
+     def __del__(self):
+         print("delete veh:", self.id)
+-        
+\ No newline at end of file
++        
+--- ./sumo-mcs-11/func/cav_merge2512_bus.py	2026-01-03 01:48:16
++++ ./sumo-mcs-11-paper-model/func/cav_merge2512_bus.py	2026-10-19 14:12:07
+@@ -12,10 +12,10 @@
+     sys.exit("please declare environment variable 'SUMO_HOME'")
+ import traci  # noqa
+ sys.path.append("../PathPlanning/FrenetOptimalTrajectory/")
+-from frenet_merge_car import generate_frenet_frame, emergency_stop
++from frenet_merge_bus import generate_frenet_frame, emergency_stop
+ 
+ maxSpeed = 11.11 # [m/s]
+-maxAccel = 1.5 # [m/ss]
++maxAccel = 1.0 # [m/ss] Table 5.1 in the thesis
+ maxDecel = -3.0 # [m/ss]
+ sensorRange = 200 # [m]
+ commRange = 200 # [m]
+@@ -1023,4 +1023,4 @@
+     # destructor
+     def __del__(self):
+         print("delete veh:", self.id)
+-        
+\ No newline at end of file
++        
+--- ./sumo-mcs-11/PathPlanning/FrenetOptimalTrajectory/frenet_three_junction.py	2025-11-29 23:08:08
++++ ./sumo-mcs-11-paper-model/PathPlanning/FrenetOptimalTrajectory/frenet_three_junction_bus.py	2026-10-19 14:12:07
+@@ -26,10 +26,10 @@
+     raise
+ 
+ # Parameter
+-MAX_SPEED = 13.89  # maximum speed [m/s]
++MAX_SPEED = 11.11  # CAVbus maximum speed [m/s], thesis Table 5.1
+ MAX_SPEED_INTERSECTION = 5.56  # maximum speed [m/s]
+-MAX_ACCEL = 3.0  # maximum acceleration [m/ss]
+-MAX_DECEL = -5.0  # maximum acceleration [m/ss]
++MAX_ACCEL = 1.0  # CAVbus maximum acceleration [m/ss], thesis Table 5.1
++MAX_DECEL = -3.0  # CAVbus maximum deceleration [m/ss], thesis Table 5.1
+ MAX_CURVATURE = 1.0  # maximum curvature [1/m]
+ tau = 1.5 # safe headway time [s]
+ D_0 = 5 # longitudinal safe margin [m]
+--- ./sumo-mcs-11/PathPlanning/FrenetOptimalTrajectory/frenet_four_junction.py	2025-11-27 14:40:58
++++ ./sumo-mcs-11-paper-model/PathPlanning/FrenetOptimalTrajectory/frenet_four_junction_bus.py	2026-10-19 14:12:07
+@@ -26,10 +26,10 @@
+     raise
+ 
+ # Parameter
+-MAX_SPEED = 13.89  # maximum speed [m/s]
++MAX_SPEED = 11.11  # CAVbus maximum speed [m/s], thesis Table 5.1
+ MAX_SPEED_INTERSECTION = 5.56  # maximum speed [m/s]
+-MAX_ACCEL = 3.0  # maximum acceleration [m/ss]
+-MAX_DECEL = -5.0  # maximum acceleration [m/ss]
++MAX_ACCEL = 1.0  # CAVbus maximum acceleration [m/ss], thesis Table 5.1
++MAX_DECEL = -3.0  # CAVbus maximum deceleration [m/ss], thesis Table 5.1
+ MAX_CURVATURE = 1.0  # maximum curvature [1/m]
+ tau = 1.5 # safe headway time [s]
+ D_0 = 5 # longitudinal safe margin [m]
+--- ./sumo-mcs-11/PathPlanning/FrenetOptimalTrajectory/frenet_merge_bus.py	2025-12-29 17:09:14
++++ ./sumo-mcs-11-paper-model/PathPlanning/FrenetOptimalTrajectory/frenet_merge_bus.py	2026-10-19 14:12:07
+@@ -28,7 +28,7 @@
+ 
+ # Parameter
+ MAX_SPEED = 11.11  # maximum speed [m/s]  #16.67
+-MAX_ACCEL = 1.5  # maximum acceleration [m/ss] #3.0
++MAX_ACCEL = 1.0  # CAVbus maximum acceleration [m/ss], thesis Table 5.1
+ MAX_DECEL = -3.0  # maximum acceleration [m/ss] #-5.0
+ MAX_CURVATURE = 1.0  # maximum curvature [1/m]
+ tau = 1.5 # safe headway time [s]

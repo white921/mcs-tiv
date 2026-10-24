@@ -1,0 +1,223 @@
+diff -ruN -x .git -x .mypy_cache -x .pytest_cache -x .venv -x statistics -x __pycache__ -x logs* -x results* -x gif -x .DS_Store /Users/shige/Documents/重野研/卒論研究/資料/山下引き継ぎ原本-2026-02/extracted/引き継ぎ用/sumo-mcs-11/junction/junction_four.sumocfg ./sumo-mcs-11/junction/junction_four.sumocfg
+--- /Users/shige/Documents/重野研/卒論研究/資料/山下引き継ぎ原本-2026-02/extracted/引き継ぎ用/sumo-mcs-11/junction/junction_four.sumocfg	2025-11-25 17:44:52
++++ ./sumo-mcs-11/junction/junction_four.sumocfg	2026-10-19 01:13:47
+@@ -10,10 +10,6 @@
+         <route-files value="junction_four.rou.xml"/>
+         <collision.action value="none"/>
+     </input>
+-    <output>
+-        <fcd-output value="./statistics/sumoStat.xml"/>
+-        <fcd-output.acceleration value="t"/>
+-    </output>
+     <time>
+         <step-length value="0.1"/>
+         <begin value="0.0"/>
+diff -ruN -x .git -x .mypy_cache -x .pytest_cache -x .venv -x statistics -x __pycache__ -x logs* -x results* -x gif -x .DS_Store /Users/shige/Documents/重野研/卒論研究/資料/山下引き継ぎ原本-2026-02/extracted/引き継ぎ用/sumo-mcs-11/junction/junction_four_agree.py ./sumo-mcs-11/junction/junction_four_agree.py
+--- /Users/shige/Documents/重野研/卒論研究/資料/山下引き継ぎ原本-2026-02/extracted/引き継ぎ用/sumo-mcs-11/junction/junction_four_agree.py	2026-01-09 11:33:32
++++ ./sumo-mcs-11/junction/junction_four_agree.py	2026-10-19 01:13:47
+@@ -2,7 +2,6 @@
+ #!/usr/bin/env python
+ from __future__ import absolute_import
+ from __future__ import print_function
+-from distutils.spawn import spawn
+ 
+ import os
+ import sys
+@@ -11,6 +10,10 @@
+ import datetime
+ import csv
+ 
++if os.environ.get("MCS_QUIET") == "1":
++    import builtins
++    builtins.print = lambda *args, **kwargs: None
++
+ # the directory in which this script resides
+ THISDIR = os.path.dirname(__file__)
+ sys.path.append("../PathPlanning/FrenetOptimalTrajectory/")
+@@ -109,8 +112,8 @@
+         # 下から入る車両：BR（下→右）またはBL（下→左）を均等に割り振り
+         route_id = random.choice(["BR", "BL"])
+         
+-        #kind = random.choice(["Bus", "Car", "Car", "Car"])
+-        kind = "Car"
++        kind = ("Car" if os.environ.get("MCS_BUS_MODE", "car") == "car"
++                else random.choice(["Bus", "Car", "Car", "Car"]))
+         if kind == "Car":
+             traci.vehicle.add(vehID=str(veh_id), routeID=route_id, typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
+             instance = CAV(veh_id, alpha, withAgree=True)
+@@ -141,8 +144,8 @@
+         #route_id = random.choice(["LR", "LB"])
+         #route_id = "LR"
+         
+-        #kind = random.choice(["Bus", "Car", "Car", "Car"])
+-        kind = "Car"
++        kind = ("Car" if os.environ.get("MCS_BUS_MODE", "car") == "car"
++                else random.choice(["Bus", "Car", "Car", "Car"]))
+         if kind == "Car":
+             traci.vehicle.add(vehID=str(veh_id), routeID=route_id, typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
+             instance = CAV(veh_id, alpha, withAgree=True)
+@@ -171,8 +174,8 @@
+         route_id = random.choice(["RL", "RB", "RT"])
+         #route_id = random.choice(["RL", "RB"])
+         #route_id = "RL"
+-        #kind = random.choice(["Bus", "Car", "Car", "Car"])
+-        kind = "Car"
++        kind = ("Car" if os.environ.get("MCS_BUS_MODE", "car") == "car"
++                else random.choice(["Bus", "Car", "Car", "Car"]))
+         if kind == "Car":
+             traci.vehicle.add(vehID=str(veh_id), routeID=route_id, typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
+             instance = CAV(veh_id, alpha, withAgree=True)
+@@ -202,8 +205,8 @@
+         #route_id = random.choice(["TL", "TR", "TB"])
+         route_id = random.choice(["TL", "TR"])
+         #route_id = "RL"
+-        #kind = random.choice(["Bus", "Car", "Car", "Car"])
+-        kind = "Car"
++        kind = ("Car" if os.environ.get("MCS_BUS_MODE", "car") == "car"
++                else random.choice(["Bus", "Car", "Car", "Car"]))
+         if kind == "Car":
+             traci.vehicle.add(vehID=str(veh_id), routeID=route_id, typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
+             instance = CAV(veh_id, alpha, withAgree=True)
+@@ -516,7 +519,8 @@
+         # 車両の新規流入
+         add_vehicle(alpha)
+ 
+-    with open("./statistics/acceptance_four.csv", "a", encoding='utf-8') as f:
++    result_csv = os.environ.get("MCS_RESULT_CSV", "./statistics/acceptance_four.csv")
++    with open(result_csv, "a", encoding='utf-8') as f:
+         #text = "{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format(seed, alpha, inflow_0, inflow_1, inflow_2, inflow_3, count_accept_utility, count_refuse_utility, count_refuse_physics, count_send_PT, count_send_DT, count_send_AT, "test")
+         text = "{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format("seed", "alpha", "inflow_Left", "inflow_Bottom", "inflow_Right", "inflow_Top", "accept_utility", "refuse_utility", "refuse_physics", "send_PT", "send_DT", "send_AT", "date_time")
+         f.write(text)
+diff -ruN -x .git -x .mypy_cache -x .pytest_cache -x .venv -x statistics -x __pycache__ -x logs* -x results* -x gif -x .DS_Store /Users/shige/Documents/重野研/卒論研究/資料/山下引き継ぎ原本-2026-02/extracted/引き継ぎ用/sumo-mcs-11/junction/junction_three.sumocfg ./sumo-mcs-11/junction/junction_three.sumocfg
+--- /Users/shige/Documents/重野研/卒論研究/資料/山下引き継ぎ原本-2026-02/extracted/引き継ぎ用/sumo-mcs-11/junction/junction_three.sumocfg	2025-11-27 12:25:56
++++ ./sumo-mcs-11/junction/junction_three.sumocfg	2026-10-19 01:13:47
+@@ -10,10 +10,6 @@
+         <route-files value="junction_three.rou.xml"/>
+         <collision.action value="none"/>
+     </input>
+-    <output>
+-        <fcd-output value="./statistics/sumoStat.xml"/>
+-        <fcd-output.acceleration value="t"/>
+-    </output>
+     <time>
+         <step-length value="0.1"/>
+         <begin value="0.0"/>
+diff -ruN -x .git -x .mypy_cache -x .pytest_cache -x .venv -x statistics -x __pycache__ -x logs* -x results* -x gif -x .DS_Store /Users/shige/Documents/重野研/卒論研究/資料/山下引き継ぎ原本-2026-02/extracted/引き継ぎ用/sumo-mcs-11/junction/junction_three_agree.py ./sumo-mcs-11/junction/junction_three_agree.py
+--- /Users/shige/Documents/重野研/卒論研究/資料/山下引き継ぎ原本-2026-02/extracted/引き継ぎ用/sumo-mcs-11/junction/junction_three_agree.py	2026-01-11 02:06:44
++++ ./sumo-mcs-11/junction/junction_three_agree.py	2026-10-19 02:13:57
+@@ -2,7 +2,6 @@
+ #!/usr/bin/env python
+ from __future__ import absolute_import
+ from __future__ import print_function
+-from distutils.spawn import spawn
+ 
+ import os
+ import sys
+@@ -11,6 +10,10 @@
+ import datetime
+ import csv
+ 
++if os.environ.get("MCS_QUIET") == "1":
++    import builtins
++    builtins.print = lambda *args, **kwargs: None
++
+ # the directory in which this script resides
+ THISDIR = os.path.dirname(__file__)
+ sys.path.append("../PathPlanning/FrenetOptimalTrajectory/")
+@@ -217,6 +220,7 @@
+     animator = Animation(file)
+ 
+     #シミュレーション開始
++    diagnostic_stop_time = float(os.environ.get("MCS_DIAGNOSTIC_STOP_TIME", simulation_time))
+     while sumo_time != simulation_time:
+         traci.simulationStep()
+         sumo_time = traci.simulation.getTime()
+@@ -401,8 +405,12 @@
+         # 車両の新規流入
+         add_vehicle(alpha)
+ 
++        if sumo_time >= diagnostic_stop_time:
++            break
+ 
+-    with open("./statistics/acceptance_three.csv", "a", encoding='utf-8') as f:
++
++    result_csv = os.environ.get("MCS_RESULT_CSV", "./statistics/acceptance_three.csv")
++    with open(result_csv, "a", encoding='utf-8') as f:
+         #text = "{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format(seed, alpha, inflow_0, inflow_1, inflow_2, inflow_3, count_accept_utility, count_refuse_utility, count_refuse_physics, count_send_PT, count_send_DT, count_send_AT, "test")
+         text = "{},{},{},{},{},{},{},{},{},{},{},{}\n".format("seed", "alpha", "inflow_Left", "inflow_Bottom", "inflow_Right", "accept_utility", "refuse_utility", "refuse_physics", "send_PT", "send_DT", "send_AT", "date_time")
+         f.write(text)
+diff -ruN -x .git -x .mypy_cache -x .pytest_cache -x .venv -x statistics -x __pycache__ -x logs* -x results* -x gif -x .DS_Store /Users/shige/Documents/重野研/卒論研究/資料/山下引き継ぎ原本-2026-02/extracted/引き継ぎ用/sumo-mcs-11/merge/merge.sumocfg ./sumo-mcs-11/merge/merge.sumocfg
+--- /Users/shige/Documents/重野研/卒論研究/資料/山下引き継ぎ原本-2026-02/extracted/引き継ぎ用/sumo-mcs-11/merge/merge.sumocfg	2025-12-18 11:24:00
++++ ./sumo-mcs-11/merge/merge.sumocfg	2026-10-19 01:13:47
+@@ -4,14 +4,10 @@
+     <route-files value="threeLane.rou.xml"/>
+     <collision.action value="none"/>
+ </input>
+-<output>
+-<fcd-output value="./statistics/sumoStat.xml"/>
+-<fcd-output.acceleration value="t"/>
+-</output>
+ <time>
+     <step-length value="0.1"/>
+     <time-to-teleport value="-1"/>
+     <begin value="0.0"/>
+     <end value="6000.0"/>
+ </time>
+-</configuration>
+\ No newline at end of file
++</configuration>
+diff -ruN -x .git -x .mypy_cache -x .pytest_cache -x .venv -x statistics -x __pycache__ -x logs* -x results* -x gif -x .DS_Store /Users/shige/Documents/重野研/卒論研究/資料/山下引き継ぎ原本-2026-02/extracted/引き継ぎ用/sumo-mcs-11/merge/merge_agree2512.py ./sumo-mcs-11/merge/merge_agree2512.py
+--- /Users/shige/Documents/重野研/卒論研究/資料/山下引き継ぎ原本-2026-02/extracted/引き継ぎ用/sumo-mcs-11/merge/merge_agree2512.py	2025-12-29 09:00:22
++++ ./sumo-mcs-11/merge/merge_agree2512.py	2026-10-19 01:13:47
+@@ -2,7 +2,6 @@
+ #!/usr/bin/env python
+ from __future__ import absolute_import
+ from __future__ import print_function
+-from distutils.spawn import spawn
+ 
+ import os
+ import sys
+@@ -11,7 +10,11 @@
+ import datetime
+ import csv
+ 
++if os.environ.get("MCS_QUIET") == "1":
++    import builtins
++    builtins.print = lambda *args, **kwargs: None
+ 
++
+ # the directory in which this script resides
+ THISDIR = os.path.dirname(__file__)
+ sys.path.append("../PathPlanning/FrenetOptimalTrajectory/")
+@@ -102,8 +105,8 @@
+     alpha = float(alpha)
+     # if sumo_time in departTime_lane1: 本線（受け入れ）
+     if sumo_time in departTime_lane1:    
+-        kind = random.choice(["Bus", "Car", "Car", "Car"])
+-        #kind = "Car"
++        kind = ("Car" if os.environ.get("MCS_BUS_MODE", "random25") == "car"
++                else random.choice(["Bus", "Car", "Car", "Car"]))
+         if kind == "Car":
+             traci.vehicle.add(vehID=str(veh_id), routeID="main", typeID="CAV_1", departLane="1", departPos="base", departSpeed="5")
+             instance = CAV(veh_id, alpha, withAgree=True)
+@@ -120,8 +123,8 @@
+ 
+     # if sumo_time in departTime_lane0:
+     if sumo_time in departTime_lane0:
+-        kind = random.choice(["Bus", "Car", "Car", "Car"])
+-        #kind = "Car"
++        kind = ("Car" if os.environ.get("MCS_BUS_MODE", "random25") == "car"
++                else random.choice(["Bus", "Car", "Car", "Car"]))
+         if kind == "Car":
+             traci.vehicle.add(vehID=str(veh_id), routeID="main", typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
+             instance = CAV(veh_id, alpha, withAgree=True)
+@@ -315,7 +318,8 @@
+         # 車両の新規流入
+         add_vehicle(alpha)
+ 
+-    with open("./statistics/acceptance.csv", "a", encoding='utf-8') as f:
++    result_csv = os.environ.get("MCS_RESULT_CSV", "./statistics/acceptance.csv")
++    with open(result_csv, "a", encoding='utf-8') as f:
+         #text = "{},{},{},{},{},{},{},{},{},{}\n".format(seed, alpha, inflow_0, inflow_1, count_accept_utility, count_refuse_utility, count_refuse_physics, count_send_PT, count_send_DT, count_send_AT)
+         text = "{},{},{},{},{},{},{},{},{},{},{}\n".format("seed", "alpha", "inflow_desired", "inflow_accepted", "accept_utility", "refuse_utility", "refuse_physics", "send_PT", "send_DT", "send_AT", "date_time")
+         f.write(text)

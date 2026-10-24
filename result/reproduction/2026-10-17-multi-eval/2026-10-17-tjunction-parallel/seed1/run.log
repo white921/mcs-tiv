@@ -1,0 +1,65 @@
+TIME: 20.0 14:54:38.366122 alpha 7 seed 1 inflow_0 400 inflow_1 400
+TIME: 40.0 14:56:39.338796 alpha 7 seed 1 inflow_0 400 inflow_1 400
+TIME: 60.0 14:58:35.490525 alpha 7 seed 1 inflow_0 400 inflow_1 400
+TIME: 80.0 15:01:06.316960 alpha 7 seed 1 inflow_0 400 inflow_1 400
+TIME: 100.0 15:06:19.136203 alpha 7 seed 1 inflow_0 400 inflow_1 400
+TIME: 120.0 15:10:10.205098 alpha 7 seed 1 inflow_0 400 inflow_1 400
+TIME: 140.0 15:12:53.787504 alpha 7 seed 1 inflow_0 400 inflow_1 400
+TIME: 160.0 15:17:40.728578 alpha 7 seed 1 inflow_0 400 inflow_1 400
+TIME: 180.0 15:22:25.512148 alpha 7 seed 1 inflow_0 400 inflow_1 400
+TIME: 200.0 15:24:38.677970 alpha 7 seed 1 inflow_0 400 inflow_1 400
+TIME: 220.0 15:26:36.979280 alpha 7 seed 1 inflow_0 400 inflow_1 400
+TIME: 240.0 15:29:04.714659 alpha 7 seed 1 inflow_0 400 inflow_1 400
+TIME: 260.0 15:33:53.606466 alpha 7 seed 1 inflow_0 400 inflow_1 400
+TIME: 280.0 15:39:12.812067 alpha 7 seed 1 inflow_0 400 inflow_1 400
+TIME: 300.0 15:42:37.611448 alpha 7 seed 1 inflow_0 400 inflow_1 400
+Interrupt signal received, trying to exit gracefully.
+Traceback (most recent call last):
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed1/junction/junction_three_agree.py", line 569, in <module>
+    run(alpha, inflow_0, inflow_1, inflow_2, quiet=True)
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed1/junction/junction_three_agree.py", line 317, in run
+    collision_list_desired, _ = ins.checkPathCollision(ins.desiredPaths[0], ins.receivedPaths, s_type="planned")
+                                ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed1/junction/../func/cav_three_junction.py", line 452, in checkPathCollision
+    if self.checkRoutePriority(own_path, x):
+       ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed1/junction/../func/cav_three_junction.py", line 332, in checkRoutePriority
+    x_route = traci.vehicle.getRouteID(x.vehID)
+  File "/Library/Frameworks/EclipseSUMO.framework/Versions/Current/EclipseSUMO/share/sumo/tools/traci/_vehicle.py", line 387, in getRouteID
+    return self._getUniversal(tc.VAR_ROUTE_ID, vehID)
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/EclipseSUMO.framework/Versions/Current/EclipseSUMO/share/sumo/tools/traci/domain.py", line 152, in _getUniversal
+    return _parse(self._retValFunc, varID, self._getCmd(varID, objectID, format, *values))
+                                           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/EclipseSUMO.framework/Versions/Current/EclipseSUMO/share/sumo/tools/traci/domain.py", line 157, in _getCmd
+    r = self._connection._sendCmd(self._cmdGetID, varID, objID, format, *values)
+  File "/Library/Frameworks/EclipseSUMO.framework/Versions/Current/EclipseSUMO/share/sumo/tools/traci/connection.py", line 232, in _sendCmd
+    return self._sendExact()
+           ~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/EclipseSUMO.framework/Versions/Current/EclipseSUMO/share/sumo/tools/traci/connection.py", line 131, in _sendExact
+    result = self._recvExact()
+  File "/Library/Frameworks/EclipseSUMO.framework/Versions/Current/EclipseSUMO/share/sumo/tools/traci/connection.py", line 109, in _recvExact
+    t = self._socket.recv(4 - len(result))
+KeyboardInterrupt
+delete veh: 60
+delete veh: 62
+delete veh: 155
+delete veh: 123
+delete veh: 129
+delete veh: 135
+delete veh: 48
+delete veh: 50
+delete veh: 52
+delete veh: 54
+delete veh: 141
+delete veh: 143
+delete veh: 145
+delete veh: 147
+delete veh: 149
+delete veh: 151
+delete veh: 56
+delete veh: 153
+delete veh: 58
+Error: tcpip::Socket::recvAndCheck @ recv: Connection reset by peer
+Quitting (on error).

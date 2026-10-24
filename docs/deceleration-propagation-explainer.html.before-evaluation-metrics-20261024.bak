@@ -1,0 +1,1367 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="既存の軌道生成と速度指示を再利用し、承諾・拒否それぞれの10秒間の減速・回復と双方の後続車列の累積損失を比較するMCS交渉判断手法の説明資料">
+  <title>10秒間の累積損失で交渉を判断する｜MCS-TIV 卒論説明資料</title>
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']]
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <style>
+    :root {
+      --ink: #14211b;
+      --muted: #5d6b64;
+      --paper: #f5f1e8;
+      --surface: #fffdf8;
+      --line: #d8d5ca;
+      --green: #0f6b4f;
+      --green-dark: #084c39;
+      --green-soft: #dcece4;
+      --amber: #b96716;
+      --amber-soft: #f8e5c9;
+      --blue: #245c8a;
+      --blue-soft: #dce9f4;
+      --red: #a94435;
+      --red-soft: #f3dfda;
+      --shadow: 0 18px 48px rgba(38, 45, 40, 0.09);
+      --radius: 22px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 76px;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 88% 2%, rgba(36, 92, 138, 0.10), transparent 30rem),
+        radial-gradient(circle at 2% 38%, rgba(15, 107, 79, 0.08), transparent 34rem),
+        var(--paper);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif;
+      line-height: 1.78;
+    }
+
+    button, input { font: inherit; }
+    a { color: inherit; }
+    h1, h2, h3, p { margin-top: 0; }
+
+    .page-shell {
+      width: min(1160px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      border-bottom: 1px solid rgba(20, 33, 27, 0.10);
+      background: rgba(245, 241, 232, 0.91);
+      backdrop-filter: blur(15px);
+    }
+
+    .topbar-inner {
+      min-height: 64px;
+      display: grid;
+      grid-template-columns: auto auto 1fr auto;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .brand {
+      font-size: 0.84rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+
+    .section-tabs {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid rgba(20, 33, 27, 0.12);
+      border-radius: 999px;
+      background: rgba(255, 253, 248, 0.74);
+    }
+
+    .section-tab {
+      padding: 7px 13px;
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 800;
+      line-height: 1;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .section-tab:hover,
+    .section-tab:focus-visible {
+      color: var(--green-dark);
+      background: var(--green-soft);
+      outline: none;
+    }
+
+    .section-tab[aria-current="page"] {
+      color: #fff;
+      background: var(--green-dark);
+    }
+
+    .progress-track {
+      height: 5px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(20, 33, 27, 0.10);
+    }
+
+    .progress-bar {
+      width: 0;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--green);
+      transition: width 180ms ease;
+    }
+
+    .deck-controls {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .deck-controls button {
+      min-width: 38px;
+      min-height: 38px;
+      border: 1px solid rgba(20, 33, 27, 0.14);
+      border-radius: 999px;
+      color: var(--ink);
+      background: rgba(255, 253, 248, 0.84);
+      cursor: pointer;
+    }
+
+    .deck-controls button:hover,
+    .deck-controls button:focus-visible {
+      border-color: rgba(15, 107, 79, 0.44);
+      background: var(--green-soft);
+      outline: none;
+    }
+
+    .slide-count {
+      min-width: 58px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      text-align: center;
+    }
+
+    main { padding: 22px 0 80px; }
+
+    .slide {
+      min-height: calc(100svh - 104px);
+      margin: 0 0 24px;
+      padding: clamp(30px, 6vw, 72px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      border: 1px solid rgba(20, 33, 27, 0.12);
+      border-radius: 30px;
+      background: rgba(255, 253, 248, 0.91);
+      box-shadow: var(--shadow);
+      scroll-margin-top: 82px;
+    }
+
+    .slide.hero {
+      position: relative;
+      overflow: hidden;
+      color: #f7fff9;
+      background: var(--green-dark);
+    }
+
+    .slide.hero::after {
+      content: "";
+      position: absolute;
+      right: -120px;
+      bottom: -220px;
+      width: 520px;
+      height: 520px;
+      border: 76px solid rgba(255,255,255,0.07);
+      border-radius: 50%;
+    }
+
+    .slide-number,
+    .eyebrow {
+      position: relative;
+      z-index: 1;
+      margin-bottom: 16px;
+      color: var(--green);
+      font-size: 0.76rem;
+      font-weight: 850;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .hero .slide-number,
+    .hero .eyebrow { color: #b9e4cf; }
+
+    h1 {
+      position: relative;
+      z-index: 1;
+      max-width: 980px;
+      margin-bottom: 24px;
+      font-family: "Hiragino Mincho ProN", "Yu Mincho", serif;
+      font-size: clamp(2.5rem, 6vw, 5rem);
+      line-height: 1.12;
+      letter-spacing: -0.045em;
+    }
+
+    h2 {
+      max-width: 920px;
+      margin-bottom: 28px;
+      font-family: "Hiragino Mincho ProN", "Yu Mincho", serif;
+      font-size: clamp(2rem, 4vw, 3.35rem);
+      line-height: 1.22;
+      letter-spacing: -0.035em;
+    }
+
+    h3 {
+      margin-bottom: 10px;
+      font-size: 1.08rem;
+      line-height: 1.5;
+    }
+
+    .lead {
+      position: relative;
+      z-index: 1;
+      max-width: 860px;
+      margin-bottom: 0;
+      color: #d8e9df;
+      font-size: clamp(1rem, 2vw, 1.28rem);
+    }
+
+    .takeaway {
+      margin: 26px 0 0;
+      padding: 20px 24px;
+      border-left: 5px solid var(--green);
+      background: var(--green-soft);
+      font-size: clamp(1rem, 2vw, 1.18rem);
+      font-weight: 700;
+    }
+
+    .grid-2,
+    .grid-3,
+    .formula-grid,
+    .implementation-grid {
+      display: grid;
+      gap: 18px;
+    }
+
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .formula-grid { grid-template-columns: 0.9fr 1.1fr; }
+    .implementation-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .card {
+      padding: 24px;
+      border: 1px solid rgba(20, 33, 27, 0.12);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,0.56);
+    }
+
+    .card.accent { background: var(--green-soft); }
+    .card.blue { background: var(--blue-soft); }
+    .card.amber { background: var(--amber-soft); }
+    .card.red { background: var(--red-soft); }
+
+    .card small,
+    .term small,
+    .flow-step small {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 850;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .card p:last-child,
+    .term p:last-child { margin-bottom: 0; }
+
+    .formula {
+      padding: 20px 22px;
+      overflow-x: auto;
+      border: 1px solid rgba(20, 33, 27, 0.11);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.66);
+      text-align: center;
+    }
+
+    .formula.primary {
+      border-color: rgba(15, 107, 79, 0.32);
+      background: var(--green-soft);
+    }
+
+    .formula .caption {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+      text-align: left;
+    }
+
+    .symbol-list {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px 16px;
+      margin: 18px 0 0;
+      align-items: start;
+    }
+
+    .symbol-list dt {
+      min-width: 96px;
+      padding: 3px 9px;
+      border-radius: 8px;
+      background: var(--green-soft);
+      font-family: var(--mono);
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .symbol-list dd { margin: 0; }
+
+    .road-scene {
+      position: relative;
+      min-height: 250px;
+      margin-top: 20px;
+      overflow: hidden;
+      border-radius: var(--radius);
+      background: #e8e4da;
+    }
+
+    .road-scene::before,
+    .road-scene::after {
+      content: "";
+      position: absolute;
+      left: 4%;
+      right: 4%;
+    }
+
+    .road-scene::before {
+      top: 80px;
+      height: 90px;
+      background: #3b4540;
+    }
+
+    .road-scene::after {
+      top: 123px;
+      height: 4px;
+      background: repeating-linear-gradient(90deg, #f6f0dc 0 32px, transparent 32px 54px);
+    }
+
+    .vehicle-row {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      align-items: center;
+      gap: 12px;
+      padding: 54px 8% 0;
+    }
+
+    .vehicle {
+      position: relative;
+      min-width: 0;
+      padding: 14px 8px;
+      border-radius: 12px;
+      color: white;
+      background: var(--blue);
+      text-align: center;
+      font-weight: 800;
+      box-shadow: 0 10px 22px rgba(0,0,0,0.18);
+    }
+
+    .vehicle.leader { background: var(--green); }
+
+    .vehicle .sub {
+      display: block;
+      margin-top: 3px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      opacity: 0.84;
+    }
+
+    .direction {
+      position: absolute;
+      right: 7%;
+      top: 32px;
+      z-index: 2;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+
+    .chain {
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .flow-step {
+      flex: 1;
+      min-width: 0;
+      padding: 18px;
+      border-radius: 16px;
+      background: var(--green-soft);
+    }
+
+    .arrow {
+      align-self: center;
+      color: var(--green);
+      font-size: 1.5rem;
+      font-weight: 900;
+    }
+
+    .braking-diagram {
+      position: relative;
+      min-height: 220px;
+      margin-top: 18px;
+      padding: 28px;
+      border-radius: var(--radius);
+      background: var(--blue-soft);
+    }
+
+    .distance-line {
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      top: 106px;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(36, 92, 138, 0.20);
+    }
+
+    .distance-part {
+      position: absolute;
+      top: 0;
+      height: 100%;
+    }
+
+    .distance-part.gap { left: 0; width: 22%; background: var(--green); }
+    .distance-part.reaction { left: 22%; width: 28%; background: var(--amber); }
+    .distance-part.brake { left: 50%; width: 50%; background: var(--blue); }
+
+    .distance-labels {
+      display: grid;
+      grid-template-columns: 22fr 28fr 50fr;
+      gap: 8px;
+      margin: 105px 6% 0;
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-align: center;
+    }
+
+    .clip-stack {
+      display: grid;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .clip-row {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 16px;
+      align-items: center;
+      padding: 15px 18px;
+      border-radius: 15px;
+      background: rgba(255,255,255,0.62);
+    }
+
+    .clip-row strong { color: var(--green-dark); }
+
+    .sim-controls {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 18px;
+      align-items: center;
+      margin: 8px 0 14px;
+    }
+
+    .sim-controls label { font-weight: 800; }
+    .sim-controls input { width: 100%; accent-color: var(--green); }
+
+    .example-notice {
+      padding: 14px 18px;
+      border-radius: 14px;
+      background: var(--blue-soft);
+      font-size: 0.9rem;
+    }
+
+    .simulation-scroll,
+    .table-scroll {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    .simulation-scroll { border-radius: var(--radius); }
+
+    .simulation-road {
+      position: relative;
+      min-width: 640px;
+      min-height: 250px;
+      overflow: hidden;
+      border-radius: var(--radius);
+      background: #e8e4da;
+    }
+
+    .simulation-road .lane {
+      position: absolute;
+      left: 3%;
+      right: 3%;
+      top: 108px;
+      height: 48px;
+      background: #3b4540;
+    }
+
+    .simulation-road .lane::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 22px;
+      height: 3px;
+      background: repeating-linear-gradient(90deg, #f6f0dc 0 26px, transparent 26px 48px);
+    }
+
+    .sim-road-note {
+      position: absolute;
+      top: 14px;
+      left: 18px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 750;
+    }
+
+    .sim-car {
+      position: absolute;
+      top: 101px;
+      z-index: 2;
+      width: 72px;
+      transform: translateX(-50%);
+      transition: left 160ms ease;
+      text-align: center;
+    }
+
+    .sim-car-body {
+      height: 52px;
+      padding: 8px 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      color: white;
+      background: #78847d;
+      font-size: 0.76rem;
+      font-weight: 800;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.17);
+    }
+
+    .sim-car.leader .sim-car-body { background: var(--green); }
+    .sim-car.affected .sim-car-body { background: var(--amber); }
+
+    .sim-speed {
+      position: absolute;
+      left: 50%;
+      bottom: 60px;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 0.73rem;
+      font-weight: 800;
+    }
+
+    .sim-state {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 0.76rem;
+      white-space: nowrap;
+    }
+
+    .sim-gap {
+      position: absolute;
+      top: 202px;
+      z-index: 3;
+      transform: translateX(-50%);
+      padding: 2px 5px;
+      border-radius: 6px;
+      color: var(--muted);
+      background: rgba(255, 253, 248, 0.82);
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      font-weight: 800;
+      white-space: nowrap;
+      transition: left 160ms ease;
+    }
+
+    .sim-gap.changed { color: var(--amber); }
+
+    .sim-summary {
+      margin-top: 14px;
+      padding: 14px 18px;
+      border-radius: 14px;
+      background: var(--amber-soft);
+      font-weight: 700;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 18px;
+      font-size: 0.9rem;
+    }
+
+    caption {
+      padding: 0 0 12px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-align: left;
+    }
+
+    .table-scroll table { min-width: 560px; }
+
+    th, td {
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--green-dark);
+      font-size: 0.76rem;
+      letter-spacing: 0.04em;
+    }
+
+    .check-list,
+    .plain-list {
+      margin: 12px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .check-list li,
+    .plain-list li {
+      position: relative;
+      margin: 9px 0;
+      padding-left: 27px;
+    }
+
+    .check-list li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--green);
+      font-weight: 900;
+    }
+
+    .plain-list li::before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: var(--blue);
+      font-weight: 900;
+    }
+
+    code {
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: rgba(20,33,27,0.07);
+      font-family: var(--mono);
+      font-size: 0.9em;
+    }
+
+    .speaker-note {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px dashed rgba(20, 33, 27, 0.18);
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .speaker-note strong { color: var(--ink); }
+
+    .final-box {
+      max-width: 900px;
+      padding: 30px;
+      border-radius: var(--radius);
+      background: var(--green-dark);
+      color: #f7fff9;
+      font-size: clamp(1.12rem, 2vw, 1.42rem);
+      font-weight: 750;
+    }
+
+    .final-box p:last-child { margin-bottom: 0; }
+
+    @media (max-width: 840px) {
+      .grid-2,
+      .grid-3,
+      .formula-grid,
+      .implementation-grid { grid-template-columns: minmax(0, 1fr); }
+      .chain { flex-direction: column; }
+      .arrow { transform: rotate(90deg); }
+      .clip-row { grid-template-columns: 1fr; gap: 4px; }
+      .vehicle-row { padding-inline: 5%; gap: 6px; }
+      .vehicle { padding-inline: 4px; font-size: 0.75rem; }
+    }
+
+    @media (max-width: 620px) {
+      .topbar-inner { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+      .brand { white-space: normal; overflow-wrap: anywhere; }
+      .section-tabs { grid-column: 1 / -1; grid-row: 2; width: fit-content; }
+      .progress-track { grid-column: 1 / -1; grid-row: 3; margin-bottom: 8px; }
+      .slide { min-height: auto; padding: 28px 20px; border-radius: 22px; }
+      .symbol-list { grid-template-columns: 1fr; gap: 4px; }
+      .symbol-list dt { width: fit-content; }
+      .sim-controls { grid-template-columns: 1fr; gap: 4px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .progress-bar, .sim-car, .sim-gap { transition: none; }
+    }
+
+    @media print {
+      @page { size: A4 landscape; margin: 10mm; }
+      body { background: white; }
+      .topbar { display: none; }
+      main { padding: 0; }
+      .page-shell { width: 100%; }
+      .slide {
+        min-height: 180mm;
+        margin: 0;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        break-after: page;
+      }
+      .speaker-note { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="page-shell topbar-inner">
+      <div class="brand">MCS-TIV｜動的後続影響評価</div>
+      <nav class="section-tabs" aria-label="資料の切り替え">
+        <a class="section-tab" href="deceleration-propagation-explainer.html" aria-current="page">提案手法</a>
+        <a class="section-tab" href="deceleration-propagation-evaluation.html">評価結果</a>
+      </nav>
+      <div class="progress-track" aria-label="資料の進行状況">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+      <div class="deck-controls">
+        <button type="button" id="prev-slide" aria-label="前のスライド">←</button>
+        <span class="slide-count" id="slide-count">01 / 13</span>
+        <button type="button" id="next-slide" aria-label="次のスライド">→</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="page-shell">
+    <section class="slide hero" id="slide-1" data-title="研究目的">
+      <div class="slide-number">01 / RESEARCH PURPOSE</div>
+      <h1>10秒後だけでなく、<br>10秒間の損失を比べる。</h1>
+      <p class="lead">既存の走行ロジックを使い、交渉を承諾した場合・拒否した場合の速度変化を予測する。要求車・受入判断車と双方の後続車列について、途中の減速から回復までを評価する。</p>
+      <p class="lead" style="margin-top:24px;font-size:0.88rem">2026年10月23日 方針更新｜研究設計資料・提案手法の実験結果ではない</p>
+    </section>
+
+    <section class="slide" id="slide-2" data-title="論文TIV">
+      <div class="slide-number">02 / PAPER BASELINE</div>
+      <h2>出発点は、論文のTIV。</h2>
+      <div class="formula primary">
+        \[
+          \mathrm{TIV}(P)=\Delta t(P)+\alpha E_R(P)+\beta a_{\max}(P)
+        \]
+        <p class="caption">小さいTIVを持つ軌道を優先する。論文条件では \(\alpha=-0.1\)、\(\beta=0.1\)。</p>
+      </div>
+      <div class="grid-3" style="margin-top:18px">
+        <article class="card">
+          <small>TIME TERM</small>
+          <h3>到達時間  \(\Delta t\)</h3>
+          <p>現在から、2本の軌道が交差する衝突候補地点へ到達するまでの時間。</p>
+        </article>
+        <article class="card amber">
+          <small>ENVIRONMENTAL TERM</small>
+          <h3>後続環境  \(E_R\)</h3>
+          <p>共有軌道の終端速度と距離係数を掛けて合計する。10秒分の軌道なら10秒後の速度。</p>
+          <div class="formula">\[E_R(P)=\sum_i v_i(H)R(X_i)\]</div>
+        </article>
+        <article class="card blue">
+          <small>PERFORMANCE TERM</small>
+          <h3>最大加速度  \(a_{\max}\)</h3>
+          <p>加速性能が低い車両ほどTIVを小さくして、判断上優先しやすくする。</p>
+        </article>
+      </div>
+      <p class="takeaway">山下さんも将来の速度を使っている。今回は「終端の状態」から「区間全体の損失」へ、後続影響の評価を広げる。</p>
+      <p class="speaker-note"><strong>説明の要点：</strong>TIVはTrajectory Influence Value。衝突確率ではなく、交通効率を考えて軌道を優先する評価値である。環境項には交渉車自身も含む。根拠は山下論文4.2節・4.2.1節。</p>
+    </section>
+
+    <section class="slide" id="slide-3" data-title="問題点とアプローチ">
+      <div class="slide-number">03 / PROBLEM &amp; APPROACH</div>
+      <h2>TIVの環境項に、<br>どんな問題があるか。</h2>
+      <div class="road-scene" aria-label="交渉車と3台の後続車が並ぶ車列">
+        <div class="direction">進行方向 →</div>
+        <div class="vehicle-row">
+          <div class="vehicle"><span>後続3</span><span class="sub">後続2に反応</span></div>
+          <div class="vehicle"><span>後続2</span><span class="sub">後続1に反応</span></div>
+          <div class="vehicle"><span>後続1</span><span class="sub">交渉車に反応</span></div>
+          <div class="vehicle leader"><span>交渉車</span><span class="sub">速度変更の起点</span></div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:18px">
+        <article class="card red">
+          <small>終端速度の限界</small>
+          <h3>途中で減速しても、最後に戻る</h3>
+          <p>10秒後の速度が同じでも、ずっと走れた車と、減速してから回復した車では損失が違う。終端速度項だけではこの違いを捉えられない。</p>
+        </article>
+        <article class="card accent">
+          <small>距離係数から速度変化へ</small>
+          <h3>どの車に、いつ影響が届くか</h3>
+          <p>予備実験由来の \(R(X)\) だけで影響を見積もらず、現在の車間・速度・予定軌道・性能から、後続車の減速と回復を予測する。</p>
+        </article>
+      </div>
+      <p class="takeaway">変更点は2つ。途中の損失を積み重ねることと、後続への影響を速度変化として追うこと。</p>
+      <p class="speaker-note"><strong>説明の要点：</strong>TIVそのものを否定する研究ではない。環境項が終端速度と固定形の距離係数に依存する点に注目し、交通状態に応じた評価へ発展させる。係数の値が常に同じという意味ではなく、距離を影響へ変換する関数形が固定されている。</p>
+    </section>
+
+    <section class="slide" id="slide-4" data-title="承諾と拒否の条件">
+      <div class="slide-number">04 / ACCEPT AND REJECT</div>
+      <h2>拒否したら、双方とも<br>元のplannedを維持する。</h2>
+      <p>要求車をA、受入判断車をBとし、同じ現在状態から2つの場合を考える。</p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>ケース</th><th>要求車A</th><th>受入判断車B</th><th>後続車列</th></tr></thead>
+          <tbody>
+            <tr><td><strong>承諾</strong></td><td>要求したdesired</td><td>譲るためのalternative</td><td>それぞれ変更後の先行車に追従</td></tr>
+            <tr><td><strong>拒否</strong></td><td>元のplanned</td><td>元のplanned</td><td>それぞれ元の先行車計画に追従</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid-2" style="margin-top:24px">
+        <article class="card blue">
+          <small>KEEP THE MCS FRAMEWORK</small>
+          <h3>交渉の仕組みは維持</h3>
+          <p>代替軌道の可否確認、合意待ち、有効期限、成立後の切り替えは既存どおり。代替軌道を作れない場合は承諾しない。</p>
+        </article>
+        <article class="card accent">
+          <small>BOTH PLATOONS</small>
+          <h3>両側の損失を合計</h3>
+          <p>A・B自身と双方の後続車を評価する。一方だけを利益、もう一方だけを損失として扱わず、各ケースの総損失を比べる。</p>
+        </article>
+      </div>
+      <p class="takeaway">拒否は「逆向きの譲歩を成立させる」ことではない。元の計画を保った場合にも損失はあり得る。</p>
+      <p class="speaker-note"><strong>説明の要点：</strong>距離そのものを影響量とはしない。候補によって後続車の速度変化がどう変わるかを追う。表は交渉結果による起点の違いであり、10秒間の再計画を禁止するものではない。合意待ちがある場合は、予測上の実行開始時刻も合わせる。</p>
+    </section>
+
+    <section class="slide" id="slide-5" data-title="既存の速度生成を再利用">
+      <div class="slide-number">05 / REUSE THE DRIVING LOGIC</div>
+      <h2>走り方は既存のまま。<br>予測と評価への使い方を追加する。</h2>
+      <div class="chain">
+        <div class="flow-step"><small>GENERATE</small><strong>Frenetで軌道候補を生成</strong></div>
+        <div class="arrow">→</div>
+        <div class="flow-step"><small>CHECK</small><strong>性能制約・衝突を確認</strong></div>
+        <div class="arrow">→</div>
+        <div class="flow-step"><small>SELECT</small><strong>既存コストで候補選択</strong></div>
+        <div class="arrow">→</div>
+        <div class="flow-step"><small>CONTROL</small><strong>位置差と加減速制限で速度指示</strong></div>
+      </div>
+      <div class="grid-2" style="margin-top:24px">
+        <article class="card blue">
+          <small>REUSE</small>
+          <h3>速度の決め方を揃える</h3>
+          <p>新しい安全速度式や追従モデルは作らない。最速の候補を独自に選ぶのでもなく、既存の候補選択・速度指示まで再利用する。</p>
+        </article>
+        <article class="card accent">
+          <small>ADD</small>
+          <h3>コピーした状態で先を計算</h3>
+          <p>承諾・拒否ごとに先行車の変化を反映し、後続車の計画と速度を予測する。予測中にSUMOの実車へ指令を出さない。</p>
+        </article>
+      </div>
+      <p class="takeaway">既存の軌道生成器は使える。ただし、2ケースの車列予測と損失集計を組み立てる処理は新しく必要。</p>
+      <p class="speaker-note"><strong>説明の要点：</strong>軌道内の速度を読むだけでは、位置差から計算して加減速制限をかける実際の速度指示とずれることがある。既存のチェックを維持するが、それだけで安全を保証したことにはしない。実走行との誤差と安全関連の挙動は別途検証する。</p>
+    </section>
+
+    <section class="slide" id="slide-6" data-title="損失の基準">
+      <div class="slide-number">06 / REFERENCE AND LOSS</div>
+      <h2>「相手がいなければ走れた速度」<br>との差を損失として見る。</h2>
+      <div class="grid-2">
+        <article class="card blue">
+          <small>REFERENCE</small>
+          <h3>基準速度 \(v_i^{\mathrm{ref}}(t)\)</h3>
+          <p>この交渉相手との干渉がなければ走れた速度。現在の速度、車種性能、道路制約、関係のない先行車などは保つ。</p>
+        </article>
+        <article class="card amber">
+          <small>EACH SCENARIO</small>
+          <h3>予測速度 \(v_i^q(t)\)</h3>
+          <p>承諾または拒否を条件に、既存の走行ロジックで予測した速度。減速が届く時刻と、その後の回復を含む。</p>
+        </article>
+      </div>
+      <div class="formula primary" style="margin-top:24px">
+        \[
+          \text{時刻 }t\text{ の速度低下}
+          =v_i^{\mathrm{ref}}(t)-v_i^q(t)
+        \]
+        <p class="caption">両ケースで同じ基準・対象車両・時間区間を使う。全員の基準を最高速度や一定速度にするわけではない。</p>
+      </div>
+      <p class="takeaway">同じ10 m/sへ戻っても、途中で長く減速した方が損失は大きい。減速量だけでなく継続時間も数える。</p>
+      <p class="speaker-note"><strong>説明の要点：</strong>後続車の基準は、直前の車を消すことではなく、交渉による減速がなかった先行車に追従する動きとして考える。基準速度列の具体的な作り方は設計確認事項。基準より速い値が出ても、利益扱いや無条件のゼロ切り捨てで隠さず整合性を確認する。</p>
+    </section>
+
+    <section class="slide" id="slide-7" data-title="伝播例">
+      <div class="slide-number">07 / ILLUSTRATIVE SPEED PROFILES</div>
+      <h2>最後の速度は同じでも、<br>途中で失った距離は違う。</h2>
+      <p class="example-notice"><strong>概念説明用の架空例：</strong>速度列は減速・回復の違いを見せるために設定したもの。Frenetによる予測値やSUMOの実験結果ではなく、伝播計算の精度を示すものでもない。</p>
+      <div class="sim-controls">
+        <label for="time-slider">例の時刻 <span id="time-label">0.0秒</span></label>
+        <input id="time-slider" type="range" min="0" max="100" value="0" step="1" aria-label="例の時刻" aria-valuetext="0.0秒">
+      </div>
+      <div class="simulation-scroll">
+      <div class="simulation-road" id="simulation-road" aria-label="架空の速度列による減速と回復の説明">
+        <div class="sim-road-note">固定縮尺｜この例の基準は10 m/s｜↔ は純車間｜車の絵は識別用</div>
+        <div class="lane"></div>
+        <div id="sim-cars"></div>
+      </div>
+      </div>
+      <div class="sim-summary" id="sim-summary" aria-live="polite">例の時刻を動かすと、速度と累積損失が変わります。</div>
+      <div class="table-scroll">
+        <table>
+          <caption>架空例の10秒間の集計（スライダーによらない全区間の値）</caption>
+          <thead><tr><th>車両</th><th>設定上の減速開始</th><th>最大速度低下</th><th>10秒後の速度</th><th>距離損失</th></tr></thead>
+          <tbody id="sim-metrics"></tbody>
+        </table>
+      </div>
+      <p class="speaker-note"><strong>説明用条件：</strong>初速・基準速度10 m/s、純車間25 m、車長5 m、起点車は10→4→10 m/s。\(H=10\)秒、刻み0.1秒で位置と距離損失を台形積分する。これは片側の車列の例であり、承諾・拒否の比較結果ではない。実装では既存走行ロジックから各ケースの速度列を得る。</p>
+    </section>
+
+    <section class="slide" id="slide-8" data-title="影響量">
+      <div class="slide-number">08 / IMPACT METRIC</div>
+      <h2>ある一時点の速度ではなく、<br>予測区間全体の速度低下を積み上げる。</h2>
+      <div class="grid-2">
+        <article class="card">
+          <small>ONE VEHICLE</small>
+          <h3>車両ごとの距離損失</h3>
+          <div class="formula">
+            \[
+              D_i^q=\int_0^{10}\left(v_i^{\mathrm{ref}}(t)-v_i^q(t)\right)dt
+            \]
+          </div>
+          <p>例えば基準10 m/sに対して8 m/sが10秒続くなら、\((10-8)\times10=20\) m。速度低下の大きさと長さをまとめて数える。</p>
+        </article>
+        <article class="card accent">
+          <small>BOTH PLATOONS</small>
+          <h3>両側の車両について合計</h3>
+          <div class="formula">
+            \[
+              L_q=\sum_{i\in\mathcal V}D_i^q,
+              \quad q\in\{\mathrm{accept},\mathrm{reject}\}
+            \]
+          </div>
+          <p>\(\mathcal V\) はA・B自身と双方の後続車。同じ車を二重に数えず、両ケースで同じ対象と時間窓を使う。</p>
+        </article>
+      </div>
+      <div class="chain">
+        <div class="flow-step"><small>INPUT</small><strong>現在状態と2つの候補</strong></div>
+        <div class="arrow">→</div>
+        <div class="flow-step"><small>ROLL OUT</small><strong>隣接車間で10秒予測</strong></div>
+        <div class="arrow">→</div>
+        <div class="flow-step"><small>COMPARE</small><strong>両ケースの総損失を比較</strong></div>
+      </div>
+      <p class="takeaway">「10秒後に何m/sか」ではなく、「10秒間でどれだけ進めなくなったか」を評価する。</p>
+      <p class="speaker-note"><strong>初期検証用の計算案：</strong>この非正規化の式の単位はmであり、遅延秒数や衝突確率ではない。正規化の有無は未確定。刻み0.1秒では100区間を積算する。一瞬速度が一致しても、その後の状態が同じとは限らないため、そこで予測を打ち切らない。</p>
+    </section>
+
+    <section class="slide" id="slide-9" data-title="提案式">
+      <div class="slide-number">09 / PROPOSED DECISION</div>
+      <h2>承諾と拒否のうち、<br>総損失が小さい方を選びたい。</h2>
+      <div class="formula primary">
+        \[
+          \boxed{
+            S_{\mathrm{loss}}=L_{\mathrm{reject}}-L_{\mathrm{accept}}
+          }
+        \]
+        <p class="caption">正なら承諾側、負なら拒否側の損失が小さい。同値・僅差の規則は要確認。実行可能な代替軌道があることは比較の前提。</p>
+      </div>
+      <div class="grid-2" style="margin-top:18px">
+        <article class="card blue">
+          <small>AGREED DIRECTION</small>
+          <h3>走行制御ではなく評価を変える</h3>
+          <p>減速・回復にはCar/Busの加減速性能を反映する。速度生成器や既存の物理的な可否確認を、損失関数で置き換えない。</p>
+        </article>
+        <article class="card amber">
+          <small>TO BE DECIDED</small>
+          <h3>元のTIV項との組み合わせ</h3>
+          <p>到達時間項・独立性能項を残すか、損失だけで決めるかは未確定。単位が変わるため、元の重みをそのまま流用しない。</p>
+        </article>
+      </div>
+      <table>
+        <thead><tr><th>方式</th><th>後続影響</th><th>独立性能項</th><th>目的</th></tr></thead>
+        <tbody>
+          <tr><td>論文TIVte</td><td>固定 \(R(X)\)</td><td>なし</td><td>論文比較</td></tr>
+          <tr><td>論文TIVtep</td><td>固定 \(R(X)\)</td><td>あり</td><td>論文比較</td></tr>
+          <tr><td><strong>提案の方向</strong></td><td>10秒間の車列の累積損失</td><td>要確認</td><td>承諾・拒否の比較</td></tr>
+        </tbody>
+      </table>
+      <p class="speaker-note"><strong>説明の要点：</strong>車両性能は速度変化と回復時間に効く。ただし、それを予測に使うことと、判断で別の性能優先項を残すことは別の選択である。基準の作り方・正規化・既存項・同値規則を確認してから最終式を確定する。</p>
+    </section>
+
+    <section class="slide" id="slide-10" data-title="実装と検証">
+      <div class="slide-number">10 / IMPLEMENTATION ROADMAP</div>
+      <h2>既存の走行制御は変えず、<br>交渉判断にだけ伝播計算を追加する。</h2>
+      <div class="implementation-grid">
+        <article class="card">
+          <small>PHASE 1</small>
+          <h3>既存処理を分離</h3>
+          <p>コピーした状態で軌道生成・選択・速度指示を計算する。</p>
+        </article>
+        <article class="card">
+          <small>PHASE 2</small>
+          <h3>車列と損失を検証</h3>
+          <p>両ケースの速度列、積算、Car/Bus差、副作用なしを確認。</p>
+        </article>
+        <article class="card">
+          <small>PHASE 3</small>
+          <h3>判断を変えず比較</h3>
+          <p>元のTIVで走行し、新しい予測と実速度の差を記録する。</p>
+        </article>
+        <article class="card accent">
+          <small>PHASE 4</small>
+          <h3>判断へ接続</h3>
+          <p>評価式を確定し、明示的な切替で新手法を検証する。</p>
+        </article>
+      </div>
+      <div class="chain">
+        <div class="flow-step"><small>UNCHANGED</small><strong>0.1秒の状態更新・MCM交換</strong></div>
+        <div class="arrow">→</div>
+        <div class="flow-step"><small>ADDED</small><strong>交渉時の局所伝播ロールアウト</strong></div>
+        <div class="arrow">→</div>
+        <div class="flow-step"><small>UNCHANGED</small><strong>次の0.1秒だけ速度指令</strong></div>
+      </div>
+      <p class="takeaway">候補軌道の再生成期限は1秒。先行車の変化などによる期限前の再計画も保持し、毎0.1秒で無条件に全生成しない。</p>
+      <p class="speaker-note"><strong>現在地：</strong>伝播計算は後続車を強制制御するためではなく、判断前に影響を見積もるためのもの。2026年10月23日の本資料更新時点では設計段階であり、車列予測の実装・検証完了を意味しない。再現実験の環境とは分離して開発する。</p>
+    </section>
+
+    <section class="slide" id="slide-11" data-title="評価の全体像">
+      <div class="slide-number">11 / EVALUATION FRAMEWORK</div>
+      <h2>評価は、4つの問いに分ける。</h2>
+      <div class="grid-2">
+        <article class="card blue">
+          <small>01 / VALIDITY</small>
+          <h3>予測と実走行はどれくらい違うか</h3>
+          <ul class="check-list">
+            <li>1・5・10秒先の速度誤差と比較件数</li>
+            <li>10秒間の速度列と距離損失の整合性</li>
+            <li>再計画・別交渉が起きたケースの分類</li>
+            <li>選ばれたケースだけを実走行と比較</li>
+          </ul>
+        </article>
+        <article class="card accent">
+          <small>02 / TRAFFIC EFFECT</small>
+          <h3>MCS全体は改善したか</h3>
+          <ul class="check-list">
+            <li>平均速度・timeLoss・通過台数</li>
+            <li>停止回数・最大減速度</li>
+            <li>最小車間・TTC・衝突</li>
+            <li>ALW / ACT / SPD / UTF / TIVte・TIVtep / Propの比較</li>
+            <li>新手法の適用率と既存判定への復帰率</li>
+          </ul>
+        </article>
+        <article class="card amber">
+          <small>03 / REAL-TIME COST</small>
+          <h3>判断は制御周期内に終わるか</h3>
+          <ul class="check-list">
+            <li>交渉判断1回の計算時間</li>
+            <li>後続車数 \(N\) と実行step数</li>
+            <li>Frenet再生成回数と最悪時間</li>
+            <li>メモリ使用量とスケーリング</li>
+          </ul>
+        </article>
+        <article class="card red">
+          <small>04 / COMMUNICATION</small>
+          <h3>必要な情報で判断できるか</h3>
+          <ul class="check-list">
+            <li>送受信側の時刻と評価窓の整合</li>
+            <li>軌道ID・車両ID・スコアの対応</li>
+            <li>古いMCMと欠損時の復帰処理</li>
+            <li>追加遅延・欠損への耐性は拡張評価</li>
+          </ul>
+        </article>
+      </div>
+      <p class="takeaway">予測誤差は山下さんの手法にもあり得る。既存処理の再利用で一致を保証せず、実速度との誤差と判断への影響を測る。</p>
+      <p class="speaker-note"><strong>検証上の注意：</strong>選ばれなかったケースは同じ走行ログでは観測できない。別の検証実行が必要である。基準速度も反実仮想なので、基準を固定して実速度を代入した損失との比較は条件付き評価とする。既存カウンタのゼロだけで安全確認済みとしない。</p>
+    </section>
+
+    <section class="slide" id="slide-12" data-title="計算量の評価">
+      <div class="slide-number">12 / COMPUTATION COST</div>
+      <h2>重さは、理論量と<br>交渉ごとの実測時間で確かめる。</h2>
+      <div class="formula primary">
+        \[
+          K=\frac{H}{\Delta t}=\frac{10}{0.1}=100,
+          \qquad
+          C_{\mathrm{pred}}\approx 2NK\,c_{\mathrm{step}}
+          +C_{\mathrm{replan}}+C_{\mathrm{ref}}
+        \]
+        <p class="caption">概算の分解。\(N\)は両側の対象車両数、\(c_{\mathrm{step}}\)は1台1ステップの更新費用。2ケースに加え、再計画と基準速度の計算費用も必要。</p>
+      </div>
+      <div class="grid-2" style="margin-top:18px">
+        <article class="card">
+          <small>REUSE WITH MEASUREMENT</small>
+          <h3>既存処理の費用を含める</h3>
+          <ul class="plain-list">
+            <li>現在状態と先行車情報の更新</li>
+            <li>必要時のFrenet生成・衝突確認</li>
+            <li>候補選択・速度指示相当の計算</li>
+            <li>位置更新と距離損失の加算</li>
+          </ul>
+        </article>
+        <article class="card amber">
+          <small>CONTROL THE COST</small>
+          <h3>精度を崩さず計算を減らす</h3>
+          <ul class="plain-list">
+            <li>対象車列を局所的に構成する</li>
+            <li>条件が同じ計算結果を再利用する</li>
+            <li>予測から別の交渉予測を再帰させない</li>
+            <li>一瞬の速度一致だけで打ち切らない</li>
+          </ul>
+        </article>
+      </div>
+      <table>
+        <thead><tr><th>記録値</th><th>なぜ必要か</th><th>報告方法</th></tr></thead>
+        <tbody>
+          <tr><td>判断時間</td><td>0.1秒の制御周期に対して遅すぎないか</td><td>中央値・p95・p99・最大値</td></tr>
+          <tr><td>\(N\) と実行step数</td><td>車列長と予測時間に対する伸び方を確認する</td><td>\(N\)別・\(H\)別のスケーリング</td></tr>
+          <tr><td>再生成回数と対象外件数</td><td>重い処理と予測できない条件を分ける</td><td>回数・費用・フォールバック理由</td></tr>
+        </tbody>
+      </table>
+      <p class="takeaway">100msは制御全体の周期。既存の生成器を使うため、「単純な一次元更新だけで軽い」とは決めつけず、実測する。</p>
+    </section>
+
+    <section class="slide" id="slide-13" data-title="通信と実験条件">
+      <div class="slide-number">13 / COMMUNICATION ROBUSTNESS</div>
+      <h2>今ある情報だけで予測し、<br>時刻を揃えて損失を比べる。</h2>
+      <div class="grid-2">
+        <article class="card accent">
+          <small>BASELINE</small>
+          <h3>現行の理想通信</h3>
+          <ul class="check-list">
+            <li>MCM送信10Hz</li>
+            <li>通信範囲200m</li>
+            <li>実質1step、約0.1秒遅れ</li>
+            <li>欠損なし・順序入替わりなし</li>
+          </ul>
+        </article>
+        <article class="card red">
+          <small>REQUIRED FOR THE PROPOSAL</small>
+          <h3>追加する情報は設計する</h3>
+          <ul class="check-list">
+            <li>各側で計算した承諾・拒否の損失</li>
+            <li>対象車両IDと軌道ID</li>
+            <li>生成時刻と共通の評価窓</li>
+            <li>予測の有効性・情報不足の理由</li>
+          </ul>
+        </article>
+      </div>
+      <div class="chain">
+        <div class="flow-step"><small>LOCAL INPUT</small><strong>自車・センサー・受信MCM</strong></div>
+        <div class="arrow">→</div>
+        <div class="flow-step"><small>FALLBACK</small><strong>予測不能なら既存判定へ</strong></div>
+        <div class="arrow">→</div>
+        <div class="flow-step"><small>VERIFY</small><strong>適用率・誤差・交通効率を記録</strong></div>
+      </div>
+      <div class="final-box" style="margin-top:22px">
+        <p>走り方は既存のまま、10秒間の車列の損失で判断を改善する。同一の流入・車種条件と複数seedで比較し、交通効率だけでなく予測誤差・安全関連の挙動・計算時間も確かめる。</p>
+      </div>
+      <p class="speaker-note"><strong>注意：</strong>通信外の全車両や未来のSUMO状態を予測入力にしない。送信・受信で時刻が違うため、合計スコアだけで窓を合わせられるか確認する。追加遅延・ゆらぎ・欠損は拡張評価の候補であり、行う場合もDSRCやC-V2Xの物理・MAC層の再現とは区別する。</p>
+    </section>
+
+  </main>
+
+  <script>
+    (() => {
+      const slides = [...document.querySelectorAll('.slide')];
+      const progress = document.getElementById('progress-bar');
+      const count = document.getElementById('slide-count');
+      const previous = document.getElementById('prev-slide');
+      const next = document.getElementById('next-slide');
+      let activeIndex = 0;
+
+      function goTo(index) {
+        const bounded = Math.max(0, Math.min(slides.length - 1, index));
+        slides[bounded].scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      function updateDeck(index) {
+        activeIndex = index;
+        count.textContent = `${String(index + 1).padStart(2, '0')} / ${String(slides.length).padStart(2, '0')}`;
+        progress.style.width = `${((index + 1) / slides.length) * 100}%`;
+        previous.disabled = index === 0;
+        next.disabled = index === slides.length - 1;
+      }
+
+      previous.addEventListener('click', () => goTo(activeIndex - 1));
+      next.addEventListener('click', () => goTo(activeIndex + 1));
+
+      document.addEventListener('keydown', event => {
+        if (event.target instanceof HTMLInputElement) return;
+        if (event.key === 'ArrowRight' || event.key === 'PageDown') goTo(activeIndex + 1);
+        if (event.key === 'ArrowLeft' || event.key === 'PageUp') goTo(activeIndex - 1);
+        if (event.key === 'Home') goTo(0);
+        if (event.key === 'End') goTo(slides.length - 1);
+      });
+
+      const observer = new IntersectionObserver(entries => {
+        const visible = entries
+          .filter(entry => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visible) updateDeck(slides.indexOf(visible.target));
+      }, { threshold: [0.35, 0.55, 0.75] });
+      slides.forEach(slide => observer.observe(slide));
+      updateDeck(0);
+
+      const dt = 0.1;
+      const steps = 100;
+      const referenceSpeed = 10;
+      // Hand-authored illustrative profiles, not a car-following predictor.
+      // The research predictor will reuse the existing Python driving logic.
+      const profiles = [
+        { name: '起点車', start: 0, bottom: 2, recovery: 3, end: 6, drop: 6 },
+        { name: '後続1', start: 0.9, bottom: 2.9, recovery: 3.6, end: 7.2, drop: 3.6 },
+        { name: '後続2', start: 2.1, bottom: 4.1, recovery: 4.8, end: 8.2, drop: 1.94 },
+        { name: '後続3', start: 4, bottom: 6, recovery: 6.7, end: 9.7, drop: 0.67 },
+        { name: '後続4', start: 0, bottom: 0, recovery: 0, end: 0, drop: 0 }
+      ];
+      const vehicleCount = profiles.length;
+      const vehicleLength = 5;
+      const positions = Array.from({ length: vehicleCount }, () => Array(steps + 1).fill(0));
+      const losses = Array.from({ length: vehicleCount }, () => Array(steps + 1).fill(0));
+
+      function exampleSpeed(profile, time) {
+        if (profile.drop === 0 || time <= profile.start || time >= profile.end) return referenceSpeed;
+        if (time < profile.bottom) {
+          return referenceSpeed - profile.drop * (time - profile.start) / (profile.bottom - profile.start);
+        }
+        if (time <= profile.recovery) return referenceSpeed - profile.drop;
+        return referenceSpeed - profile.drop * (profile.end - time) / (profile.end - profile.recovery);
+      }
+
+      const speeds = profiles.map(profile =>
+        Array.from({ length: steps + 1 }, (_, k) => exampleSpeed(profile, k * dt))
+      );
+      for (let i = 0; i < vehicleCount; i++) positions[i][0] = -30 * i;
+
+      for (let k = 0; k < steps; k++) {
+        for (let i = 0; i < vehicleCount; i++) {
+          const averageSpeed = (speeds[i][k] + speeds[i][k + 1]) / 2;
+          positions[i][k + 1] = positions[i][k] + averageSpeed * dt;
+          losses[i][k + 1] = losses[i][k] + (referenceSpeed - averageSpeed) * dt;
+        }
+      }
+
+      const metrics = document.getElementById('sim-metrics');
+      profiles.forEach((profile, index) => {
+        const row = document.createElement('tr');
+        [
+          profile.name,
+          profile.drop === 0 ? '10秒以内になし' : `${profile.start.toFixed(1)}秒`,
+          `${(referenceSpeed - Math.min(...speeds[index])).toFixed(2)} m/s`,
+          `${speeds[index][steps].toFixed(2)} m/s`,
+          `${losses[index][steps].toFixed(2)} m`
+        ].forEach(value => {
+          const cell = document.createElement('td');
+          cell.textContent = value;
+          row.appendChild(cell);
+        });
+        metrics.appendChild(row);
+      });
+
+      const slider = document.getElementById('time-slider');
+      const timeLabel = document.getElementById('time-label');
+      const carsHost = document.getElementById('sim-cars');
+      const summary = document.getElementById('sim-summary');
+      const carNodes = Array.from({ length: vehicleCount }, (_, index) => {
+        const node = document.createElement('div');
+        node.className = `sim-car${index === 0 ? ' leader' : ''}`;
+        node.innerHTML = `
+          <div class="sim-speed"></div>
+          <div class="sim-car-body">${index === 0 ? '起点車' : `後続${index}`}</div>
+          <div class="sim-state"></div>
+        `;
+        carsHost.appendChild(node);
+        return node;
+      });
+      const gapNodes = Array.from({ length: vehicleCount - 1 }, () => {
+        const node = document.createElement('div');
+        node.className = 'sim-gap';
+        node.setAttribute('aria-hidden', 'true');
+        carsHost.appendChild(node);
+        return node;
+      });
+
+      function renderSimulation(index) {
+        timeLabel.textContent = `${(index * dt).toFixed(1)}秒`;
+        slider.setAttribute('aria-valuetext', timeLabel.textContent);
+        const currentPositions = positions.map(series => series[index]);
+        const referencePosition = referenceSpeed * index * dt;
+        const relativePositions = currentPositions.map(position => position - referencePosition);
+        const displayMinimum = -132;
+        const displayMaximum = 12;
+        const toDisplayLeft = position => 6 + 88 * (position - displayMinimum) / (displayMaximum - displayMinimum);
+        let affectedCount = 0;
+
+        carNodes.forEach((node, vehicleIndex) => {
+          const left = toDisplayLeft(relativePositions[vehicleIndex]);
+          const speedLoss = referenceSpeed - speeds[vehicleIndex][index];
+          const affected = vehicleIndex > 0 && speedLoss > 0.05;
+          if (affected) affectedCount += 1;
+          node.style.left = `${left}%`;
+          node.classList.toggle('affected', affected);
+          node.querySelector('.sim-speed').textContent = `${speeds[vehicleIndex][index].toFixed(2)} m/s`;
+          node.querySelector('.sim-state').textContent = vehicleIndex === 0
+            ? '設定した速度'
+            : (affected ? `−${speedLoss.toFixed(2)} m/s`
+              : (losses[vehicleIndex][index] > 0.05 ? '回復済み' : '速度変更なし'));
+        });
+
+        gapNodes.forEach((node, gapIndex) => {
+          const followerIndex = gapIndex + 1;
+          const gap = currentPositions[gapIndex] - currentPositions[followerIndex] - vehicleLength;
+          const midpoint = (relativePositions[gapIndex] + relativePositions[followerIndex]) / 2;
+          node.style.left = `${toDisplayLeft(midpoint)}%`;
+          node.textContent = `↔ ${gap.toFixed(1)} m`;
+          node.classList.toggle('changed', Math.abs(gap - 25) > 0.05);
+        });
+
+        const totalLoss = losses.reduce((sum, series) => sum + series[index], 0);
+        summary.textContent = index === steps
+          ? `全車が10 m/sに回復しても、この例の5台の累積距離損失は${totalLoss.toFixed(2)} m残ります。`
+          : `この時点で基準より遅い後続車は${affectedCount}台。起点車を含む5台の累積距離損失は${totalLoss.toFixed(2)} mです。`;
+      }
+
+      slider.addEventListener('input', () => renderSimulation(Number(slider.value)));
+      renderSimulation(0);
+    })();
+  </script>
+</body>
+</html>

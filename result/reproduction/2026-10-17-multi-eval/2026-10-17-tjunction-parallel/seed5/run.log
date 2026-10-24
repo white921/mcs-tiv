@@ -1,0 +1,57 @@
+TIME: 20.0 14:54:54.375851 alpha 7 seed 5 inflow_0 400 inflow_1 400
+TIME: 40.0 14:56:27.371357 alpha 7 seed 5 inflow_0 400 inflow_1 400
+TIME: 60.0 14:57:37.189818 alpha 7 seed 5 inflow_0 400 inflow_1 400
+TIME: 80.0 14:59:34.240985 alpha 7 seed 5 inflow_0 400 inflow_1 400
+TIME: 100.0 15:01:18.326829 alpha 7 seed 5 inflow_0 400 inflow_1 400
+TIME: 120.0 15:03:48.561415 alpha 7 seed 5 inflow_0 400 inflow_1 400
+TIME: 140.0 15:05:48.855964 alpha 7 seed 5 inflow_0 400 inflow_1 400
+TIME: 160.0 15:10:04.191126 alpha 7 seed 5 inflow_0 400 inflow_1 400
+TIME: 180.0 15:14:54.611261 alpha 7 seed 5 inflow_0 400 inflow_1 400
+TIME: 200.0 15:20:46.704199 alpha 7 seed 5 inflow_0 400 inflow_1 400
+TIME: 220.0 15:25:35.161965 alpha 7 seed 5 inflow_0 400 inflow_1 400
+TIME: 240.0 15:35:19.893077 alpha 7 seed 5 inflow_0 400 inflow_1 400
+Interrupt signal received, trying to exit gracefully.
+Traceback (most recent call last):
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed5/junction/junction_three_agree.py", line 569, in <module>
+    run(alpha, inflow_0, inflow_1, inflow_2, quiet=True)
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed5/junction/junction_three_agree.py", line 308, in run
+    ins.updatePlannedPath(ob)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed5/junction/../func/cav_three_junction_bus.py", line 298, in updatePlannedPath
+    path_candidates = self.generatePlannedPath(ob=ob)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed5/junction/../func/cav_three_junction_bus.py", line 1334, in generatePlannedPath
+    path_candidates = generate_frenet_frame(objects=ob, c_s=c_s, c_s_d=self.speed, c_s_dd=self.accel, c_d=0.0,\
+                                        target_speed=maxSpeed, mode="free", route=self.route, simTime=self.simTime, target_pos=141.8, vehInstance=self)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed5/junction/../func/cav_three_junction_bus.py", line 43, in generate_frenet_frame
+    return _generate_frenet_frame(*args, **kwargs)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed5/junction/../PathPlanning/FrenetOptimalTrajectory/frenet_three_junction.py", line 893, in generate_frenet_frame
+    fplist = calc_frenet_paths_free(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, targetSpeed=vehicle_max_speed)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-17-tjunction-parallel/seed5/junction/../PathPlanning/FrenetOptimalTrajectory/frenet_three_junction.py", line 197, in calc_frenet_paths_free
+    fp.t = [round(t, 3) for t in np.arange(0.0, Ti+0.1, timeStep)]
+            ~~~~~^^^^^^
+KeyboardInterrupt
+delete veh: 75
+delete veh: 79
+delete veh: 83
+delete veh: 85
+delete veh: 87
+delete veh: 93
+delete veh: 95
+delete veh: 40
+delete veh: 42
+delete veh: 99
+delete veh: 101
+delete veh: 105
+delete veh: 107
+delete veh: 46
+delete veh: 109
+delete veh: 111
+delete veh: 113
+delete veh: 115
+delete veh: 48
+delete veh: 50
+delete veh: 117
+delete veh: 119
+Error: tcpip::Socket::recvAndCheck @ recv: peer shutdown
+Quitting (on error).
