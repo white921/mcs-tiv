@@ -1,0 +1,27 @@
+TIME: 20.0 15:27:18.876341 alpha 7 seed 2 inflow_0 400 inflow_1 400
+Traceback (most recent call last):
+  File "/Users/shige/Documents/重野研/卒論研究/mcs-tiv/scripts/benchmark_thesis_cases.py", line 161, in <module>
+    worker(args)
+  File "/Users/shige/Documents/重野研/卒論研究/mcs-tiv/scripts/benchmark_thesis_cases.py", line 66, in worker
+    runpy.run_path(str(source / folder / script), run_name="__main__")
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/runpy.py", line 268, in run_path
+    return _run_module_code(code, init_globals, run_name,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/runpy.py", line 97, in _run_module_code
+    _run_code(code, mod_globals, init_globals,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-20-thesis-zotero/timing-comparison/t3-interval-0.1/source/junction/junction_three_agree.py", line 587, in <module>
+    run(alpha, inflow_0, inflow_1, inflow_2, quiet=True)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-20-thesis-zotero/timing-comparison/t3-interval-0.1/source/junction/junction_three_agree.py", line 319, in run
+    ins.updatePlannedPath(ob)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-20-thesis-zotero/timing-comparison/t3-interval-0.1/source/func/cav_three_junction.py", line 287, in updatePlannedPath
+    path_candidates = self.generatePlannedPath(ob=ob)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-20-thesis-zotero/timing-comparison/t3-interval-0.1/source/func/cav_three_junction.py", line 1303, in generatePlannedPath
+    path_candidates = generate_frenet_frame(objects=ob, c_s=c_s, c_s_d=self.speed, c_s_dd=self.accel, c_d=0.0,\
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-20-thesis-zotero/timing-comparison/t3-interval-0.1/source/PathPlanning/FrenetOptimalTrajectory/frenet_three_junction.py", line 896, in generate_frenet_frame
+    fplist = calc_global_paths(fplist, csp)
+  File "/Users/shige/Documents/重野研/卒論研究/再現実験/2026-10-20-thesis-zotero/timing-comparison/t3-interval-0.1/source/PathPlanning/FrenetOptimalTrajectory/frenet_three_junction.py", line 703, in calc_global_paths
+    i_yaw = csp.calc_yaw(fp.s[i])
+KeyboardInterrupt
+Error: tcpip::Socket::recvAndCheck @ recv: peer shutdown
+Quitting (on error).

@@ -1,0 +1,1421 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>減速伝播提案法｜評価結果</title>
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']]
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <style>
+    :root {
+      --paper: #f4f0e6;
+      --paper-strong: #ebe4d4;
+      --ink: #17251e;
+      --muted: #647068;
+      --green-950: #10261d;
+      --green-850: #173d2d;
+      --green-700: #276247;
+      --green-500: #4e8a68;
+      --green-200: #bfd4c6;
+      --green-100: #dfe9e2;
+      --orange: #d97842;
+      --orange-soft: #f1d7c4;
+      --red: #b84a42;
+      --line: rgba(23, 37, 30, 0.14);
+      --shadow: 0 18px 60px rgba(19, 45, 34, 0.10);
+      --radius: 22px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 88% 2%, rgba(78, 138, 104, 0.14), transparent 28rem),
+        var(--paper);
+      font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", system-ui, sans-serif;
+      line-height: 1.7;
+    }
+
+    a { color: inherit; }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: grid;
+      grid-template-columns: auto auto 1fr;
+      align-items: center;
+      gap: 22px;
+      min-height: 70px;
+      padding: 10px clamp(18px, 4vw, 56px);
+      color: #f9f7ef;
+      background: rgba(16, 38, 29, 0.96);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(14px);
+    }
+
+    .brand {
+      font-family: Georgia, "Yu Mincho", serif;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+
+    .section-tabs {
+      display: flex;
+      gap: 5px;
+      padding: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    .section-tab {
+      padding: 7px 15px;
+      border-radius: 999px;
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .section-tab:hover { color: #fff; }
+
+    .section-tab.active {
+      color: var(--green-950);
+      background: #f8f5eb;
+    }
+
+    .jump-links {
+      justify-self: end;
+      display: flex;
+      gap: 18px;
+      color: rgba(255, 255, 255, 0.68);
+      font-size: 0.78rem;
+    }
+
+    .jump-links a { text-decoration: none; }
+    .jump-links a:hover { color: #fff; }
+
+    main {
+      width: min(1180px, calc(100% - 36px));
+      margin: 34px auto 72px;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1.35fr 0.65fr;
+      gap: 36px;
+      min-height: 430px;
+      padding: clamp(34px, 6vw, 72px);
+      color: #f8f4e9;
+      background: var(--green-950);
+      border-radius: 30px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 420px;
+      height: 420px;
+      right: -150px;
+      top: -170px;
+      border: 70px solid rgba(255, 255, 255, 0.055);
+      border-radius: 50%;
+    }
+
+    .eyebrow {
+      margin: 0 0 18px;
+      color: #a9d0b7;
+      font-size: 0.77rem;
+      font-weight: 800;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      max-width: 760px;
+      margin-bottom: 22px;
+      font-family: Georgia, "Yu Mincho", serif;
+      font-size: clamp(2.25rem, 5.4vw, 5rem);
+      line-height: 1.05;
+      letter-spacing: -0.035em;
+    }
+
+    .hero-copy {
+      max-width: 720px;
+      color: rgba(248, 244, 233, 0.75);
+      font-size: clamp(1rem, 1.8vw, 1.22rem);
+    }
+
+    .hero-aside {
+      align-self: end;
+      position: relative;
+      z-index: 1;
+      padding: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.055);
+    }
+
+    .hero-aside strong {
+      display: block;
+      margin-bottom: 8px;
+      color: #fff;
+      font-size: 1rem;
+    }
+
+    .hero-aside p {
+      margin: 0;
+      color: rgba(248, 244, 233, 0.72);
+      font-size: 0.9rem;
+    }
+
+    .section {
+      scroll-margin-top: 90px;
+      margin-top: 26px;
+      padding: clamp(26px, 5vw, 54px);
+      background: rgba(255, 255, 255, 0.54);
+      border: 1px solid rgba(23, 37, 30, 0.09);
+      border-radius: var(--radius);
+      box-shadow: 0 10px 40px rgba(19, 45, 34, 0.045);
+    }
+
+    .section-heading {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 24px;
+      margin-bottom: 30px;
+    }
+
+    .section-number {
+      color: var(--green-500);
+      font-size: 0.74rem;
+      font-weight: 900;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      margin-bottom: 6px;
+      font-family: Georgia, "Yu Mincho", serif;
+      font-size: clamp(1.65rem, 3vw, 2.65rem);
+      line-height: 1.2;
+    }
+
+    h3 {
+      font-size: 1rem;
+      line-height: 1.4;
+    }
+
+    .section-lead {
+      max-width: 800px;
+      margin-bottom: 0;
+      color: var(--muted);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 12px;
+      border: 1px solid var(--green-200);
+      border-radius: 999px;
+      color: var(--green-700);
+      background: var(--green-100);
+      font-size: 0.76rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .badge.pending {
+      color: #80441f;
+      border-color: #e5b992;
+      background: #f6e5d4;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .metric-card {
+      min-height: 160px;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    .metric-card.accent {
+      color: #f7f5ec;
+      border-color: var(--green-850);
+      background: var(--green-850);
+    }
+
+    .metric-label {
+      display: block;
+      margin-bottom: 13px;
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+    }
+
+    .metric-card.accent .metric-label { color: #b9d0c1; }
+
+    .metric-value {
+      display: block;
+      font-family: Georgia, "Yu Mincho", serif;
+      font-size: clamp(2rem, 4vw, 3.25rem);
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .metric-unit {
+      margin-left: 5px;
+      font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .metric-note {
+      margin: 13px 0 0;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .metric-card.accent .metric-note { color: rgba(255, 255, 255, 0.64); }
+
+    .evidence-map {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .evidence-card {
+      position: relative;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.66);
+    }
+
+    .evidence-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 24px;
+      width: 52px;
+      height: 4px;
+      border-radius: 0 0 999px 999px;
+      background: var(--green-500);
+    }
+
+    .evidence-card.proposal-only::before { background: var(--orange); }
+    .evidence-card.causal-limit::before { background: #8f9691; }
+
+    .evidence-card small {
+      color: var(--muted);
+      font-size: 0.7rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+    }
+
+    .evidence-card h3 { margin: 10px 0 8px; }
+    .evidence-card p { margin-bottom: 0; color: var(--muted); font-size: 0.86rem; }
+
+    .formula-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 20px;
+    }
+
+    .formula-card {
+      min-width: 0;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.62);
+    }
+
+    .formula-card.wide { grid-column: 1 / -1; }
+
+    .formula-card h3 {
+      margin-bottom: 5px;
+      color: var(--green-850);
+    }
+
+    .formula-card > p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .math-block {
+      overflow-x: auto;
+      margin: 15px 0;
+      padding: 16px;
+      border-radius: 12px;
+      color: var(--green-950);
+      background: var(--green-100);
+    }
+
+    .math-block mjx-container[display="true"] { margin: 0 !important; }
+
+    .symbol-list {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 5px 12px;
+      margin: 13px 0 0;
+      font-size: 0.78rem;
+    }
+
+    .symbol-list dt {
+      color: var(--green-700);
+      font-weight: 800;
+    }
+
+    .symbol-list dd { margin: 0; color: var(--muted); }
+
+    .reading-list {
+      margin: 14px 0 0;
+      padding-left: 20px;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .reading-list li + li { margin-top: 6px; }
+
+    .scope-banner {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 14px;
+      align-items: start;
+      margin-bottom: 20px;
+      padding: 18px 20px;
+      border: 1px solid #e5b992;
+      border-radius: 14px;
+      background: #f8eadc;
+    }
+
+    .scope-banner strong {
+      padding: 5px 9px;
+      color: #7a381c;
+      border-radius: 999px;
+      background: var(--orange-soft);
+      font-size: 0.72rem;
+      white-space: nowrap;
+    }
+
+    .scope-banner p { margin: 0; color: #694b39; font-size: 0.87rem; }
+
+    .callout {
+      margin-top: 18px;
+      padding: 20px 22px;
+      border-left: 4px solid var(--orange);
+      border-radius: 0 14px 14px 0;
+      background: rgba(241, 215, 196, 0.45);
+    }
+
+    .callout strong { color: #7a381c; }
+    .callout p:last-child { margin-bottom: 0; }
+
+    .condition-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .condition {
+      padding: 18px;
+      border-top: 3px solid var(--green-500);
+      background: rgba(255, 255, 255, 0.58);
+    }
+
+    .condition span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 800;
+    }
+
+    .condition strong {
+      display: block;
+      margin-top: 3px;
+      font-size: 1.08rem;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      gap: 26px;
+      align-items: start;
+    }
+
+    .chart-card, .table-card {
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.66);
+    }
+
+    .chart-title {
+      margin-bottom: 2px;
+      font-size: 0.95rem;
+    }
+
+    .chart-subtitle {
+      margin-bottom: 22px;
+      color: var(--muted);
+      font-size: 0.76rem;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-bottom: 22px;
+      color: var(--muted);
+      font-size: 0.76rem;
+    }
+
+    .legend span::before {
+      content: "";
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      margin-right: 6px;
+      border-radius: 50%;
+      background: var(--green-700);
+    }
+
+    .legend .proposal::before { background: var(--orange); }
+
+    .dumbbell-row {
+      display: grid;
+      grid-template-columns: 54px minmax(0, 1fr) 70px;
+      align-items: center;
+      gap: 12px;
+      margin: 17px 0;
+    }
+
+    .seed-label { font-size: 0.76rem; font-weight: 800; }
+
+    .dumbbell-track {
+      position: relative;
+      height: 20px;
+      border-radius: 999px;
+      background: linear-gradient(to right, rgba(23, 37, 30, 0.04), rgba(23, 37, 30, 0.10));
+    }
+
+    .dumbbell-line {
+      position: absolute;
+      top: 9px;
+      height: 2px;
+      background: rgba(23, 37, 30, 0.42);
+    }
+
+    .dot {
+      position: absolute;
+      top: 4px;
+      width: 12px;
+      height: 12px;
+      margin-left: -6px;
+      border: 2px solid white;
+      border-radius: 50%;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+    }
+
+    .dot.tiv { background: var(--green-700); }
+    .dot.proposal { background: var(--orange); }
+
+    .delta {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-size: 0.75rem;
+      font-weight: 800;
+    }
+
+    .delta.positive { color: var(--green-700); }
+    .delta.negative { color: var(--red); }
+
+    .axis {
+      display: flex;
+      justify-content: space-between;
+      margin: 0 82px 0 66px;
+      color: var(--muted);
+      font-size: 0.67rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-variant-numeric: tabular-nums;
+    }
+
+    th, td {
+      padding: 11px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 0.7rem;
+      letter-spacing: 0.04em;
+    }
+
+    th:first-child, td:first-child { text-align: left; }
+    tbody tr:last-child td { border-bottom: 0; }
+
+    .table-scroll { overflow-x: auto; }
+
+    .accuracy-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .small-metric {
+      padding: 20px;
+      border-radius: 16px;
+      background: var(--green-100);
+    }
+
+    .small-metric p {
+      margin: 13px 0 0;
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.65;
+    }
+
+    .small-metric strong {
+      display: block;
+      margin: 7px 0 3px;
+      font-family: Georgia, "Yu Mincho", serif;
+      font-size: clamp(1.45rem, 3vw, 2.2rem);
+      line-height: 1;
+    }
+
+    .small-metric span, .small-metric small {
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+
+    .comparison-block + .comparison-block { margin-top: 30px; }
+
+    .comparison-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .comparison-title p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .observed-bars {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .bar-card {
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.58);
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 82px minmax(80px, 1fr) 74px;
+      align-items: center;
+      gap: 10px;
+      margin-top: 13px;
+      font-size: 0.73rem;
+    }
+
+    .bar-track {
+      overflow: hidden;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--paper-strong);
+    }
+
+    .bar-fill { height: 100%; border-radius: inherit; background: var(--green-700); }
+    .bar-fill.proposal { background: var(--orange); }
+    .bar-value { text-align: right; font-variant-numeric: tabular-nums; }
+
+    .decision-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .stacked {
+      display: flex;
+      overflow: hidden;
+      height: 36px;
+      margin: 20px 0 12px;
+      border-radius: 999px;
+      background: var(--paper-strong);
+    }
+
+    .stacked span { min-width: 1px; }
+    .stacked .agree { background: var(--green-700); }
+    .stacked .disagree { background: var(--orange); }
+    .stacked .unavailable { background: #a9aca7; }
+
+    .decision-legend {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      font-size: 0.73rem;
+    }
+
+    .decision-legend strong { display: block; font-size: 1.2rem; }
+
+    .count-pairs {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .count-pair {
+      padding: 16px;
+      border-radius: 14px;
+      background: var(--green-100);
+    }
+
+    .count-pair strong { display: block; font-size: 1.45rem; }
+    .count-pair span { color: var(--muted); font-size: 0.75rem; }
+
+    .limits {
+      display: grid;
+      gap: 10px;
+      counter-reset: limit;
+    }
+
+    .limit-item {
+      position: relative;
+      padding: 18px 18px 18px 62px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.55);
+    }
+
+    .limit-item::before {
+      counter-increment: limit;
+      content: "0" counter(limit);
+      position: absolute;
+      left: 18px;
+      top: 18px;
+      color: var(--green-500);
+      font-weight: 900;
+    }
+
+    .eval5-grid {
+      display: grid;
+      grid-template-columns: 0.75fr 1.25fr;
+      gap: 22px;
+    }
+
+    .eval5-summary {
+      display: grid;
+      align-content: start;
+      gap: 12px;
+    }
+
+    .eval5-mean {
+      padding: 28px;
+      color: #fff;
+      border-radius: 18px;
+      background: var(--green-850);
+    }
+
+    .eval5-mean strong {
+      display: block;
+      margin: 8px 0;
+      font-family: Georgia, "Yu Mincho", serif;
+      font-size: clamp(2.5rem, 5vw, 4.5rem);
+      line-height: 1;
+    }
+
+    .eval5-mean small { color: rgba(255, 255, 255, 0.64); }
+
+    .eval5-bars { padding: 24px; border: 1px solid var(--line); border-radius: 18px; background: rgba(255, 255, 255, 0.62); }
+
+    .eval5-row {
+      display: grid;
+      grid-template-columns: 56px minmax(0, 1fr) 86px;
+      align-items: center;
+      gap: 12px;
+      margin: 17px 0;
+      font-size: 0.76rem;
+    }
+
+    .eval5-track { height: 13px; border-radius: 999px; background: var(--paper-strong); overflow: hidden; }
+    .eval5-fill { height: 100%; border-radius: inherit; background: var(--orange); }
+    .eval5-value { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+    .source-list {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.73rem;
+      overflow-wrap: anywhere;
+    }
+
+    footer {
+      width: min(1180px, calc(100% - 36px));
+      margin: 0 auto 56px;
+      color: var(--muted);
+      font-size: 0.74rem;
+    }
+
+    @media (max-width: 900px) {
+      .topbar { grid-template-columns: 1fr auto; gap: 8px 14px; }
+      .section-tabs { justify-self: end; }
+      .jump-links { grid-column: 1 / -1; justify-self: start; overflow-x: auto; max-width: 100%; }
+      .hero { grid-template-columns: 1fr; min-height: auto; }
+      .metric-grid, .condition-grid { grid-template-columns: repeat(2, 1fr); }
+      .split, .eval5-grid { grid-template-columns: 1fr; }
+      .accuracy-grid { grid-template-columns: repeat(2, 1fr); }
+      .evidence-map { grid-template-columns: 1fr; }
+      .decision-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 620px) {
+      .topbar { position: static; grid-template-columns: 1fr; }
+      .section-tabs, .jump-links { justify-self: stretch; }
+      .section-tabs { width: 100%; }
+      .section-tab { flex: 1; text-align: center; }
+      .jump-links { display: none; }
+      main { width: min(100% - 20px, 1180px); margin-top: 10px; }
+      .hero { padding: 30px 22px; border-radius: 20px; }
+      h1 { font-size: 2.35rem; }
+      .section { padding: 26px 18px; border-radius: 18px; }
+      .section-heading { grid-template-columns: 1fr; gap: 10px; }
+      .metric-grid, .condition-grid, .accuracy-grid, .observed-bars, .formula-grid { grid-template-columns: 1fr; }
+      .formula-card.wide { grid-column: auto; }
+      .scope-banner { grid-template-columns: 1fr; }
+      .metric-card { min-height: 0; }
+      .dumbbell-row { grid-template-columns: 46px minmax(0, 1fr) 62px; gap: 7px; }
+      .axis { margin-left: 53px; margin-right: 69px; }
+      .decision-legend { grid-template-columns: 1fr; }
+      .count-pairs { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media print {
+      body { background: #fff; }
+      .topbar { position: static; color: var(--ink); background: #fff; border-bottom: 1px solid #aaa; }
+      .section-tabs, .jump-links { display: none; }
+      main { width: 100%; margin: 15px 0; }
+      .hero, .section { box-shadow: none; break-inside: avoid; }
+      .section { background: #fff; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Deceleration Propagation</div>
+    <nav class="section-tabs" aria-label="資料の切り替え">
+      <a class="section-tab" href="deceleration-propagation-explainer.html">提案手法</a>
+      <a class="section-tab active" href="deceleration-propagation-evaluation.html" aria-current="page">評価結果</a>
+    </nav>
+    <nav class="jump-links" aria-label="ページ内目次">
+      <a href="#eval3">Eval.3</a>
+      <a href="#prediction">提案法予測</a>
+      <a href="#burden">安全・局所負担</a>
+      <a href="#decisions">判断差</a>
+      <a href="#eval5">Eval.5</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Evaluation report / paired evidence</p>
+        <h1>減速伝播評価<br>結果を、主張ごとに分ける。</h1>
+        <p class="hero-copy">判断根拠を直接化した提案法がマクロ交通性能をどこまで維持したかと、予測器が選択済み行動の実測をどこまで説明したかを、別々の根拠として示す。</p>
+      </div>
+      <aside class="hero-aside">
+        <strong>このページの証拠範囲</strong>
+        <p>Eval.3は同一seedのTIVtep／提案法対応比較。Eval.5は提案法5 seedのみで、対応するTIVtep再実行結果は未収録。</p>
+      </aside>
+    </section>
+
+    <section class="section" aria-labelledby="evidence-map-title">
+      <div class="section-heading">
+        <div>
+          <span class="section-number">How to read this report</span>
+          <h2 id="evidence-map-title">3種類の証拠を混ぜずに読む</h2>
+          <p class="section-lead">同じページに載っていても、各指標が答える問いと比較可能な範囲は異なる。</p>
+        </div>
+      </div>
+      <div class="evidence-map">
+        <article class="evidence-card">
+          <small>PAIRED METHOD COMPARISON</small>
+          <h3>両手法の実走行結果</h3>
+          <p>平均速度、強い減速時間率、停止時間率、free-flow shortfallは、同じseedで走らせたTIVtepと提案法を並べる。手法間の交通状態の差を観測する指標。</p>
+        </article>
+        <article class="evidence-card proposal-only">
+          <small>PROPOSAL-ONLY VALIDATION</small>
+          <h3>提案法の予測器の答え合わせ</h3>
+          <p>速度MAE・RMSE・距離誤差は提案法だけに存在する内部妥当性指標。TIVtep側の同じ欄は空であり、両手法の予測精度比較ではない。</p>
+        </article>
+        <article class="evidence-card causal-limit">
+          <small>DECISION DIFFERENCE</small>
+          <h3>判断が変わった事実</h3>
+          <p>一致・不一致は、同じイベントで判定規則が異なる答えを出したかを示す。選ばなかった行動を実走していないため、どちらが良かったかまでは示さない。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="eval3">
+      <div class="section-heading">
+        <div>
+          <span class="section-number">01 / Eval.3 conclusion</span>
+          <h2>平均速度は−0.2120 m/s</h2>
+          <p class="section-lead">TIVtepに対して提案法の5-seed平均は2.79%低い。速度の優劣と、判断根拠を将来の損失として直接表現できることは別の主張である。</p>
+        </div>
+        <span class="badge">同一seed対応比較</span>
+      </div>
+
+      <div class="metric-grid">
+        <article class="metric-card">
+          <span class="metric-label">TIVtep｜平均速度</span>
+          <span class="metric-value">7.5843<span class="metric-unit">m/s</span></span>
+          <p class="metric-note">seed 1〜5の平均</p>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">提案法｜平均速度</span>
+          <span class="metric-value">7.3724<span class="metric-unit">m/s</span></span>
+          <p class="metric-note">seed 1〜5の平均</p>
+        </article>
+        <article class="metric-card accent">
+          <span class="metric-label">対応差｜提案法 − TIVtep</span>
+          <span class="metric-value">−0.2120<span class="metric-unit">m/s</span></span>
+          <p class="metric-note">相対差 −2.79%／対応差の標本SD 0.3888 m/s</p>
+        </article>
+      </div>
+
+      <div class="formula-grid">
+        <article class="formula-card">
+          <h3>5-seed平均の定義</h3>
+          <p>方式 \(m\) のseed \(s\) における平均速度を \(v_s^{(m)}\) とし、同じ5 seedを単純平均する。</p>
+          <div class="math-block">
+            \[
+              \bar{v}^{(m)}=\frac{1}{S}\sum_{s=1}^{S}v_s^{(m)},\qquad S=5
+            \]
+          </div>
+          <p>値が大きいほど、この条件下で車両群が平均的に速く走れたことを表す。単独では安全性や局所的な負担を表さない。</p>
+        </article>
+        <article class="formula-card">
+          <h3>対応差と相対差</h3>
+          <p>各seed内で提案法からTIVtepを引く。負値は提案法の平均速度が低いseed、正値は高いseedを表す。</p>
+          <div class="math-block">
+            \[
+              \Delta_s=v_s^{(\mathrm{Prop})}-v_s^{(\mathrm{TIV})},\qquad
+              \bar{\Delta}=\frac{1}{S}\sum_{s=1}^{S}\Delta_s
+            \]
+            \[
+              r_{\Delta}=\frac{\bar v^{(\mathrm{Prop})}-\bar v^{(\mathrm{TIV})}}
+              {\bar v^{(\mathrm{TIV})}}\times100
+            \]
+            \[
+              s_{\Delta}=\sqrt{\frac{1}{S-1}\sum_{s=1}^{S}
+              \left(\Delta_s-\bar{\Delta}\right)^2}
+            \]
+          </div>
+          <p>今回の \(\bar\Delta=-0.2120\,\mathrm{m/s}\)、\(r_\Delta=-2.79\%\)。標本SD 0.3888 m/sは、seed間で差がどれほど散らばったかを示す。</p>
+        </article>
+      </div>
+
+      <div class="callout">
+        <p><strong>解釈：</strong>seed 3・4では提案法が増加し、seed 1・2・5では低下した。JSONには「許容範囲」の判定閾値が定義されていないため、本レポートは観測差を提示し、許容可否そのものは研究上の基準として別に判断する。</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-heading">
+        <div>
+          <span class="section-number">02 / Experiment setup</span>
+          <h2>実験条件</h2>
+          <p class="section-lead">交通需要と乱数seedを揃え、各seed内でTIVtepと提案法を対応させた。</p>
+        </div>
+      </div>
+      <div class="condition-grid">
+        <div class="condition"><span>交差点</span><strong>T字路</strong></div>
+        <div class="condition"><span>α</span><strong>7</strong></div>
+        <div class="condition"><span>流入</span><strong>400 / 400 / 400</strong></div>
+        <div class="condition"><span>車種構成</span><strong>paper-random25</strong></div>
+        <div class="condition"><span>実行時間</span><strong>600秒</strong></div>
+        <div class="condition"><span>seed</span><strong>1〜5</strong></div>
+        <div class="condition"><span>比較方法</span><strong>同一seed対応</strong></div>
+        <div class="condition"><span>評価</span><strong>Eval.3</strong></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-heading">
+        <div>
+          <span class="section-number">03 / Per-seed speed</span>
+          <h2>平均だけでなく、seedごとの差を見る</h2>
+          <p class="section-lead">橙が提案法、緑がTIVtep。右向きの差は提案法の速度増加、左向きは低下を示す。</p>
+        </div>
+      </div>
+      <div class="split">
+        <div class="chart-card">
+          <h3 class="chart-title">seed別 平均速度ダンベル図</h3>
+          <p class="chart-subtitle">横軸：平均速度（m/s）／差：提案法 − TIVtep</p>
+          <div class="legend"><span>TIVtep</span><span class="proposal">提案法</span></div>
+          <div id="eval3-dumbbell" aria-label="seed別平均速度比較図"></div>
+          <div class="axis"><span>7.0</span><span>7.5</span><span>8.0 m/s</span></div>
+        </div>
+        <div class="table-card table-scroll">
+          <table>
+            <thead><tr><th>seed</th><th>TIVtep</th><th>提案法</th><th>差</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td>7.3867</td><td>7.3797</td><td>−0.0070</td></tr>
+              <tr><td>2</td><td>7.9353</td><td>7.2308</td><td>−0.7045</td></tr>
+              <tr><td>3</td><td>7.5424</td><td>7.6833</td><td>+0.1408</td></tr>
+              <tr><td>4</td><td>7.4352</td><td>7.5017</td><td>+0.0665</td></tr>
+              <tr><td>5</td><td>7.6220</td><td>7.0665</td><td>−0.5555</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="prediction">
+      <div class="section-heading">
+        <div>
+          <span class="section-number">04 / Prediction accuracy</span>
+          <h2>提案法のみ｜10秒予測の内部妥当性</h2>
+          <p class="section-lead">提案法が承諾または拒否を決める際に生成した速度列を、実際に選択された行動のその後10秒と照合する。山下TIVtep側では同形式の予測値を保存していない。</p>
+        </div>
+        <span class="badge pending">手法間比較ではない</span>
+      </div>
+
+      <div class="scope-banner">
+        <strong>比較対象</strong>
+        <p>同じ判断時点の「提案法による選択済み行動の予測」と「その行動を実際に走らせた観測」を比較する。TIVtep対提案法の比較でも、選ばなかった逆判断との比較でもない。</p>
+      </div>
+
+      <div class="formula-grid" style="margin-top:0">
+        <article class="formula-card">
+          <h3>速度MAE</h3>
+          <p>全速度サンプルについて、予測と実測のずれの絶対値を平均する。誤差の向きを相殺せず、平均的なずれの大きさをm/sで示す。</p>
+          <div class="math-block">
+            \[
+              \mathrm{MAE}_v=\frac{1}{N}\sum_{j=1}^{N}\left|\hat v_j-v_j\right|
+            \]
+          </div>
+          <p>\(\hat v_j\) は予測速度、\(v_j\) は対応する実測速度、\(N=2{,}084{,}236\) は全seedを合算した速度サンプル数。</p>
+        </article>
+        <article class="formula-card">
+          <h3>速度RMSE</h3>
+          <p>速度誤差を二乗してから平均し、平方根を取る。大きな外れをMAEより強く反映する。</p>
+          <div class="math-block">
+            \[
+              \mathrm{RMSE}_v=\sqrt{\frac{1}{N}\sum_{j=1}^{N}\left(\hat v_j-v_j\right)^2}
+            \]
+          </div>
+          <p>今回RMSEがMAEより大きいことは、大きめの誤差が一部に含まれることと整合する。ただし、その発生条件の特定には誤差分布の追加分析が必要。</p>
+        </article>
+        <article class="formula-card wide">
+          <h3>10秒累積距離の絶対誤差</h3>
+          <p>予測窓 \(w\) ごとに、10秒の予測速度列から得た累積距離 \(\hat D_w\) と、対応する実測速度列から得た累積距離 \(D_w\) の差を求める。</p>
+          <div class="math-block">
+            \[
+              \mathrm{MAE}_D=\frac{1}{W}\sum_{w=1}^{W}\left|\hat D_w-D_w\right|,
+              \qquad W=3{,}743
+            \]
+          </div>
+          <dl class="symbol-list">
+            <dt>\(\hat D_w\)</dt><dd>窓 \(w\) で保存された10秒累積予測距離</dd>
+            <dt>\(D_w\)</dt><dd>同じ窓・同じ対象について観測した10秒累積距離</dd>
+            <dt>\(W\)</dt><dd>予測と10秒後までの実測を対応づけられた評価窓数</dd>
+          </dl>
+        </article>
+      </div>
+
+      <div class="accuracy-grid">
+        <div class="small-metric"><span>速度 MAE</span><strong>1.8047</strong><small>m/s</small><p>各サンプルで平均すると、予測速度と実測速度の絶対差は約1.80 m/s。</p></div>
+        <div class="small-metric"><span>速度 RMSE</span><strong>2.6822</strong><small>m/s</small><p>大きなずれを強調した速度誤差。0に近いほど実測への適合が高い。</p></div>
+        <div class="small-metric"><span>10秒累積距離 絶対誤差</span><strong>42.4529</strong><small>m / window</small><p>1つの評価窓で、対象車両群の予測移動距離と実測移動距離が平均約42.45 mずれた。</p></div>
+        <div class="small-metric"><span>評価窓数</span><strong>3,743</strong><small>windows</small><p>予測開始から実測追跡まで対応づけられ、誤差集計に入った判断区間の数。</p></div>
+        <div class="small-metric"><span>平均後続車数</span><strong>3.5132</strong><small>vehicles / window</small><p>1窓あたりに予測対象へ含まれた後続車数の平均。誤差の大小を示す値ではない。</p></div>
+      </div>
+      <div class="callout">
+        <p><strong>解釈の限界：</strong>この結果だけで「MAE 1.8047 m/sなら十分正確」とは判断できない。許容誤差の閾値がJSONに定義されていないため、現時点で言えるのは誤差の大きさまでである。また、選ばなかった逆判断の実測ではないため、反実仮想の正しさとも呼ばない。</p>
+      </div>
+    </section>
+
+    <section class="section" id="burden">
+      <div class="section-heading">
+        <div>
+          <span class="section-number">05 / Observed burden</span>
+          <h2>安全・局所負担の観測指標</h2>
+          <p class="section-lead">強い減速時間率、停止時間率、車両別free-flow shortfallを車種別に並べる。いずれも観測分布であり、安全性そのものの断定には使わない。</p>
+        </div>
+      </div>
+
+      <div class="formula-grid" style="margin-top:0">
+        <article class="formula-card">
+          <h3>強い減速時間率</h3>
+          <p>観測された総車両時間のうち、加速度が \(-3.0\,\mathrm{m/s^2}\) 以下だった時間の割合。急減速した「回数」ではなく、状態が続いた「時間率」である。</p>
+          <div class="math-block">
+            \[
+              r_{\mathrm{brake}}=
+              \frac{\sum_j \mathbf{1}\!\left(a_j\le -3.0\right)\Delta t}
+              {\sum_j \Delta t}
+            \]
+          </div>
+          <p>値が大きいほど、強い減速状態で観測された時間の比率が高い。衝突件数や安全性全体を直接表す指標ではない。</p>
+        </article>
+        <article class="formula-card">
+          <h3>停止時間率</h3>
+          <p>観測された総車両時間のうち、速度が \(0.1\,\mathrm{m/s}\) 未満だった時間の割合。停止イベントの発生回数とは異なる。</p>
+          <div class="math-block">
+            \[
+              r_{\mathrm{stop}}=
+              \frac{\sum_j \mathbf{1}\!\left(v_j<0.1\right)\Delta t}
+              {\sum_j \Delta t}
+            \]
+          </div>
+          <p>長い停止が1回ある場合と短い停止が複数回ある場合を、合計停止時間として集約する。</p>
+        </article>
+        <article class="formula-card wide">
+          <h3>車両別 free-flow shortfall</h3>
+          <p>各車両 \(i\) について、自由流基準速度 \(v_{\mathrm{ff}}=13.89\,\mathrm{m/s}\) と実速度との差を、その車両の観測時間にわたって積分した代理指標。単位はm。</p>
+          <div class="math-block">
+            \[
+              F_i=\int_{0}^{T_i}\left(v_{\mathrm{ff}}-v_i(t)\right)dt,\qquad
+              v_{\mathrm{ff}}=13.89\,\mathrm{m/s}
+            \]
+          </div>
+          <ul class="reading-list">
+            <li><strong>中央値：</strong>分布の中央。半数の車両がこの値以下、残り半数がこの値以上。</li>
+            <li><strong>p95：</strong>95%の車両がこの値以下。負担の大きい側の裾を見る。</li>
+            <li><strong>最大値：</strong>最も大きかった1台。極端値を示すが、1台の挙動に左右される。</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="comparison-block">
+        <div class="comparison-title">
+          <h3>強い減速時間率・停止時間率</h3>
+          <p>時間率（%）</p>
+        </div>
+        <div class="observed-bars">
+          <article class="bar-card">
+            <h3>car｜強い減速</h3>
+            <div class="bar-row"><span>TIVtep</span><div class="bar-track"><div class="bar-fill" style="width:81.7%"></div></div><span class="bar-value">0.5356%</span></div>
+            <div class="bar-row"><span>提案法</span><div class="bar-track"><div class="bar-fill proposal" style="width:100%"></div></div><span class="bar-value">0.6555%</span></div>
+          </article>
+          <article class="bar-card">
+            <h3>bus｜強い減速</h3>
+            <div class="bar-row"><span>TIVtep</span><div class="bar-track"><div class="bar-fill" style="width:79.7%"></div></div><span class="bar-value">0.0743%</span></div>
+            <div class="bar-row"><span>提案法</span><div class="bar-track"><div class="bar-fill proposal" style="width:100%"></div></div><span class="bar-value">0.0932%</span></div>
+          </article>
+          <article class="bar-card">
+            <h3>car｜停止</h3>
+            <div class="bar-row"><span>TIVtep</span><div class="bar-track"><div class="bar-fill" style="width:83.0%"></div></div><span class="bar-value">2.3388%</span></div>
+            <div class="bar-row"><span>提案法</span><div class="bar-track"><div class="bar-fill proposal" style="width:100%"></div></div><span class="bar-value">2.8173%</span></div>
+          </article>
+          <article class="bar-card">
+            <h3>bus｜停止</h3>
+            <div class="bar-row"><span>TIVtep</span><div class="bar-track"><div class="bar-fill" style="width:100%"></div></div><span class="bar-value">1.8433%</span></div>
+            <div class="bar-row"><span>提案法</span><div class="bar-track"><div class="bar-fill proposal" style="width:99.8%"></div></div><span class="bar-value">1.8404%</span></div>
+          </article>
+        </div>
+        <p class="chart-subtitle" style="margin:12px 0 0">棒の長さは各カード内の2方式だけを相対比較するためのもの。異なる車種・異なる指標の棒同士は、長さでは比較しない。</p>
+      </div>
+
+      <div class="comparison-block">
+        <div class="comparison-title">
+          <h3>車両別 free-flow shortfall</h3>
+          <p>中央値／p95／最大値（m）</p>
+        </div>
+        <div class="table-card table-scroll">
+          <table>
+            <thead><tr><th>車種</th><th>方式</th><th>中央値</th><th>p95</th><th>最大値</th></tr></thead>
+            <tbody>
+              <tr><td>car</td><td>TIVtep</td><td>216.4</td><td>455.0</td><td>852.7</td></tr>
+              <tr><td>car</td><td>提案法</td><td>225.7</td><td>489.2</td><td>758.4</td></tr>
+              <tr><td>bus</td><td>TIVtep</td><td>259.2</td><td>507.8</td><td>878.1</td></tr>
+              <tr><td>bus</td><td>提案法</td><td>266.7</td><td>551.6</td><td>788.6</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="comparison-block">
+        <div class="comparison-title">
+          <h3>following_vehicle_shortfall</h3>
+          <p>前方車を持つライブ制御対象のみ</p>
+        </div>
+        <div class="table-card table-scroll">
+          <table>
+            <thead><tr><th>車種</th><th>方式</th><th>台数</th><th>中央値</th><th>p95</th><th>最大値</th></tr></thead>
+            <tbody>
+              <tr><td>car</td><td>TIVtep</td><td>742</td><td>199.4</td><td>446.6</td><td>850.9</td></tr>
+              <tr><td>car</td><td>提案法</td><td>744</td><td>214.0</td><td>477.8</td><td>758.4</td></tr>
+              <tr><td>bus</td><td>TIVtep</td><td>228</td><td>221.6</td><td>459.2</td><td>801.6</td></tr>
+              <tr><td>bus</td><td>提案法</td><td>230</td><td>236.7</td><td>486.9</td><td>761.3</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="callout">
+        <p><strong>対象集合の違い：</strong>上段のfree-flow shortfallは対象車両全体、following_vehicle_shortfallはライブ制御中に前方車を持った車両だけを抽出した同じ指標である。後者は後続車への局所負担を見るために使う。どちらも実走行の速度不足を自由流基準から測る代理指標であり、提案法が判断時に計算する承諾／拒否の反実仮想距離損失ではない。</p>
+      </div>
+    </section>
+
+    <section class="section" id="decisions">
+      <div class="section-heading">
+        <div>
+          <span class="section-number">06 / Decision difference</span>
+          <h2>提案法は実際に異なる判断を出した</h2>
+          <p class="section-lead">TIVtepとの同時判定が可能だった3,340件のうち、1,062件で承諾／拒否が一致しなかった。</p>
+        </div>
+      </div>
+
+      <div class="formula-grid" style="margin-top:0;margin-bottom:20px">
+        <article class="formula-card">
+          <h3>一致・不一致の数え方</h3>
+          <p>同じ交渉イベント \(e\) に対し、実際の提案法判断 \(P_e\) と、同時に計算したTIVtep判断 \(T_e\) を比較する。</p>
+          <div class="math-block">
+            \[
+              A=\sum_e\mathbf{1}(P_e=T_e),\qquad
+              D=\sum_e\mathbf{1}(P_e\ne T_e)
+            \]
+            \[
+              r_D=\frac{D}{A+D}=\frac{1{,}062}{2{,}278+1{,}062}=31.80\%
+            \]
+          </div>
+          <p>\(A\) は一致、\(D\) は不一致。31.80%はTIVtep比較が可能だった3,340件を分母にした不一致率。</p>
+        </article>
+        <article class="formula-card">
+          <h3>評価成立率とフォールバック率</h3>
+          <p>全試行4,511件のうち、提案法の評価処理が成立した件数と、非対応条件によって既存判定へ戻った件数を分ける。</p>
+          <div class="math-block">
+            \[
+              r_{\mathrm{eval}}=\frac{3{,}808}{4{,}511}=84.42\%,\qquad
+              r_{\mathrm{fallback}}=\frac{703}{4{,}511}=15.58\%
+            \]
+          </div>
+          <p>3,808件にはTIVtep比較不能の468件も含まれるため、評価成立件数と手法間比較可能件数は同じではない。</p>
+        </article>
+      </div>
+
+      <div class="decision-grid">
+        <article class="chart-card">
+          <h3>判断一致・不一致・比較不能</h3>
+          <div class="stacked" aria-label="判断一致2278件、不一致1062件、比較不能468件">
+            <span class="agree" style="width:59.82%"></span>
+            <span class="disagree" style="width:27.89%"></span>
+            <span class="unavailable" style="width:12.29%"></span>
+          </div>
+          <div class="decision-legend">
+            <div><strong>2,278</strong>一致</div>
+            <div><strong>1,062</strong>不一致</div>
+            <div><strong>468</strong>TIV比較不能</div>
+          </div>
+        </article>
+        <article class="chart-card">
+          <h3>各方式の判断数</h3>
+          <div class="count-pairs">
+            <div class="count-pair"><span>提案法 accept</span><strong>2,207</strong></div>
+            <div class="count-pair"><span>提案法 reject</span><strong>1,133</strong></div>
+            <div class="count-pair"><span>TIV would accept</span><strong>1,335</strong></div>
+            <div class="count-pair"><span>TIV would reject</span><strong>2,005</strong></div>
+          </div>
+        </article>
+      </div>
+      <div class="callout">
+        <p><strong>解釈：</strong>不一致は、提案法が既存手法と異なる判断を実際に出した証拠である。ただし、この比較で実走したのは提案法が選んだ行動だけである。同一イベントからTIVtep側の行動も分岐実行していないため、不一致だけでどちらの判断が交通性能上優れていたかは断定できない。</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-heading">
+        <div>
+          <span class="section-number">07 / Limitations & next</span>
+          <h2>限界と次の評価</h2>
+          <p class="section-lead">集計JSONに記録された限界を、結論の境界としてそのまま反映する。</p>
+        </div>
+      </div>
+      <div class="limits">
+        <div class="limit-item">予測精度は提案法が選択した行動についてのみ観測されており、反実仮想の結果検証ではない。</div>
+        <div class="limit-item">同一イベントのTIV比較は判断の不一致数を示すが、分岐再実行なしにはどちらの選択が良かったかを確定できない。</div>
+        <div class="limit-item">free-flow shortfallは分布上の代理指標であり、提案法が定義する反実仮想距離損失ではない。</div>
+      </div>
+      <div class="callout">
+        <p><strong>次に必要な実験：</strong>同じ判断時点の状態を保存し、承諾と拒否を2枝に分けて再実行する。各枝の実測結果を比較して初めて、判断単位の反実仮想的な優劣を評価できる。</p>
+      </div>
+    </section>
+
+    <section class="section" id="eval5">
+      <div class="section-heading">
+        <div>
+          <span class="section-number">08 / Eval.5 follow-up</span>
+          <h2>Eval.5 提案法フォローアップ</h2>
+          <p class="section-lead">四差路条件で提案法の5 seedは完走している。一方、同一実行条件のTIVtep対応結果は、この結果セットには含まれていない。</p>
+        </div>
+        <span class="badge pending">提案法のみ・比較保留</span>
+      </div>
+
+      <div class="condition-grid" style="margin-bottom:22px">
+        <div class="condition"><span>交差点</span><strong>四差路</strong></div>
+        <div class="condition"><span>α</span><strong>7</strong></div>
+        <div class="condition"><span>流入</span><strong>300 × 4方向</strong></div>
+        <div class="condition"><span>車種構成</span><strong>paper-random25</strong></div>
+        <div class="condition"><span>実行時間</span><strong>600秒</strong></div>
+        <div class="condition"><span>seed</span><strong>1〜5</strong></div>
+        <div class="condition"><span>SUMO</span><strong>1.18.0</strong></div>
+        <div class="condition"><span>終了状態</span><strong>全seed exit 0</strong></div>
+      </div>
+
+      <div class="eval5-grid">
+        <div class="eval5-summary">
+          <div class="eval5-mean">
+            <span>提案法 5-seed平均</span>
+            <strong>5.9562</strong>
+            <small>m/s（summary.jsonの5値から算出）</small>
+          </div>
+          <div class="callout" style="margin-top:0">
+            <p><strong>比較保留：</strong>manifestにある論文参照値6.4420 m/sは、今回の同一seed・同一実装で走らせた対応ベースラインではない。これとの差だけで提案法の優劣を主張しない。</p>
+          </div>
+          <div class="callout" style="margin-top:0">
+            <p><strong>再現性上の注意：</strong>summary.jsonでは全seedの <code>source_unchanged</code> が <code>false</code>。終了コードと各監査JSONの出力は確認できるが、実行中にソース状態が変化した可能性を残すため、固定スナップショットとしては扱わない。</p>
+          </div>
+        </div>
+        <div class="eval5-bars">
+          <h3>seed別 平均速度</h3>
+          <p class="chart-subtitle">提案法のみ（m/s）</p>
+          <div id="eval5-bars"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-heading">
+        <div>
+          <span class="section-number">09 / Data provenance</span>
+          <h2>数値の出典</h2>
+          <p class="section-lead">表示値は次のJSONを正本として転記し、画面上では読みやすい桁数に丸めた。</p>
+        </div>
+      </div>
+      <ul class="source-list">
+        <li>result/proposed-method/eval3/2026-10-23-deceleration-propagation/eval3-metrics-comparison-20261023/evaluation-report.json</li>
+        <li>result/proposed-method/eval3/2026-10-23-deceleration-propagation/eval3-metrics-comparison-20261023/evaluation-report.md</li>
+        <li>result/proposed-method/eval3/2026-10-23-deceleration-propagation/eval3-tivtep-metrics-20261023/eval3/seed-*/manifest.json</li>
+        <li>result/proposed-method/eval3/2026-10-23-deceleration-propagation/eval3-tivtep-metrics-20261023/eval3/seed-*/evaluation-metrics.json</li>
+        <li>result/proposed-method/eval3/2026-10-23-deceleration-propagation/eval3-proposal-metrics-20261023/eval3/seed-*/manifest.json</li>
+        <li>result/proposed-method/eval3/2026-10-23-deceleration-propagation/eval3-proposal-metrics-20261023/eval3/seed-*/evaluation-metrics.json</li>
+        <li>result/proposed-method/eval3/2026-10-23-deceleration-propagation/eval3-proposal-metrics-20261023/eval3/seed-*/deceleration-audit.json</li>
+        <li>result/proposed-method/eval5/2026-10-24-deceleration-propagation/eval5-proposal-metrics-20261024-systemd/summary.json</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>Eval.3 / Eval.5 減速伝播評価レポート。未計測の急減速回数、停止回数、逆判断の反実仮想結果は補完していない。</p>
+  </footer>
+
+  <script>
+    const eval3PerSeed = [
+      { seed: 1, tiv: 7.386727321566524, proposal: 7.379684184077671, diff: -0.007043137488853546 },
+      { seed: 2, tiv: 7.935313831756921, proposal: 7.230770566313753, diff: -0.704543265443168 },
+      { seed: 3, tiv: 7.542435651120275, proposal: 7.683284075428737, diff: 0.14084842430846134 },
+      { seed: 4, tiv: 7.435210917100737, proposal: 7.50166591624938, diff: 0.06645499914864317 },
+      { seed: 5, tiv: 7.621975950442175, proposal: 7.06647097813809, diff: -0.5555049723040844 }
+    ];
+
+    const eval5PerSeed = [
+      { seed: 1, speed: 6.466922543856111 },
+      { seed: 2, speed: 6.353627754219629 },
+      { seed: 3, speed: 5.1087873657055445 },
+      { seed: 4, speed: 5.788457842946716 },
+      { seed: 5, speed: 6.063064439086012 }
+    ];
+
+    function pct(value, min, max) {
+      return Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+    }
+
+    function renderEval3() {
+      const root = document.getElementById("eval3-dumbbell");
+      const min = 7.0;
+      const max = 8.0;
+      eval3PerSeed.forEach((item) => {
+        const tivPos = pct(item.tiv, min, max);
+        const proposalPos = pct(item.proposal, min, max);
+        const left = Math.min(tivPos, proposalPos);
+        const width = Math.abs(tivPos - proposalPos);
+        const row = document.createElement("div");
+        row.className = "dumbbell-row";
+        row.innerHTML = `
+          <span class="seed-label">seed ${item.seed}</span>
+          <div class="dumbbell-track" title="TIVtep ${item.tiv.toFixed(4)} / 提案法 ${item.proposal.toFixed(4)} m/s">
+            <span class="dumbbell-line" style="left:${left}%;width:${width}%"></span>
+            <span class="dot tiv" style="left:${tivPos}%"></span>
+            <span class="dot proposal" style="left:${proposalPos}%"></span>
+          </div>
+          <span class="delta ${item.diff >= 0 ? "positive" : "negative"}">${item.diff >= 0 ? "+" : ""}${item.diff.toFixed(4)}</span>`;
+        root.appendChild(row);
+      });
+    }
+
+    function renderEval5() {
+      const root = document.getElementById("eval5-bars");
+      const max = 7;
+      eval5PerSeed.forEach((item) => {
+        const row = document.createElement("div");
+        row.className = "eval5-row";
+        row.innerHTML = `
+          <span class="seed-label">seed ${item.seed}</span>
+          <div class="eval5-track"><div class="eval5-fill" style="width:${(item.speed / max) * 100}%"></div></div>
+          <span class="eval5-value">${item.speed.toFixed(4)}</span>`;
+        root.appendChild(row);
+      });
+    }
+
+    renderEval3();
+    renderEval5();
+  </script>
+</body>
+</html>
