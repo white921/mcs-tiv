@@ -19,6 +19,7 @@ from cav_four_junction import CAV
 from cav_four_junction_bus import CAV_bus
 from animation_four_junction import Animation
 from frenet_merge import emergency_stop
+from fixed_vehicle_inputs import load_fixed_vehicle_input
 import evaluation_metrics
 
 # we need to import python modules from the $SUMO_HOME/tools directory
@@ -36,6 +37,8 @@ simulation_time = 600.0
 bus_share = 0.0
 bus_allocation = "fixed"
 diagnostic_stop_time = None
+fixed_input_path = None
+fixed_input_schedule = None
 # matplotlibによる描画
 show_animation = False
 import random
@@ -131,6 +134,32 @@ def set_environment(inflow_0=750, inflow_1=750, inflow_2=750, inflow_3=750):
     global veh_id
     global departTime_lane0, departTime_lane1, departTime_lane2, departTime_lane3
     global vehicleType_lane0, vehicleType_lane1, vehicleType_lane2, vehicleType_lane3
+    global fixed_input_schedule
+
+    if fixed_input_path is not None:
+        fixed_input_schedule = load_fixed_vehicle_input(
+            fixed_input_path,
+            expected_case="eval5",
+            expected_seed=seed,
+            expected_duration_s=600.0,
+            expected_flows_vph={
+                "left": inflow_0, "bottom": inflow_1,
+                "right": inflow_2, "top": inflow_3,
+            },
+            expected_bus_share=bus_share,
+            prefix_duration_s=(
+                diagnostic_stop_time if diagnostic_stop_time is not None else simulation_time
+            ),
+        )
+        departTime_lane0 = fixed_input_schedule.departure_times("left")
+        departTime_lane1 = fixed_input_schedule.departure_times("bottom")
+        departTime_lane2 = fixed_input_schedule.departure_times("right")
+        departTime_lane3 = fixed_input_schedule.departure_times("top")
+        print(departTime_lane0)
+        print(departTime_lane1)
+        print(departTime_lane2)
+        print(departTime_lane3)
+        return
 
     k_0 = int((simulation_time/3600)*inflow_0)
     k_1 = int((simulation_time/3600)*inflow_1)
@@ -170,8 +199,13 @@ def add_vehicle(alpha):
     # if sumo_time in departTime_lane1:
     if sumo_time in departTime_lane1:
         # 下から入る車両：BR（下→右）またはBL（下→左）を均等に割り振り
-        route_id = random.choice(["BR", "BL"])
-        kind = select_vehicle_type(vehicleType_lane1)
+        if fixed_input_schedule is None:
+            route_id = random.choice(["BR", "BL"])
+            kind = select_vehicle_type(vehicleType_lane1)
+        else:
+            event = fixed_input_schedule.pop("bottom", sumo_time)
+            route_id = event["route"]
+            kind = event["vehicle_type"]
         if kind == "Car":
             traci.vehicle.add(vehID=str(veh_id), routeID=route_id, typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
             instance = CAV(veh_id, alpha, withAgree=True)
@@ -198,10 +232,15 @@ def add_vehicle(alpha):
     # if sumo_time in departTime_lane0:
     if sumo_time in departTime_lane0:
         # 左から入る車両：LR（左→右）またはLB（左→下）を均等に割り振り
-        route_id = random.choice(["LR", "LB", "LT"])
+        if fixed_input_schedule is None:
+            route_id = random.choice(["LR", "LB", "LT"])
+            kind = select_vehicle_type(vehicleType_lane0)
+        else:
+            event = fixed_input_schedule.pop("left", sumo_time)
+            route_id = event["route"]
+            kind = event["vehicle_type"]
         #route_id = random.choice(["LR", "LB"])
         #route_id = "LR"
-        kind = select_vehicle_type(vehicleType_lane0)
         if kind == "Car":
             traci.vehicle.add(vehID=str(veh_id), routeID=route_id, typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
             instance = CAV(veh_id, alpha, withAgree=True)
@@ -227,10 +266,15 @@ def add_vehicle(alpha):
 
     if sumo_time in departTime_lane2:
         # 右から入る車両：RL（右→左）またはRB（右→下）を均等に割り振り
-        route_id = random.choice(["RL", "RB", "RT"])
+        if fixed_input_schedule is None:
+            route_id = random.choice(["RL", "RB", "RT"])
+            kind = select_vehicle_type(vehicleType_lane2)
+        else:
+            event = fixed_input_schedule.pop("right", sumo_time)
+            route_id = event["route"]
+            kind = event["vehicle_type"]
         #route_id = random.choice(["RL", "RB"])
         #route_id = "RL"
-        kind = select_vehicle_type(vehicleType_lane2)
         if kind == "Car":
             traci.vehicle.add(vehID=str(veh_id), routeID=route_id, typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
             instance = CAV(veh_id, alpha, withAgree=True)
@@ -258,9 +302,14 @@ def add_vehicle(alpha):
     if sumo_time in departTime_lane3:
         # 上から入る車両：TL（上→左）またはTR（上→右）を均等に割り振り
         #route_id = random.choice(["TL", "TR", "TB"])
-        route_id = random.choice(["TL", "TR"])
+        if fixed_input_schedule is None:
+            route_id = random.choice(["TL", "TR"])
+            kind = select_vehicle_type(vehicleType_lane3)
+        else:
+            event = fixed_input_schedule.pop("top", sumo_time)
+            route_id = event["route"]
+            kind = event["vehicle_type"]
         #route_id = "RL"
-        kind = select_vehicle_type(vehicleType_lane3)
         if kind == "Car":
             traci.vehicle.add(vehID=str(veh_id), routeID=route_id, typeID="CAV_0", departLane="0", departPos="base", departSpeed="5")
             instance = CAV(veh_id, alpha, withAgree=True)
@@ -691,6 +740,8 @@ def get_options():
     optParser.add_option("--stop-time", type="float", default=None, help="stop early while retaining the full-duration input schedule")
     optParser.add_option("--bus-allocation", type="choice", choices=["fixed", "paper-random25"], default="fixed", help="fixed share or the paper artifact's per-vehicle 25%% draw")
     optParser.add_option("--bus-share", type="float", default=0.0, help="share of buses from 0 to 1")
+    optParser.add_option("--fixed-input", type="string", default=None,
+                         help="versioned JSONL vehicle schedule; bypasses runtime input randomness")
     optParser.add_option("--quiet", action="store_true", default=False, help="suppress verbose per-step output")
     optParser.add_option("--no-save", action="store_true", default=False, help="do not append the run to statistics CSV")
     optParser.add_option("--deceleration-shadow", action="store_true", default=False,
@@ -724,12 +775,14 @@ if __name__ == "__main__":
     diagnostic_stop_time = options.stop_time
     bus_share = options.bus_share
     bus_allocation = options.bus_allocation
+    fixed_input_path = options.fixed_input
     if not options.quiet:
         print(args)
     alpha = str(args[0])
     seed = args[1]
-    random.seed(seed)
-    vehicle_type_rng.seed(f"{seed}:vehicle-types")
+    if fixed_input_path is None:
+        random.seed(seed)
+        vehicle_type_rng.seed(f"{seed}:vehicle-types")
     inflow_0 = int(args[2])
     inflow_1 = int(args[3])
     inflow_2 = int(args[4])

@@ -7,8 +7,10 @@ route files or historical statistics CSVs.  This runner deliberately keeps the
 comparison settings fixed: an explicitly selected simulated duration (600 s
 for final evaluation or 300 s for diagnostics), the documented seed sets,
 one-second candidate trajectory regeneration in ``thesis`` mode, and a fixed
-25% bus composition where applicable.  SUMO and MCM still advance every 0.1
-seconds.  ``paper-random25`` remains available only when reproducing the
+25% bus composition where applicable.  Eval.3/5/7 use prefixes of committed
+600-second vehicle-event files for fixed-allocation runs up to 600 seconds.
+SUMO and MCM still advance every
+0.1 seconds.  ``paper-random25`` remains available only when reproducing the
 original artifact's per-vehicle random draw.
 """
 
@@ -27,6 +29,9 @@ import time
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "func"))
+from fixed_vehicle_inputs import load_fixed_vehicle_input  # noqa: E402
+
 SPEED = re.compile(r"^all_speed\s*:\s*(\S+)\s*$", re.MULTILINE)
 MIX = re.compile(r"^vehicle_mix\s*:\s*Bus\s+(\d+)\s+Car\s+(\d+)", re.MULTILINE)
 
@@ -38,6 +43,7 @@ CASES = {
         "folder": "junction", "script": "junction_three_agree.py", "alpha": "7",
         "flows": ["400", "400", "400"], "bus_share": "0.25",
         "seeds": [1, 2, 3, 4, 5], "reference": 7.4159,
+        "fixed_input": "fixed_inputs/thesis/eval3/seed-{seed}.jsonl",
     },
     "eval4": {
         "folder": "junction", "script": "junction_four_agree.py", "alpha": "6",
@@ -48,6 +54,7 @@ CASES = {
         "folder": "junction", "script": "junction_four_agree.py", "alpha": "7",
         "flows": ["300", "300", "300", "300"], "bus_share": "0.25",
         "seeds": [1, 2, 3, 4, 5], "reference": 6.4420,
+        "fixed_input": "fixed_inputs/thesis/eval5/seed-{seed}.jsonl",
     },
     "eval6": {
         "folder": "merge", "script": "merge_agree2512.py", "alpha": "6",
@@ -58,8 +65,55 @@ CASES = {
         "folder": "merge", "script": "merge_agree2512.py", "alpha": "7",
         "flows": ["1000", "1000"], "bus_share": "0.25",
         "seeds": [1, 2, 3, 7, 11], "reference": 4.2084,
+        "fixed_input": "fixed_inputs/thesis/eval7/seed-{seed}.jsonl",
     },
 }
+
+
+def fixed_input_details(
+    name, seed, duration, bus_allocation, prefix_duration=None, source_root=ROOT
+):
+    """Return the committed 600-second input selected for a batch task."""
+    pattern = CASES[name].get("fixed_input")
+    if pattern is None or bus_allocation != "fixed":
+        return None
+    if not 0 < duration <= 600:
+        raise ValueError("fixed vehicle input duration must be in (0, 600]")
+    if prefix_duration is None:
+        prefix_duration = duration
+    if not 0 < prefix_duration <= duration:
+        raise ValueError("fixed vehicle input prefix must be in (0, duration]")
+    relative_path = Path(pattern.format(seed=seed))
+    path = source_root / relative_path
+    schedule = load_fixed_vehicle_input(path, prefix_duration_s=prefix_duration)
+    metadata = schedule.metadata
+    if metadata.get("case") != name or metadata.get("seed") != seed:
+        raise ValueError(f"fixed input metadata mismatch: {relative_path}")
+    return {
+        "relative_path": relative_path.as_posix(),
+        "runtime_path": str(Path("..") / relative_path),
+        "schema_version": metadata["schema_version"],
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "prefix_duration_s": schedule.prefix_duration_s,
+        "prefix_event_count": len(schedule.events),
+        "prefix_sha256": schedule.prefix_sha256,
+    }
+
+
+def build_tasks(case_names, seeds_per_case=None, seeds=None):
+    """Build tasks from documented seeds, optionally selecting an explicit subset."""
+    tasks = []
+    for name in case_names:
+        documented = CASES[name]["seeds"]
+        if seeds is not None:
+            unknown = [seed for seed in seeds if seed not in documented]
+            if unknown:
+                raise ValueError(f"{name} does not document seeds: {unknown}")
+            selected = seeds
+        else:
+            selected = documented[:seeds_per_case]
+        tasks.extend((name, seed) for seed in selected)
+    return tasks
 
 
 def source_hashes(source):
@@ -67,7 +121,7 @@ def source_hashes(source):
         str(path.relative_to(source)): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in source.rglob("*")
         if (path.is_file() and "statistics" not in path.parts
-            and path.suffix in (".py", ".xml", ".sumocfg"))
+            and path.suffix in (".py", ".xml", ".sumocfg", ".jsonl"))
     }
 
 
@@ -91,7 +145,7 @@ def git_metadata():
 def prepare_source(destination, case):
     source = destination / "source"
     source.mkdir()
-    for name in ("func", "PathPlanning", "junction", "merge"):
+    for name in ("func", "PathPlanning", "junction", "merge", "fixed_inputs"):
         shutil.copytree(ROOT / name, source / name, ignore=shutil.ignore_patterns(
             "__pycache__", "*.pyc", "statistics", "results*", "*.log"))
     for name in ("junction", "merge"):
@@ -126,6 +180,13 @@ def run_task(task, args):
     command = [args.python, "-u", case["script"], case["alpha"], str(seed),
                *case["flows"], "--nogui", "--quiet", "--duration", str(args.duration),
                "--bus-allocation", args.bus_allocation]
+    fixed_input = fixed_input_details(
+        name, seed, args.duration, args.bus_allocation,
+        prefix_duration=(args.stop_time if args.stop_time is not None else args.duration),
+        source_root=source,
+    )
+    if fixed_input is not None:
+        command += ["--fixed-input", fixed_input["runtime_path"]]
     if args.deceleration_active:
         command.append("--deceleration-active")
     if not is_three_way:
@@ -139,6 +200,15 @@ def run_task(task, args):
         "paper_reference_mean_mps": case["reference"],
         "bus_allocation": args.bus_allocation,
         "bus_share": case["bus_share"],
+        "fixed_vehicle_input": ({
+            "path": fixed_input["relative_path"],
+            "schema_version": fixed_input["schema_version"],
+            "sha256": fixed_input["sha256"],
+            "prefix_duration_s": fixed_input["prefix_duration_s"],
+            "prefix_event_count": fixed_input["prefix_event_count"],
+            "prefix_sha256": fixed_input["prefix_sha256"],
+            "prefix_sha256_scope": "canonical vehicle JSONL records with depart_time_s < prefix_duration_s",
+        } if fixed_input is not None else None),
         "decision_method": "deceleration-propagation" if args.deceleration_active else "thesis-tiv",
         "diagnostic_traces_requested": args.diagnostic_traces,
         "diagnostic_traces_enabled": bool(args.diagnostic_traces and is_three_way),
@@ -188,6 +258,8 @@ def main():
                         help="independent SUMO tasks; use 3-4, not all CPU threads")
     parser.add_argument("--seeds-per-case", type=int,
                         help="run only this many leading documented seeds per case (smoke tests)")
+    parser.add_argument("--seeds", type=int, nargs="+",
+                        help="run only these documented seeds for every selected case")
     parser.add_argument("--duration", type=float, default=600,
                         help="scenario duration in seconds (300 for diagnostic comparisons; default: 600)")
     parser.add_argument("--stop-time", type=float,
@@ -206,6 +278,8 @@ def main():
         parser.error("--workers must be positive")
     if args.seeds_per_case is not None and args.seeds_per_case < 1:
         parser.error("--seeds-per-case must be positive")
+    if args.seeds_per_case is not None and args.seeds is not None:
+        parser.error("--seeds-per-case and --seeds cannot be combined")
     if not 0 < args.duration <= 600:
         parser.error("--duration must be in (0, 600]")
     if args.stop_time is not None and not 0 < args.stop_time <= args.duration:
@@ -216,8 +290,10 @@ def main():
         parser.error("--paper must name an existing PDF")
     args.output = args.output.resolve()
     args.output.mkdir(parents=True, exist_ok=False)
-    tasks = [(name, seed) for name in args.cases
-             for seed in CASES[name]["seeds"][:args.seeds_per_case]]
+    try:
+        tasks = build_tasks(args.cases, args.seeds_per_case, args.seeds)
+    except ValueError as error:
+        parser.error(str(error))
     print(json.dumps({"tasks": len(tasks), "workers": args.workers, "output": str(args.output)}), flush=True)
     reports = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as pool:
