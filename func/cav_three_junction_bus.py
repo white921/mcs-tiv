@@ -80,7 +80,7 @@ class CAV_bus:
         if self.route in ["RL", "RB", "RT"]:
             self.pos_x = 300.0
             self.pos_y = 1.6
-        if self.route == ["LR", "LB", "LT"]:
+        if self.route in ["LR", "LB", "LT"]:
             self.pos_x = 0.0
             self.pos_y = -1.6
         elif self.route in ["BR", "BL", "BT"]:
@@ -1389,12 +1389,13 @@ class CAV_bus:
             else:
                 path_candidates = emergency_stop(self.pos_x, self.speed, self.pos_y, self.route)
                 # print('Emergency Brake time', self.simTime, "veh", self.id, file=sys.stderr)
-                self.status == "stop"
+                self.status = "stop"
                 for path in path_candidates:
                     path.t = [round(n+self.simTime, 1) for n in path.t]
 
         if len(path_candidates) == 0:
             path_candidates = emergency_stop(self.pos_x, self.speed, self.pos_y, self.route)
+            self.status = "stop"
 
         return path_candidates
 

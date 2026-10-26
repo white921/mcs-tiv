@@ -893,12 +893,13 @@ class CAV:
             else:
                 path_candidates = emergency_stop(self.pos_x, self.speed, self.pos_y, self.route)
                 # print('Emergency Brake time', self.simTime, "veh", self.id, file=sys.stderr)
-                self.status == "stop"
+                self.status = "stop"
                 for path in path_candidates:
                     path.t = [round(n+self.simTime, 1) for n in path.t]
 
         if len(path_candidates) == 0:
             path_candidates = emergency_stop(self.pos_x, self.speed, self.pos_y, self.route)
+            self.status = "stop"
 
         return path_candidates
 
