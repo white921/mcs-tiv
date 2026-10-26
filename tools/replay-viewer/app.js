@@ -395,7 +395,9 @@ async function loadSelection(selectionId) {
   timeline.max = String(Math.max(0, state.meta.frame_count - 1));
   const manifest = state.meta.manifest;
   document.querySelector('#run-title').textContent = `${caseLabel(manifest.case || 'シミュレーション')} · Seed ${manifest.seed ?? '—'}`;
-  document.querySelector('#run-meta').innerHTML = `${manifest.decision_method || '方式不明'}<br>${state.meta.start_time ?? '—'}–${state.meta.end_time ?? '—'} s · ${state.meta.frame_count}フレーム · FCD ${state.meta.fcd_available ? 'あり' : 'なし'}`;
+  const fcdLabel = !state.meta.fcd_available ? 'なし'
+    : (state.meta.fcd_complete ? 'あり' : '部分ログ');
+  document.querySelector('#run-meta').innerHTML = `${manifest.decision_method || '方式不明'}<br>${state.meta.start_time ?? '—'}–${state.meta.end_time ?? '—'} s · ${state.meta.frame_count}フレーム · FCD ${fcdLabel}`;
   const note = document.querySelector('#scenario-note');
   note.textContent = state.meta.scenario_note || '';
   note.hidden = !state.meta.scenario_note;

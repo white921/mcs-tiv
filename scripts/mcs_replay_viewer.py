@@ -65,10 +65,14 @@ class FrameStore:
 
 
 def find_trace(run_dir: Path, base_name: str, required=False) -> Path | None:
-    for suffix in ("", ".gz"):
-        candidate = run_dir / f"{base_name}{suffix}"
-        if candidate.is_file():
-            return candidate
+    names = [base_name]
+    if base_name.endswith(".jsonl"):
+        names.insert(0, f"{base_name.removesuffix('.jsonl')}-full.jsonl")
+    for name in names:
+        for suffix in ("", ".gz"):
+            candidate = run_dir / f"{name}{suffix}"
+            if candidate.is_file():
+                return candidate
     if required:
         raise FileNotFoundError(f"{base_name} not found under {run_dir}")
     return None
@@ -145,6 +149,9 @@ class ReplayApplication:
         self.frames = FrameStore(state_path)
         self.manifest = json.loads((self.run_dir / "manifest.json").read_text()) \
             if (self.run_dir / "manifest.json").is_file() else {}
+        self.replay_stitch = json.loads(
+            (self.run_dir / "replay-stitch.json").read_text()) \
+            if (self.run_dir / "replay-stitch.json").is_file() else None
         self.events = read_jsonl(find_trace(self.run_dir, "negotiations.jsonl"))
         self.events.sort(key=lambda event: float(event.get("sim_time", 0)))
         self.network = parse_network(find_network(
@@ -159,6 +166,7 @@ class ReplayApplication:
             "end_time": self.frames.times[-1] if self.frames.times else None,
             "manifest": self.manifest,
             "fcd_available": (self.run_dir / "fcd.xml.gz").is_file(),
+            "fcd_complete": self.replay_stitch is None,
             "event_count": len(self.events),
             "scenario_note": (
                 "論文上はT字路。引き継ぎ実装は上側流入を使わない十字路ネットワーク。"
@@ -230,6 +238,35 @@ def format_duration(duration) -> str:
     return f"{value:g}秒"
 
 
+def logical_experiment_id(manifest: dict, physical_experiment_id: str) -> str:
+    """Group checkpoint recoveries with the batch they resume.
+
+    Recovery runs intentionally live in separate result directories, but they
+    are continuations of the same logical experiment from a replay user's
+    perspective.  The checkpoint path is persisted in every recovered seed
+    manifest, so it is the authoritative link back to the original batch.
+    """
+    resume_from = (
+        manifest.get("checkpointing", {}).get("resume_from")
+        if isinstance(manifest.get("checkpointing"), dict) else None
+    )
+    if resume_from:
+        parts = Path(str(resume_from)).parts
+        try:
+            runs_index = parts.index("runs")
+            return parts[runs_index + 1]
+        except (ValueError, IndexError):
+            pass
+    return physical_experiment_id
+
+
+def physical_experiment_id(root: Path, search_root: Path) -> str:
+    """Return the experiment directory name for the modern results/runs layout."""
+    if root.parent == search_root / "runs":
+        return root.name
+    return relative_label(root, search_root)
+
+
 class ReplayCatalog:
     def __init__(self, search_root: Path):
         self.search_root = search_root.resolve()
@@ -240,13 +277,16 @@ class ReplayCatalog:
                 replayable_seed_directories(self.search_root)):
             manifest = json.loads((seed_dir / "manifest.json").read_text())
             root = experiment_root(seed_dir, self.search_root)
-            experiment_id = relative_label(root, self.search_root)
+            physical_id = physical_experiment_id(root, self.search_root)
+            experiment_id = logical_experiment_id(
+                manifest, physical_id)
             selection_id = str(index)
             duration = manifest.get("stop_time") or manifest.get("input_duration")
             method = manifest.get("decision_method") or "方式不明"
             entry = {
                 "id": selection_id,
                 "experiment_id": experiment_id,
+                "physical_experiment_id": physical_id,
                 "experiment_label": (
                     f"{format_started_at(manifest)} · "
                     f"{display_method(experiment_id, method)} · "
@@ -264,6 +304,24 @@ class ReplayCatalog:
         self._entries.sort(key=lambda entry: (
             -(float(entry["started_epoch"] or 0)),
             entry["experiment_id"], entry["case"], str(entry["seed"])))
+
+        # Use one stable label for every case/seed in a logical experiment.
+        # Prefer the original batch's manifest over a later recovery manifest.
+        grouped_entries = {}
+        for entry in self._entries:
+            grouped_entries.setdefault(entry["experiment_id"], []).append(entry)
+        for experiment_id, entries in grouped_entries.items():
+            original = next((entry for entry in entries
+                             if entry["physical_experiment_id"] == experiment_id), None)
+            representative = original or min(
+                entries, key=lambda entry: float(entry["started_epoch"] or 0))
+            label = representative["experiment_label"]
+            if any(entry["physical_experiment_id"] != experiment_id
+                   for entry in entries):
+                label += " · 復旧統合"
+            for entry in entries:
+                entry["experiment_label"] = label
+
         experiments_by_label = {}
         for entry in reversed(self._entries):
             experiments = experiments_by_label.setdefault(

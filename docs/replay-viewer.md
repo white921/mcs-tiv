@@ -25,6 +25,11 @@ Passing either a different results root or one seed directory remains supported.
   and jump-to-negotiation controls are always available;
 - experiment, Eval, and Seed selectors are populated from local replayable
   manifests; switching them replays saved logs and never reruns SUMO;
+- checkpoint recovery directories are grouped with their original batch, so a
+  recovered case/seed remains selectable under one experiment entry;
+- when a verified `*-full.jsonl.gz` stitched trace is present, it is preferred
+  over the recovery-only trace; the UI labels a non-stitched FCD as a partial
+  log instead of implying that it covers the whole replay;
 - dragging pans the map, and an unmodified vertical wheel gesture zooms around
   the pointer (up to zoom in, down to zoom out);
 - horizontal wheel/two-finger gestures move the view, while pinch zooms it;

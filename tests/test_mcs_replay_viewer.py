@@ -12,8 +12,11 @@ from mcs_replay_viewer import (
     FrameStore,
     ReplayCatalog,
     display_method,
+    find_trace,
     find_network,
+    logical_experiment_id,
     parse_network,
+    physical_experiment_id,
 )
 
 
@@ -29,6 +32,15 @@ class ReplayViewerTests(unittest.TestCase):
             store = FrameStore(path)
             self.assertEqual(store.times, [0.1, 0.2])
             self.assertEqual(store.get(1)["vehicles"][0]["vehicle_id"], "1")
+
+    def test_find_trace_prefers_full_stitched_trace(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            partial = run / "vehicle-states.jsonl"
+            full = run / "vehicle-states-full.jsonl.gz"
+            partial.write_text("partial")
+            full.write_text("full")
+            self.assertEqual(find_trace(run, "vehicle-states.jsonl"), full)
 
     def test_parse_network_returns_lane_shapes_and_bounds(self):
         network = parse_network(ROOT / "junction" / "junction_three.net.xml")
@@ -88,6 +100,55 @@ class ReplayViewerTests(unittest.TestCase):
             display_method("formal", "deceleration-propagation"),
             "提案手法")
         self.assertEqual(display_method("formal", "thesis-tiv"), "山下手法")
+
+    def test_recovery_entries_join_the_original_experiment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            original_name = "baseline-20261026"
+            original = root / original_name / "eval3" / "seed-1"
+            original.mkdir(parents=True)
+            (original.parent.parent / "summary.json").write_text("{}")
+            base_manifest = {
+                "case": "eval3", "seed": 1, "exit_code": 0,
+                "started_epoch": 1, "decision_method": "deceleration-propagation",
+                "stop_time": 300,
+            }
+            (original / "manifest.json").write_text(json.dumps(base_manifest))
+            (original / "vehicle-states.jsonl").write_text(
+                json.dumps({"sim_time": 0.1, "vehicles": []}) + "\n")
+
+            recovered = root / "recovery-seed2" / "eval3" / "seed-2"
+            recovered.mkdir(parents=True)
+            (recovered.parent.parent / "summary.json").write_text("{}")
+            recovery_manifest = {
+                **base_manifest,
+                "seed": 2,
+                "started_epoch": 2,
+                "checkpointing": {
+                    "resume_from": (
+                        f"/remote/repo/results/runs/{original_name}/"
+                        "eval3/seed-2/checkpoints/t0000240.0")
+                },
+            }
+            (recovered / "manifest.json").write_text(json.dumps(recovery_manifest))
+            (recovered / "vehicle-states.jsonl").write_text(
+                json.dumps({"sim_time": 240.1, "vehicles": []}) + "\n")
+
+            entries = ReplayCatalog(root).metadata()["entries"]
+            self.assertEqual({entry["experiment_id"] for entry in entries},
+                             {original_name})
+            self.assertEqual({int(entry["seed"]) for entry in entries}, {1, 2})
+            self.assertEqual(len({entry["experiment_label"] for entry in entries}), 1)
+            self.assertTrue(entries[0]["experiment_label"].endswith("復旧統合"))
+
+    def test_logical_experiment_id_falls_back_for_non_checkpoint_runs(self):
+        self.assertEqual(logical_experiment_id({}, "run-a"), "run-a")
+
+    def test_modern_results_run_uses_directory_name_as_experiment_id(self):
+        root = Path("/repo/results")
+        experiment = root / "runs" / "baseline-20261026"
+        self.assertEqual(
+            physical_experiment_id(experiment, root), "baseline-20261026")
 
     def test_catalog_numbers_duplicate_display_labels_by_experiment(self):
         with tempfile.TemporaryDirectory() as directory:
