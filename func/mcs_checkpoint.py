@@ -96,6 +96,8 @@ def capture_shared_modules(evaluation_metrics, deceleration_prediction, thesis_t
             "PENDING": evaluation_metrics.PENDING,
             "PREDICTION": evaluation_metrics.PREDICTION,
             "PREDICTION_EVENTS": evaluation_metrics.PREDICTION_EVENTS,
+            "PHYSICAL_COLLISION_FRAMES": evaluation_metrics.PHYSICAL_COLLISION_FRAMES,
+            "ACTIVE_PHYSICAL_COLLISIONS": evaluation_metrics.ACTIVE_PHYSICAL_COLLISIONS,
         },
         "deceleration_prediction": {
             "COUNTS": deceleration_prediction.COUNTS,
@@ -123,6 +125,11 @@ def restore_shared_modules(
         _replace_mapping(getattr(evaluation_metrics, name), metrics[name])
     for name in ("PENDING", "PREDICTION_EVENTS"):
         getattr(evaluation_metrics, name)[:] = metrics[name]
+    evaluation_metrics.PHYSICAL_COLLISION_FRAMES[:] = metrics.get(
+        "PHYSICAL_COLLISION_FRAMES", [])
+    evaluation_metrics.ACTIVE_PHYSICAL_COLLISIONS.clear()
+    evaluation_metrics.ACTIVE_PHYSICAL_COLLISIONS.update(
+        metrics.get("ACTIVE_PHYSICAL_COLLISIONS", set()))
     prediction = state["deceleration_prediction"]
     _replace_mapping(deceleration_prediction.COUNTS, prediction["COUNTS"])
     deceleration_prediction.RECORDS[:] = prediction["RECORDS"]

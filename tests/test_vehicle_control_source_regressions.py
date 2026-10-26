@@ -53,6 +53,28 @@ class VehicleControlSourceRegressionTests(unittest.TestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_traci_control_modes_do_not_use_removed_keyword_names(self):
+        offenders = []
+        for path in ACTIVE_CONTROLLERS:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                for keyword in node.keywords:
+                    if keyword.arg in {"lcm", "sm"}:
+                        offenders.append(f"{path.name}:{node.lineno}:{keyword.arg}")
+
+        self.assertEqual(offenders, [])
+
+    def test_active_runners_do_not_label_controller_counters_as_collisions(self):
+        for relative in (
+                "junction/junction_three_agree.py",
+                "junction/junction_four_agree.py",
+                "merge/merge_agree2512.py"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            self.assertNotIn('print("collision :"', source, relative)
+            self.assertIn("sumo_physical_collision_episodes", source, relative)
+
 
 if __name__ == "__main__":
     unittest.main()

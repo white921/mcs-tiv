@@ -115,6 +115,8 @@ def _module_state():
             "PENDING": evaluation_metrics.PENDING,
             "PREDICTION": evaluation_metrics.PREDICTION,
             "PREDICTION_EVENTS": evaluation_metrics.PREDICTION_EVENTS,
+            "PHYSICAL_COLLISION_FRAMES": evaluation_metrics.PHYSICAL_COLLISION_FRAMES,
+            "ACTIVE_PHYSICAL_COLLISIONS": evaluation_metrics.ACTIVE_PHYSICAL_COLLISIONS,
         },
         "deceleration_prediction": {
             "COUNTS": deceleration_prediction.COUNTS,
@@ -141,6 +143,11 @@ def _restore_module_state(state):
         _replace_state(getattr(evaluation_metrics, name), metrics[name])
     for name in ("PENDING", "PREDICTION_EVENTS"):
         getattr(evaluation_metrics, name)[:] = metrics[name]
+    evaluation_metrics.PHYSICAL_COLLISION_FRAMES[:] = metrics.get(
+        "PHYSICAL_COLLISION_FRAMES", [])
+    evaluation_metrics.ACTIVE_PHYSICAL_COLLISIONS.clear()
+    evaluation_metrics.ACTIVE_PHYSICAL_COLLISIONS.update(
+        metrics.get("ACTIVE_PHYSICAL_COLLISIONS", set()))
     prediction = state["deceleration_prediction"]
     _replace_state(deceleration_prediction.COUNTS, prediction["COUNTS"])
     deceleration_prediction.RECORDS[:] = prediction["RECORDS"]
@@ -499,6 +506,7 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False, save_sta
         traci.simulationStep()
         phase_seconds["sumo_step"] += time.perf_counter() - phase_started
         sumo_time = traci.simulation.getTime()
+        evaluation_metrics.observe_sumo_safety(traci, sumo_time)
         print("\nTIME:", sumo_time)
         if sumo_time % 20 == 0:
             now = datetime.datetime.now().time() # 実時刻を取り込んでいる
@@ -779,10 +787,17 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False, save_sta
     print("all_speed :", mean_or_nan(all_vehicle_speed), file=summary_stream)
     print(f"all_speed (0s ~ {split_time:g}s) :", mean_or_nan(all_vehicle_speed_first_half), file=summary_stream)
     print(f"all_speed ({split_time:g}s ~ end) :", mean_or_nan(all_vehicle_speed_second_half), file=summary_stream)
-    print("collision :", total_collision_time, file=summary_stream)
+    print(
+        "sumo_physical_collision_episodes :",
+        int(evaluation_metrics.COUNTS.get("sumo_unique_collision_episodes", 0)),
+        file=summary_stream,
+    )
+    print(
+        "sumo_physical_collision_steps :",
+        int(evaluation_metrics.COUNTS.get("sumo_collision_steps", 0)),
+        file=summary_stream,
+    )
     print("caution :", total_caution_time, file=summary_stream)
-    #print("collision :", CAV.returnCollisionTime())
-
     if(count_Distribution and save_statistics):
         palameter = [alpha, seed, inflow_0, inflow_1, simulation_time, get_followrange, get_parameter, mean_or_nan(cav0_speed), mean_or_nan(cav1_speed), mean_or_nan(all_speed), mean_or_nan(cav0_speed_after_30s), mean_or_nan(cav1_speed_after_30s), mean_or_nan(all_speed_after_30s)]
         #pala_dist = palameter + cav0_dist + cav1_dist

@@ -17,6 +17,7 @@ HARD_BRAKE = -3.0
 STOP_SPEED = 0.1
 AUDIT = os.environ.get("MCS_EVALUATION_AUDIT")
 PREDICTION_EVENT_AUDIT = os.environ.get("MCS_PREDICTION_EVENT_AUDIT")
+PHYSICAL_COLLISION_AUDIT = os.environ.get("MCS_PHYSICAL_COLLISION_AUDIT")
 
 COUNTS = Counter()
 GROUPS = defaultdict(Counter)
@@ -25,6 +26,63 @@ FOLLOWING_VEHICLES = {}
 PENDING = []
 PREDICTION = defaultdict(Counter)
 PREDICTION_EVENTS = []
+PHYSICAL_COLLISION_FRAMES = []
+ACTIVE_PHYSICAL_COLLISIONS = set()
+
+
+def _collision_record(collision):
+    """Convert a SUMO TraCI collision object into stable JSON data."""
+    return {
+        "collider_id": str(collision.collider),
+        "victim_id": str(collision.victim),
+        "collider_type": collision.colliderType,
+        "victim_type": collision.victimType,
+        "collider_speed_mps": float(collision.colliderSpeed),
+        "victim_speed_mps": float(collision.victimSpeed),
+        "collision_type": collision.type,
+        "lane_id": collision.lane,
+        "lane_position_m": float(collision.pos),
+    }
+
+
+def _collision_key(record):
+    vehicles = tuple(sorted((record["collider_id"], record["victim_id"])))
+    return vehicles + (record["collision_type"], record["lane_id"])
+
+
+def observe_sumo_safety(traci, now):
+    """Measure physical collisions reported by SUMO for the current step.
+
+    This deliberately uses SUMO's own collision API. It is separate from the
+    controller's predicted-path conflict and proximity counters, neither of
+    which proves that physical vehicle bodies collided.
+    """
+    if not AUDIT:
+        return
+    collisions = tuple(traci.simulation.getCollisions())
+    colliding_ids = sorted(set(
+        str(vehicle_id)
+        for vehicle_id in traci.simulation.getCollidingVehiclesIDList()))
+    records = [_collision_record(collision) for collision in collisions]
+    current = {_collision_key(record) for record in records}
+
+    COUNTS["sumo_safety_steps_observed"] += 1
+    COUNTS["sumo_safety_last_time_s"] = float(now)
+    if records or colliding_ids:
+        COUNTS["sumo_collision_steps"] += 1
+        COUNTS["sumo_collision_pair_time_s"] += len(records) * DT
+        COUNTS["sumo_colliding_vehicle_time_s"] += len(colliding_ids) * DT
+        new_collisions = current - ACTIVE_PHYSICAL_COLLISIONS
+        COUNTS["sumo_unique_collision_episodes"] += len(new_collisions)
+        PHYSICAL_COLLISION_FRAMES.append({
+            "sim_time": float(now),
+            "colliding_vehicle_ids": colliding_ids,
+            "collisions": records,
+            "new_collision_episode_keys": [
+                list(key) for key in sorted(new_collisions)],
+        })
+    ACTIVE_PHYSICAL_COLLISIONS.clear()
+    ACTIVE_PHYSICAL_COLLISIONS.update(current)
 
 
 def _group(vehicle):
@@ -234,11 +292,32 @@ def _write_audit():
     for data in FOLLOWING_VEHICLES.values():
         following_by_group[data["group"]].append(data["free_flow_shortfall_m"])
         following_net_by_group[data["group"]].append(data["net_free_flow_distance_delta_m"])
+    safety_steps = COUNTS.get("sumo_safety_steps_observed", 0)
+    collision_steps = COUNTS.get("sumo_collision_steps", 0)
+    physical_safety = {
+        "measurement_source": (
+            "SUMO TraCI simulation.getCollisions and "
+            "simulation.getCollidingVehiclesIDList"),
+        "controller_conflicts_are_excluded": True,
+        "steps_observed": safety_steps,
+        "last_observed_time_s": COUNTS.get("sumo_safety_last_time_s"),
+        "steps_with_collisions": collision_steps,
+        "unique_collision_episodes": COUNTS.get(
+            "sumo_unique_collision_episodes", 0),
+        "collision_pair_time_s": COUNTS.get(
+            "sumo_collision_pair_time_s", 0.0),
+        "colliding_vehicle_time_s": COUNTS.get(
+            "sumo_colliding_vehicle_time_s", 0.0),
+        "collision_frames_written": len(PHYSICAL_COLLISION_FRAMES),
+        "physical_collision_free": (
+            collision_steps == 0 if safety_steps else None),
+    }
     result = {"thresholds": {"hard_brake_mps2": HARD_BRAKE, "stop_speed_mps": STOP_SPEED,
                                "free_flow_reference": "SUMO allowed speed per vehicle and time step",
                                "fallback_car_mps": CAR_FREE_FLOW_SPEED,
                                "fallback_bus_mps": BUS_FREE_FLOW_SPEED},
-              "counts": dict(COUNTS), "groups": groups,
+              "counts": dict(COUNTS), "physical_safety": physical_safety,
+              "groups": groups,
               "vehicle_free_flow_shortfall_m": {name: _distribution(values) for name, values in by_group.items()},
               "vehicle_free_flow_shortfall_samples_m": dict(by_group),
               "vehicle_net_free_flow_distance_delta_m": {name: _distribution(values) for name, values in net_by_group.items()},
@@ -255,6 +334,10 @@ def _write_audit():
         with open(PREDICTION_EVENT_AUDIT, "w") as stream:
             for event in PREDICTION_EVENTS:
                 stream.write(json.dumps(event) + "\n")
+    if PHYSICAL_COLLISION_AUDIT:
+        with open(PHYSICAL_COLLISION_AUDIT, "w") as stream:
+            for frame in PHYSICAL_COLLISION_FRAMES:
+                stream.write(json.dumps(frame) + "\n")
 
 
 atexit.register(_write_audit)

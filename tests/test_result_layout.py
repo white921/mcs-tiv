@@ -65,6 +65,20 @@ class ResultLayoutTests(unittest.TestCase):
                 path.read_text(encoding="utf-8"),
                 '{\n  "status": "completed"\n}\n')
 
+    def test_experiment_environment_does_not_inherit_mcs_switches_or_paths(self):
+        stale = {
+            "PATH": "/usr/bin",
+            "MCS_PRIORITY_HOLD_MODE": "conditional",
+            "MCS_DECELERATION_MODE": "active",
+            "MCS_DECELERATION_TIME_HALF_LIFE_S": "99",
+            "MCS_FCD_OUTPUT": "/tmp/old-fcd.xml",
+            "MCS_CHECKPOINT_DIR": "/tmp/old-checkpoint",
+        }
+
+        cleaned = RUNNER.clean_experiment_environment(stale)
+
+        self.assertEqual(cleaned, {"PATH": "/usr/bin"})
+
 
 if __name__ == "__main__":
     unittest.main()

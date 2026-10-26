@@ -36,6 +36,32 @@ from fixed_vehicle_inputs import load_fixed_vehicle_input  # noqa: E402
 SPEED = re.compile(r"^all_speed\s*:\s*(\S+)\s*$", re.MULTILINE)
 MIX = re.compile(r"^vehicle_mix\s*:\s*Bus\s+(\d+)\s+Car\s+(\d+)", re.MULTILINE)
 
+# A batch run must not inherit switches or output destinations from an earlier
+# experiment. A stale priority-hold setting, for example, would otherwise
+# change a baseline whose manifest says that the hold is off.
+CONTROLLED_MCS_ENV = {
+    "MCS_CHECKPOINT_DIR",
+    "MCS_CHECKPOINT_INTERVAL",
+    "MCS_CONFLICT_AUDIT",
+    "MCS_DECELERATION_AUDIT",
+    "MCS_DECELERATION_MODE",
+    "MCS_DECELERATION_TIME_HALF_LIFE_S",
+    "MCS_EVALUATION_AUDIT",
+    "MCS_FCD_OUTPUT",
+    "MCS_NEGOTIATION_AUDIT",
+    "MCS_PHYSICAL_COLLISION_AUDIT",
+    "MCS_PREDICTION_EVENT_AUDIT",
+    "MCS_PRIORITY_HOLD_ACTIVATION_SPEED",
+    "MCS_PRIORITY_HOLD_MAX_DURATION",
+    "MCS_PRIORITY_HOLD_MODE",
+    "MCS_PRIORITY_HOLD_PROGRESS_TIMEOUT",
+    "MCS_PRIORITY_HOLD_QUEUE_GROWTH_LIMIT",
+    "MCS_RUNTIME_AUDIT",
+    "MCS_TIV_AUDIT",
+    "MCS_TIV_IMPLEMENTATION",
+    "MCS_VEHICLE_STATE_AUDIT",
+}
+
 # These are the five published result families for which the audited source
 # contains an exact scenario runner.  Eval.1/2 need their comparison matrices
 # audited separately before they can be called paper reproductions.
@@ -116,6 +142,14 @@ def default_run_directory(args, now=None):
 def write_json(path, value):
     path.write_text(json.dumps(value, indent=2, allow_nan=False) + "\n",
                     encoding="utf-8")
+
+
+def clean_experiment_environment(parent=None):
+    """Return a copy without state left by an earlier MCS experiment."""
+    env = dict(os.environ if parent is None else parent)
+    for name in CONTROLLED_MCS_ENV:
+        env.pop(name, None)
+    return env
 
 
 def fixed_input_details(
@@ -210,13 +244,20 @@ def run_task(task, args):
     sumo_home = args.sumo_home.resolve()
     is_three_way = case["folder"] == "junction" and case["script"] == "junction_three_agree.py"
     supports_replay_checkpoint = name in ("eval3", "eval5", "eval7")
-    env = dict(os.environ,
+    env = dict(clean_experiment_environment(),
                SUMO_HOME=str(sumo_home),
                PYTHONPATH=str(sumo_home / "tools"),
                MPLBACKEND="Agg", OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1",
                MCS_TIV_IMPLEMENTATION="thesis",
+               MCS_DECELERATION_MODE=("active" if args.deceleration_active else "off"),
+               MCS_DECELERATION_TIME_HALF_LIFE_S=str(
+                   args.deceleration_time_half_life if args.deceleration_active else 0.0),
+               MCS_PRIORITY_HOLD_MODE=(
+                   "conditional" if args.conditional_priority_hold else "off"),
                MCS_TIV_AUDIT=str(destination / "tiv-audit.json"),
                MCS_EVALUATION_AUDIT=str(destination / "evaluation-metrics.json"),
+               MCS_PHYSICAL_COLLISION_AUDIT=str(
+                   destination / "physical-collisions.jsonl"),
                MCS_PREDICTION_EVENT_AUDIT=str(destination / "prediction-events.jsonl"))
     if args.diagnostic_traces:
         env.update(
@@ -237,8 +278,6 @@ def run_task(task, args):
     if args.deceleration_active:
         env.update(
             MCS_DECELERATION_AUDIT=str(destination / "deceleration-audit.json"),
-            MCS_DECELERATION_TIME_HALF_LIFE_S=str(
-                args.deceleration_time_half_life),
         )
     if args.conditional_priority_hold:
         env.update(
@@ -309,6 +348,12 @@ def run_task(task, args):
         "negotiation_trace_enabled": bool(args.diagnostic_traces),
         "fcd_trace_enabled": bool(args.diagnostic_traces),
         "trace_schema_version": 2 if args.diagnostic_traces else None,
+        "physical_collision_measurement": {
+            "source": "SUMO TraCI collision API",
+            "events": "physical-collisions.jsonl",
+            "summary": "evaluation-metrics.json:physical_safety",
+            "controller_conflict_counters_excluded": True,
+        },
         "replay_bundle_version": 1 if args.diagnostic_traces and supports_replay_checkpoint else None,
         "checkpointing": ({
             "schema_version": 1,
@@ -345,6 +390,8 @@ def run_task(task, args):
                     vehicle_mix=([int(mix.group(1)), int(mix.group(2))] if mix else None),
                     audit_written=(destination / "tiv-audit.json").is_file(),
                     evaluation_metrics_written=(destination / "evaluation-metrics.json").is_file(),
+                    physical_collision_audit_written=(
+                        destination / "physical-collisions.jsonl").is_file(),
                     prediction_event_audit_written=(destination / "prediction-events.jsonl").is_file(),
                     deceleration_audit_written=(destination / "deceleration-audit.json").is_file(),
                     vehicle_state_audit_written=(destination / "vehicle-states.jsonl").is_file(),

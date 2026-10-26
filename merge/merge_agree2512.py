@@ -344,6 +344,7 @@ def run(alpha='0.0', inflow_0=750, inflow_1=750, quiet=False, save_statistics=Tr
         step_started = time.perf_counter()
         traci.simulationStep()
         sumo_time = traci.simulation.getTime()
+        evaluation_metrics.observe_sumo_safety(traci, sumo_time)
         print("\nTIME:", sumo_time)
         if sumo_time % 20 == 0:
             now = datetime.datetime.now().time() # 実時刻を取り込んでいる
@@ -573,10 +574,16 @@ def run(alpha='0.0', inflow_0=750, inflow_1=750, quiet=False, save_statistics=Tr
     print("cav0_bus_speed (30s ~ end) :", np.mean(cav0_bus_speed[cav0_bus_300s:]))
     print("cav1_bus_speed (30s ~ end) :", np.mean(cav1_bus_speed[cav1_bus_300s:]))
     print("all_bus_speed (30s ~ end) :", np.mean(cav0_bus_speed[cav0_bus_300s:]+cav1_bus_speed[cav1_bus_300s:]))
-    print("collision :", total_collision_time)
+    print(
+        "sumo_physical_collision_episodes :",
+        int(evaluation_metrics.COUNTS.get("sumo_unique_collision_episodes", 0)),
+    )
+    print(
+        "sumo_physical_collision_steps :",
+        int(evaluation_metrics.COUNTS.get("sumo_collision_steps", 0)),
+    )
+    print("controller_proximity_counter :", total_collision_time)
     print("caution :", total_caution_time)
-    #print("collision :", CAV.returnCollisionTime())
-
     if(count_Distribution):
         palameter = [alpha, seed, inflow_0, inflow_1, simulation_time, get_followrange, get_parameter, np.mean(cav0_speed), np.mean(cav1_speed), np.mean(all_speed), np.mean(cav0_speed_after_30s), np.mean(cav1_speed_after_30s), np.mean(all_speed_after_30s)]
         #pala_dist = palameter + cav0_dist + cav1_dist

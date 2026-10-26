@@ -52,9 +52,9 @@ class CAV_bus:
     def __init__(self, vehID, alpha, withAgree=False):
         self.id = str(vehID)
         # not allow autonomous lanechange
-        traci.vehicle.setLaneChangeMode(vehID=self.id, lcm=0b000000000000)
+        traci.vehicle.setLaneChangeMode(vehID=self.id, laneChangeMode=0b000000000000)
         # control vehicle speed by traci
-        traci.vehicle.setSpeedMode(vehID=self.id, sm=0b100000)
+        traci.vehicle.setSpeedMode(vehID=self.id, speedMode=0b100000)
 
         self.plannedPath = None
         self.desiredPaths = None
@@ -437,7 +437,6 @@ class CAV_bus:
                 self.waitPath = None
 
         for path in collision_list:
-            print(path)
             leadPath = path["path"]
             desiredID = int(path["collideID"])
 

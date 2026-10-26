@@ -49,7 +49,9 @@ class MCSCheckpointTests(unittest.TestCase):
         metrics = NS(
             COUNTS=Counter(old=1), GROUPS=defaultdict(Counter),
             VEHICLES={"old": 1}, FOLLOWING_VEHICLES={}, PENDING=["old"],
-            PREDICTION=defaultdict(Counter), PREDICTION_EVENTS=["old"])
+            PREDICTION=defaultdict(Counter), PREDICTION_EVENTS=["old"],
+            PHYSICAL_COLLISION_FRAMES=["old"],
+            ACTIVE_PHYSICAL_COLLISIONS={"old"})
         prediction = NS(
             COUNTS=Counter(old=1), RECORDS=["old"],
             ACTIVE_DECISION_UNTIL={"old": 1}, MODE="old")
@@ -63,6 +65,8 @@ class MCSCheckpointTests(unittest.TestCase):
                 "PENDING": ["new"],
                 "PREDICTION": {"new": Counter(hit=2)},
                 "PREDICTION_EVENTS": ["new"],
+                "PHYSICAL_COLLISION_FRAMES": ["collision"],
+                "ACTIVE_PHYSICAL_COLLISIONS": {"active"},
             },
             "deceleration_prediction": {
                 "COUNTS": Counter(new=2), "RECORDS": ["new"],
@@ -77,6 +81,8 @@ class MCSCheckpointTests(unittest.TestCase):
 
         self.assertEqual(metrics.COUNTS, Counter(new=2))
         self.assertEqual(metrics.PENDING, ["new"])
+        self.assertEqual(metrics.PHYSICAL_COLLISION_FRAMES, ["collision"])
+        self.assertEqual(metrics.ACTIVE_PHYSICAL_COLLISIONS, {"active"})
         self.assertEqual(prediction.ACTIVE_DECISION_UNTIL, {"new": 4})
         self.assertEqual(prediction.MODE, "new")
         self.assertEqual(tiv.EXAMPLES, ["new"])
