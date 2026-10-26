@@ -174,7 +174,8 @@ def run_task(task, args):
             MCS_VEHICLE_STATE_AUDIT=str(destination / "vehicle-states.jsonl"),
             MCS_CONFLICT_AUDIT=str(destination / "conflicts.jsonl"),
             MCS_NEGOTIATION_AUDIT=str(destination / "negotiations.jsonl"),
-            MCS_RUNTIME_AUDIT=str(destination / "runtime.jsonl"))
+            MCS_RUNTIME_AUDIT=str(destination / "runtime.jsonl"),
+            MCS_FCD_OUTPUT=str(destination / "fcd.xml.gz"))
     if args.deceleration_active:
         env["MCS_DECELERATION_AUDIT"] = str(destination / "deceleration-audit.json")
     command = [args.python, "-u", case["script"], case["alpha"], str(seed),
@@ -212,7 +213,8 @@ def run_task(task, args):
         "decision_method": "deceleration-propagation" if args.deceleration_active else "thesis-tiv",
         "diagnostic_traces_requested": args.diagnostic_traces,
         "diagnostic_traces_enabled": bool(args.diagnostic_traces and is_three_way),
-        "trace_schema_version": 1 if args.diagnostic_traces and is_three_way else None,
+        "trace_schema_version": 2 if args.diagnostic_traces and is_three_way else None,
+        "replay_bundle_version": 1 if args.diagnostic_traces and is_three_way else None,
         "source_sha256": initial_hashes,
         "git": git_metadata(),
         "python_version": sys.version,
@@ -245,6 +247,7 @@ def run_task(task, args):
                     conflict_audit_written=(destination / "conflicts.jsonl").is_file(),
                     negotiation_audit_written=(destination / "negotiations.jsonl").is_file(),
                     runtime_audit_written=(destination / "runtime.jsonl").is_file())
+    manifest["fcd_written"] = (destination / "fcd.xml.gz").is_file()
     (destination / "manifest.json").write_text(json.dumps(manifest, indent=2))
     return manifest
 

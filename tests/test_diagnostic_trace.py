@@ -33,6 +33,33 @@ class FakeVehicleAPI:
     def getSpeed(self, vehicle_id):
         return 4.0
 
+    def getAngle(self, vehicle_id):
+        return 90.0
+
+    def getSlope(self, vehicle_id):
+        return 0.0
+
+    def getLength(self, vehicle_id):
+        return 5.0
+
+    def getWidth(self, vehicle_id):
+        return 1.8
+
+    def getHeight(self, vehicle_id):
+        return 1.5
+
+    def getLanePosition(self, vehicle_id):
+        return 42.0
+
+    def getLateralLanePosition(self, vehicle_id):
+        return 0.0
+
+    def getSignals(self, vehicle_id):
+        return 10  # left blinker + brake light
+
+    def getColor(self, vehicle_id):
+        return (20, 30, 40, 255)
+
 
 class DiagnosticTraceTests(unittest.TestCase):
     def setUp(self):
@@ -73,6 +100,13 @@ class DiagnosticTraceTests(unittest.TestCase):
         self.assertEqual(state["leader_id"], "lead-1")
         self.assertEqual(state["leader_gap_m"], 7.5)
         self.assertEqual(state["planned_path_id"], "1_4")
+        self.assertEqual(state["angle_deg"], 90.0)
+        self.assertEqual(state["signals"], 10)
+        self.assertTrue(state["signal_state"]["left_blinker"])
+        self.assertTrue(state["signal_state"]["brake_light"])
+        self.assertFalse(state["signal_state"]["right_blinker"])
+        self.assertEqual(state["length_m"], 5.0)
+        self.assertEqual(state["color_rgba"], [20, 30, 40, 255])
 
     def test_initialize_creates_zero_event_streams(self):
         diagnostic_trace.initialize()

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MCS Replay Viewer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">MCS REPLAY VIEWER</p>
+      <h1 id="run-title">ログを読み込み中</h1>
+    </div>
+    <div class="run-meta" id="run-meta"></div>
+  </header>
+
+  <main>
+    <section class="map-panel">
+      <canvas id="map" aria-label="車両時系列図"></canvas>
+      <div class="map-badges">
+        <span id="time-badge">0.0 s</span>
+        <span id="frame-badge">0 / 0</span>
+      </div>
+      <div class="legend" aria-label="凡例">
+        <span><i class="vehicle car"></i>乗用車</span>
+        <span><i class="vehicle bus"></i>バス</span>
+        <span><i class="ring stopped"></i>停止</span>
+        <span><i class="ring sender"></i>交渉要求側</span>
+        <span><i class="ring receiver"></i>判断側</span>
+        <span><i class="lamp blinker"></i>ウインカー</span>
+        <span><i class="lamp brake"></i>ブレーキランプ</span>
+      </div>
+    </section>
+
+    <aside class="side-panel">
+      <section>
+        <div class="section-heading">
+          <h2>現在の状態</h2>
+          <button id="fit-button" type="button">全体表示</button>
+        </div>
+        <dl class="state-grid" id="state-grid"></dl>
+      </section>
+      <section class="events-section">
+        <div class="section-heading">
+          <h2>交渉イベント</h2>
+          <span id="event-count">0件</span>
+        </div>
+        <div id="events" class="events"></div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="timeline-panel">
+    <div class="transport">
+      <button id="prev-event" type="button" title="前の交渉">│◀</button>
+      <button id="prev" type="button" title="前のフレーム">◀</button>
+      <button id="play" class="primary" type="button" title="再生・停止">▶</button>
+      <button id="next" type="button" title="次のフレーム">▶</button>
+      <button id="next-event" type="button" title="次の交渉">▶│</button>
+      <label>速度
+        <select id="speed">
+          <option value="0.25">0.25×</option>
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+          <option value="5">5×</option>
+          <option value="10">10×</option>
+        </select>
+      </label>
+    </div>
+    <input id="timeline" type="range" min="0" max="0" value="0" step="1" aria-label="時系列">
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

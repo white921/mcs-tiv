@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 STATE_AUDIT = os.environ.get("MCS_VEHICLE_STATE_AUDIT")
 CONFLICT_AUDIT = os.environ.get("MCS_CONFLICT_AUDIT")
 NEGOTIATION_AUDIT = os.environ.get("MCS_NEGOTIATION_AUDIT")
@@ -75,6 +75,30 @@ def _path_id(path):
     return getattr(path, "pathID", None) if path is not None else None
 
 
+def decode_vehicle_signals(signal_bits):
+    """Return stable names for SUMO's vehicle signal bitset.
+
+    Keeping both the original integer and decoded flags makes the trace usable
+    by SUMO-oriented tools as well as by the local replay viewer.
+    """
+    if signal_bits is None:
+        return None
+    signal_bits = int(signal_bits)
+    return {
+        "right_blinker": bool(signal_bits & 1),
+        "left_blinker": bool(signal_bits & 2),
+        "emergency_blinker": bool(signal_bits & 4),
+        "brake_light": bool(signal_bits & 8),
+        "front_light": bool(signal_bits & 16),
+        "fog_light": bool(signal_bits & 32),
+        "high_beam": bool(signal_bits & 64),
+        "reverse_light": bool(signal_bits & 128),
+        "wiper": bool(signal_bits & 256),
+        "left_door_open": bool(signal_bits & 512),
+        "right_door_open": bool(signal_bits & 1024),
+    }
+
+
 def record_vehicle_states(vehicles, sim_time, traci):
     """Write one frame containing every active vehicle's observable state."""
     if not STATE_AUDIT:
@@ -84,6 +108,7 @@ def record_vehicle_states(vehicles, sim_time, traci):
         vehicle_id = str(vehicle.id)
         leader = _safe(lambda: traci.vehicle.getLeader(vehicle_id))
         desired = getattr(vehicle, "desiredPaths", None) or []
+        signal_bits = _safe(lambda: traci.vehicle.getSignals(vehicle_id))
         states.append({
             "vehicle_id": vehicle_id,
             "vehicle_group": getattr(vehicle, "type", None),
@@ -92,6 +117,20 @@ def record_vehicle_states(vehicles, sim_time, traci):
             "y": float(vehicle.pos_y),
             "speed_mps": float(vehicle.speed),
             "accel_mps2": float(vehicle.accel),
+            "angle_deg": _safe(lambda: float(traci.vehicle.getAngle(vehicle_id))),
+            "slope_deg": _safe(lambda: float(traci.vehicle.getSlope(vehicle_id))),
+            "length_m": _safe(lambda: float(traci.vehicle.getLength(vehicle_id)),
+                              float(getattr(vehicle, "length", 5.0))),
+            "width_m": _safe(lambda: float(traci.vehicle.getWidth(vehicle_id)),
+                             float(getattr(vehicle, "width", 1.8))),
+            "height_m": _safe(lambda: float(traci.vehicle.getHeight(vehicle_id))),
+            "lane_position_m": _safe(
+                lambda: float(traci.vehicle.getLanePosition(vehicle_id))),
+            "lateral_lane_position_m": _safe(
+                lambda: float(traci.vehicle.getLateralLanePosition(vehicle_id))),
+            "signals": int(signal_bits) if signal_bits is not None else None,
+            "signal_state": decode_vehicle_signals(signal_bits),
+            "color_rgba": _safe(lambda: list(traci.vehicle.getColor(vehicle_id))),
             "route_id": getattr(vehicle, "route", None),
             "road_id": getattr(vehicle, "road", None),
             "lane_index": getattr(vehicle, "lane", None),
