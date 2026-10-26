@@ -127,7 +127,11 @@ mcs-tiv/
 │   ├── run_merge_seeds.py      # 合流の複数seed実行・平均集計
 │   ├── statistics/            # 過去の合流実験結果
 │   └── unused/                # 旧ランナー
+├── results/                   # 新しい実験結果の正本（1実験1フォルダー）
+│   └── runs/<実験ID>/<Eval>/seed-<seed>/
+├── result/                    # 引き継ぎ・旧集約結果の読み取り用アーカイブ
 └── docs/
+    ├── result-layout.md        # 実験結果の標準保存規約
     └── upstream-history.md     # 移行元のGit・PR・Issue情報
 ```
 

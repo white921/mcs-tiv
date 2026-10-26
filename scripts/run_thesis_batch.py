@@ -16,6 +16,7 @@ original artifact's per-vehicle random draw.
 
 import argparse
 import concurrent.futures
+import datetime
 import hashlib
 import json
 import os
@@ -68,6 +69,50 @@ CASES = {
         "fixed_input": "fixed_inputs/thesis/eval7/seed-{seed}.jsonl",
     },
 }
+
+
+def filesystem_component(value):
+    """Return a readable, portable component for an experiment directory."""
+    component = "".join(
+        character if character.isalnum() or character in "+-_." else "-"
+        for character in str(value).strip()
+    )
+    component = re.sub(r"-+", "-", component).strip("-.")
+    if not component:
+        raise ValueError("run name must contain at least one letter or number")
+    return component
+
+
+def duration_label(duration):
+    duration = float(duration)
+    return str(int(duration)) if duration.is_integer() else str(duration).replace(".", "p")
+
+
+def default_run_directory(args, now=None):
+    """Choose one canonical directory for one batch invocation."""
+    if args.run_name:
+        name = filesystem_component(args.run_name)
+    else:
+        now = now or datetime.datetime.now().astimezone()
+        timestamp = now.strftime("%Y%m%dT%H%M%S%z")
+        method = "proposal" if args.deceleration_active else "yamashita"
+        if args.conditional_priority_hold:
+            method += "-conditional-hold"
+        cases = "-".join(args.cases)
+        if args.seeds is not None:
+            seeds = "seeds-" + "-".join(str(seed) for seed in args.seeds)
+        elif args.seeds_per_case is not None:
+            seeds = f"first-{args.seeds_per_case}-seeds"
+        else:
+            seeds = "documented-seeds"
+        name = filesystem_component(
+            f"{timestamp}__{method}__{cases}__{duration_label(args.duration)}s__{seeds}")
+    return ROOT / "results" / "runs" / name
+
+
+def write_json(path, value):
+    path.write_text(json.dumps(value, indent=2, allow_nan=False) + "\n",
+                    encoding="utf-8")
 
 
 def fixed_input_details(
@@ -216,6 +261,11 @@ def run_task(task, args):
     if args.resume_checkpoint is not None:
         command += ["--resume-checkpoint", str(args.resume_checkpoint.resolve())]
     manifest = {
+        "schema_version": 2,
+        "record_type": "simulation-run",
+        "experiment_id": args.output.name,
+        "simulation_id": f"{name}-seed-{seed}",
+        "experiment_directory": str(args.output),
         "case": name, "seed": seed, "command": command,
         "input_duration": args.duration, "stop_time": args.stop_time or args.duration,
         "paper_reference_mean_mps": case["reference"],
@@ -265,7 +315,7 @@ def run_task(task, args):
     }
     if args.paper is not None:
         manifest["paper_sha256"] = hashlib.sha256(args.paper.read_bytes()).hexdigest()
-    (destination / "manifest.json").write_text(json.dumps(manifest, indent=2))
+    write_json(destination / "manifest.json", manifest)
     started = time.monotonic()
     with (destination / "stdout.log").open("w") as stdout, (destination / "stderr.log").open("w") as stderr:
         process = subprocess.run(command, cwd=source / case["folder"], env=env,
@@ -294,14 +344,20 @@ def run_task(task, args):
         len([path for path in checkpoint_root.iterdir()
              if path.is_dir() and (path / "checkpoint.json").is_file()])
         if checkpoint_root.is_dir() else 0)
-    (destination / "manifest.json").write_text(json.dumps(manifest, indent=2))
+    write_json(destination / "manifest.json", manifest)
     return manifest
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sumo-home", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
+    output_group = parser.add_mutually_exclusive_group()
+    output_group.add_argument(
+        "--output", type=Path,
+        help="experiment directory; defaults to a unique directory under results/runs")
+    output_group.add_argument(
+        "--run-name",
+        help="readable experiment directory name created under results/runs")
     parser.add_argument("--cases", choices=CASES, nargs="+", default=list(CASES))
     parser.add_argument("--workers", type=int, default=3,
                         help="independent SUMO tasks; use 3-4, not all CPU threads")
@@ -354,8 +410,6 @@ def main():
         parser.error("--sumo-home must contain bin/sumo and tools/traci")
     if args.paper is not None and not args.paper.is_file():
         parser.error("--paper must name an existing PDF")
-    args.output = args.output.resolve()
-    args.output.mkdir(parents=True, exist_ok=False)
     try:
         tasks = build_tasks(args.cases, args.seeds_per_case, args.seeds)
     except ValueError as error:
@@ -365,7 +419,49 @@ def main():
             parser.error("--resume-checkpoint requires exactly one Eval.3/5/7 task")
         if not (args.resume_checkpoint / "checkpoint.json").is_file():
             parser.error("--resume-checkpoint must name a complete checkpoint directory")
-    print(json.dumps({"tasks": len(tasks), "workers": args.workers, "output": str(args.output)}), flush=True)
+    try:
+        args.output = ((args.output.resolve() if args.output is not None
+                        else default_run_directory(args).resolve()))
+    except ValueError as error:
+        parser.error(str(error))
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.mkdir(parents=True, exist_ok=False)
+    runner_log = args.output / "runner.log"
+    started_at = datetime.datetime.now().astimezone()
+
+    def emit(event, **fields):
+        record = {
+            "time": datetime.datetime.now().astimezone().isoformat(),
+            "event": event,
+            **fields,
+        }
+        line = json.dumps(record, allow_nan=False)
+        with runner_log.open("a", encoding="utf-8") as stream:
+            stream.write(line + "\n")
+        print(line, flush=True)
+
+    experiment_manifest = {
+        "schema_version": 1,
+        "record_type": "experiment-run",
+        "experiment_id": args.output.name,
+        "status": "running",
+        "started_at": started_at.isoformat(),
+        "started_epoch": started_at.timestamp(),
+        "directory": str(args.output),
+        "method": "deceleration-propagation" if args.deceleration_active else "yamashita-tiv",
+        "conditional_priority_hold": bool(args.conditional_priority_hold),
+        "cases": list(args.cases),
+        "tasks": [{"case": case, "seed": seed} for case, seed in tasks],
+        "duration_s": args.duration,
+        "stop_time_s": args.stop_time,
+        "workers": args.workers,
+        "diagnostic_traces": bool(args.diagnostic_traces),
+        "checkpoint_interval_s": args.checkpoint_interval,
+        "git": git_metadata(),
+    }
+    write_json(args.output / "experiment-manifest.json", experiment_manifest)
+    emit("experiment_started", tasks=len(tasks), workers=args.workers,
+         output=str(args.output))
     reports = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as pool:
         future_to_task = {pool.submit(run_task, task, args): task for task in tasks}
@@ -376,10 +472,28 @@ def main():
             except Exception as error:  # preserve other completed task evidence
                 report = {"case": task[0], "seed": task[1], "error": repr(error)}
             reports.append(report)
-            print(json.dumps({key: report.get(key) for key in ("case", "seed", "exit_code", "elapsed_seconds", "all_speed_mps", "error")}), flush=True)
+            emit("simulation_finished", **{
+                key: report.get(key) for key in (
+                    "case", "seed", "exit_code", "elapsed_seconds",
+                    "all_speed_mps", "error")})
     reports.sort(key=lambda report: (report["case"], report["seed"]))
-    (args.output / "summary.json").write_text(json.dumps(reports, indent=2, allow_nan=False))
+    write_json(args.output / "summary.json", reports)
     failures = [report for report in reports if report.get("exit_code") != 0]
+    finished_at = datetime.datetime.now().astimezone()
+    experiment_manifest.update(
+        status="failed" if failures else "completed",
+        finished_at=finished_at.isoformat(),
+        finished_epoch=finished_at.timestamp(),
+        elapsed_seconds=finished_at.timestamp() - started_at.timestamp(),
+        completed_simulations=len(reports) - len(failures),
+        failed_simulations=len(failures),
+        summary_file="summary.json",
+        runner_log="runner.log",
+    )
+    write_json(args.output / "experiment-manifest.json", experiment_manifest)
+    emit("experiment_finished", status=experiment_manifest["status"],
+         completed=experiment_manifest["completed_simulations"],
+         failed=experiment_manifest["failed_simulations"])
     return 1 if failures else 0
 
 

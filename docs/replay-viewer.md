@@ -10,7 +10,7 @@ Give it the directory containing one seed's `manifest.json` and trace files.
 
 ```bash
 python3 scripts/mcs_replay_viewer.py \
-  results/<run>/eval3/seed-3
+  results/runs/<experiment-id>/eval3/seed-3
 ```
 
 The command starts a server bound to `127.0.0.1:8765` and opens the browser.

@@ -53,20 +53,21 @@ T字路Eval.3は、隔離コピー・seedごとの監査ログ・実行manifest�
 ```sh
 python3 scripts/run_thesis_batch.py \
   --sumo-home /path/to/sumo --python python3 \
-  --output results/deceleration-eval3 --cases eval3 --workers 1 \
+  --run-name eval3-proposal-600s --cases eval3 --workers 1 \
   --deceleration-active
 ```
 
 各`seed-*`の`manifest.json`に平均速度、`deceleration-audit.json`に各交渉の
-損失・判断・後続車数が残る。現時点でactive実装の対象はT字路Eval.3のみであり、
-Eval.5/7へ一般化する前に十字路・合流の車線関係を同じ予測器で検証する必要がある。
+損失・判断・後続車数が残る。active実装と標準診断ログはT字路Eval.3、
+十字路Eval.5、合流Eval.7に対応している。ケース間の結果は別の実験フォルダーか、
+同じバッチ内の別Evalフォルダーとして保存する。
 
 振る舞い調査用の300秒実験では`--diagnostic-traces`を付ける。
 
 ```sh
 python3 scripts/run_thesis_batch.py \
   --sumo-home /path/to/sumo --python python3 \
-  --output results/deceleration-eval3-diagnostic \
+  --run-name eval3-proposal-diagnostic-300s \
   --cases eval3 --workers 1 --duration 300 \
   --deceleration-active --diagnostic-traces
 ```
@@ -81,4 +82,7 @@ python3 scripts/run_thesis_batch.py \
 - `manifest.json`: Gitコミット・ブランチ・dirty状態、Python/SUMO/OS、seed、条件、各ログの生成結果
 
 上記は観測フックのみで、交渉判断、軌道生成、速度制御を変更しない。
-論文の最終評価では`--duration 600`を使い、論文再現用の出力先や統計CSVと同居させない。
+論文の最終評価では`--duration 600`を使う。出力は
+`results/runs/<実験ID>/<Eval>/seed-<seed>/`へまとまり、論文再現用の別実験や
+統計CSVと同居させない。`--run-name`も`--output`も省略した場合は、条件を含む
+一意な実験IDを自動生成する。
