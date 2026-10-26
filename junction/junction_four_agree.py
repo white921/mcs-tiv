@@ -10,6 +10,7 @@ from contextlib import redirect_stdout
 import numpy as np
 import datetime
 import csv
+import time
 
 # the directory in which this script resides
 THISDIR = os.path.dirname(__file__)
@@ -21,6 +22,10 @@ from animation_four_junction import Animation
 from frenet_merge import emergency_stop
 from fixed_vehicle_inputs import load_fixed_vehicle_input
 import evaluation_metrics
+import diagnostic_trace
+import deceleration_prediction
+import mcs_checkpoint
+import thesis_tiv
 
 # we need to import python modules from the $SUMO_HOME/tools directory
 # If the the environment variable SUMO_HOME is not set, try to locate the python modules relative to this script
@@ -39,6 +44,7 @@ bus_allocation = "fixed"
 diagnostic_stop_time = None
 fixed_input_path = None
 fixed_input_schedule = None
+resume_checkpoint = None
 # matplotlibによる描画
 show_animation = False
 import random
@@ -89,6 +95,68 @@ count_BR = [0, 0, 0, 0]
 
 
 count_Distribution = False
+
+CHECKPOINT_RUN_FIELDS = (
+    "sumo_time", "next_central_path_server", "all_speed",
+    "all_speed_after_30s", "all_bus_speed", "all_bus_speed_after_30s",
+    "LT_speed", "LR_speed", "LR_BI_speed", "LB_speed", "TR_speed",
+    "TB_speed", "TB_BI_speed", "TL_speed", "RB_speed", "RL_speed",
+    "RL_BI_speed", "RT_speed", "BL_speed", "BT_speed", "BT_BI_speed",
+    "BR_speed", "LT_bus_speed", "LR_bus_speed", "LR_BI_bus_speed",
+    "LB_bus_speed", "TR_bus_speed", "TB_bus_speed", "TB_BI_bus_speed",
+    "TL_bus_speed", "RB_bus_speed", "RL_bus_speed", "RL_BI_bus_speed",
+    "RT_bus_speed", "BL_bus_speed", "BT_bus_speed", "BT_BI_bus_speed",
+    "BR_bus_speed", "cav0_dist", "total_collision_time",
+    "total_caution_time", "get_parameter", "get_followrange",
+)
+
+
+def _checkpoint_globals():
+    return {
+        "vehicle_instance": vehicle_instance,
+        "veh_id": veh_id, "veh_id_bus": veh_id_bus,
+        "fixed_input_schedule": fixed_input_schedule,
+        "depart_times": [departTime_lane0, departTime_lane1,
+                         departTime_lane2, departTime_lane3],
+        "vehicle_types": [vehicleType_lane0, vehicleType_lane1,
+                          vehicleType_lane2, vehicleType_lane3],
+        "counters": [count_accept_utility, count_refuse_utility,
+                     count_refuse_physics, count_send_PT, count_send_DT,
+                     count_send_AT],
+        "route_counts": {
+            name: value for name, value in (
+                ("LT", count_LT), ("LR", count_LR), ("LB", count_LB),
+                ("TR", count_TR), ("TB", count_TB), ("TL", count_TL),
+                ("RB", count_RB), ("RL", count_RL), ("RT", count_RT),
+                ("BL", count_BL), ("BT", count_BT), ("BR", count_BR))},
+        "random_state": random.getstate(),
+        "vehicle_type_random_state": vehicle_type_rng.getstate(),
+    }
+
+
+def _restore_checkpoint_globals(state):
+    global vehicle_instance, veh_id, veh_id_bus, fixed_input_schedule
+    global departTime_lane0, departTime_lane1, departTime_lane2, departTime_lane3
+    global vehicleType_lane0, vehicleType_lane1, vehicleType_lane2, vehicleType_lane3
+    global count_accept_utility, count_refuse_utility, count_refuse_physics
+    global count_send_PT, count_send_DT, count_send_AT
+    vehicle_instance = state["vehicle_instance"]
+    veh_id, veh_id_bus = state["veh_id"], state["veh_id_bus"]
+    fixed_input_schedule = state["fixed_input_schedule"]
+    (departTime_lane0, departTime_lane1, departTime_lane2,
+     departTime_lane3) = state["depart_times"]
+    (vehicleType_lane0, vehicleType_lane1, vehicleType_lane2,
+     vehicleType_lane3) = state["vehicle_types"]
+    (count_accept_utility, count_refuse_utility, count_refuse_physics,
+     count_send_PT, count_send_DT, count_send_AT) = state["counters"]
+    for name, target in (
+            ("LT", count_LT), ("LR", count_LR), ("LB", count_LB),
+            ("TR", count_TR), ("TB", count_TB), ("TL", count_TL),
+            ("RB", count_RB), ("RL", count_RL), ("RT", count_RT),
+            ("BL", count_BL), ("BT", count_BT), ("BR", count_BR)):
+        target[:] = state["route_counts"][name]
+    random.setstate(state["random_state"])
+    vehicle_type_rng.setstate(state["vehicle_type_random_state"])
 
 
 def build_vehicle_type_schedules(lane_counts, target_bus_share):
@@ -147,9 +215,7 @@ def set_environment(inflow_0=750, inflow_1=750, inflow_2=750, inflow_3=750):
                 "right": inflow_2, "top": inflow_3,
             },
             expected_bus_share=bus_share,
-            prefix_duration_s=(
-                diagnostic_stop_time if diagnostic_stop_time is not None else simulation_time
-            ),
+            prefix_duration_s=simulation_time,
         )
         departTime_lane0 = fixed_input_schedule.departure_times("left")
         departTime_lane1 = fixed_input_schedule.departure_times("bottom")
@@ -387,13 +453,61 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, inflow_3=750, quiet=F
     get_followrange = 0
 
     #初期設定（障害物の配置など）
-    set_environment(inflow_0, inflow_1, inflow_2, inflow_3)
+    diagnostic_trace.initialize()
+    if resume_checkpoint:
+        checkpoint_manifest, checkpoint_payload, _ = mcs_checkpoint.load(
+            resume_checkpoint)
+        if checkpoint_manifest.get("case") != "eval5":
+            raise ValueError("resume checkpoint is not an Eval.5 checkpoint")
+        _restore_checkpoint_globals(checkpoint_payload["globals"])
+        mcs_checkpoint.restore_shared_modules(
+            checkpoint_payload["modules"], evaluation_metrics,
+            deceleration_prediction, thesis_tiv)
+        restored = checkpoint_payload["run"]
+        sumo_time = restored["sumo_time"]
+        next_central_path_server = restored["next_central_path_server"]
+        all_speed = restored["all_speed"]
+        all_speed_after_30s = restored["all_speed_after_30s"]
+        all_bus_speed = restored["all_bus_speed"]
+        all_bus_speed_after_30s = restored["all_bus_speed_after_30s"]
+        (LT_speed, LR_speed, LR_BI_speed, LB_speed, TR_speed, TB_speed,
+         TB_BI_speed, TL_speed, RB_speed, RL_speed, RL_BI_speed, RT_speed,
+         BL_speed, BT_speed, BT_BI_speed, BR_speed) = tuple(
+            restored[name] for name in (
+                "LT_speed", "LR_speed", "LR_BI_speed", "LB_speed", "TR_speed",
+                "TB_speed", "TB_BI_speed", "TL_speed", "RB_speed", "RL_speed",
+                "RL_BI_speed", "RT_speed", "BL_speed", "BT_speed",
+                "BT_BI_speed", "BR_speed"))
+        (LT_bus_speed, LR_bus_speed, LR_BI_bus_speed, LB_bus_speed,
+         TR_bus_speed, TB_bus_speed, TB_BI_bus_speed, TL_bus_speed,
+         RB_bus_speed, RL_bus_speed, RL_BI_bus_speed, RT_bus_speed,
+         BL_bus_speed, BT_bus_speed, BT_BI_bus_speed, BR_bus_speed) = tuple(
+            restored[name] for name in (
+                "LT_bus_speed", "LR_bus_speed", "LR_BI_bus_speed",
+                "LB_bus_speed", "TR_bus_speed", "TB_bus_speed",
+                "TB_BI_bus_speed", "TL_bus_speed", "RB_bus_speed",
+                "RL_bus_speed", "RL_BI_bus_speed", "RT_bus_speed",
+                "BL_bus_speed", "BT_bus_speed", "BT_BI_bus_speed",
+                "BR_bus_speed"))
+        cav0_dist = restored["cav0_dist"]
+        total_collision_time = restored["total_collision_time"]
+        total_caution_time = restored["total_caution_time"]
+        get_parameter = restored["get_parameter"]
+        get_followrange = restored["get_followrange"]
+        actual_time = traci.simulation.getTime()
+        if abs(actual_time - sumo_time) > 1e-6:
+            raise ValueError(
+                f"SUMO/MCS checkpoint time mismatch: {actual_time} != {sumo_time}")
+        mcs_checkpoint.restore_vehicle_controls(traci, vehicle_instance)
+    else:
+        set_environment(inflow_0, inflow_1, inflow_2, inflow_3)
     file = alpha + '_' + str(inflow_0) + '_' + str(inflow_1) + '_' + str(inflow_2) + '_' + str(inflow_3)
     animator = Animation(file)
 
     #シミュレーション開始
     run_until = diagnostic_stop_time if diagnostic_stop_time is not None else simulation_time
     while sumo_time < run_until:
+        step_started = time.perf_counter()
         traci.simulationStep()
         sumo_time = traci.simulation.getTime()
         print("\nTIME:", sumo_time)
@@ -617,6 +731,7 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, inflow_3=750, quiet=F
         evaluation_metrics.observe(
             observed, sumo_time,
             {str(ins.id): traci.vehicle.getAllowedSpeed(ins.id) for ins in observed})
+        diagnostic_trace.record_vehicle_states(observed, sumo_time, traci)
 
         #車両インスタンスを削除
         if poplist:
@@ -628,6 +743,22 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, inflow_3=750, quiet=F
 
         # 車両の新規流入
         add_vehicle(alpha)
+        diagnostic_trace.record_runtime(
+            sumo_time, {}, len(observed), time.perf_counter() - step_started)
+        checkpoint_root = os.environ.get("MCS_CHECKPOINT_DIR")
+        if checkpoint_root and mcs_checkpoint.is_due(sumo_time):
+            local_values = locals()
+            run_state = {name: local_values[name]
+                         for name in CHECKPOINT_RUN_FIELDS}
+            mcs_checkpoint.save(
+                traci, checkpoint_root, sumo_time,
+                {"globals": _checkpoint_globals(), "run": run_state,
+                 "modules": mcs_checkpoint.capture_shared_modules(
+                     evaluation_metrics, deceleration_prediction, thesis_tiv)},
+                {"case": "eval5", "seed": int(seed), "alpha": int(alpha),
+                 "fixed_input_path": fixed_input_path,
+                 "priority_hold_mode": os.environ.get(
+                     "MCS_PRIORITY_HOLD_MODE", "off")})
 
     statistics_path = "./statistics/acceptance_four.csv" if save_statistics else os.devnull
     with open(statistics_path, "a", encoding='utf-8') as f:
@@ -748,6 +879,8 @@ def get_options():
                          help="record read-only deceleration-propagation comparisons")
     optParser.add_option("--deceleration-active", action="store_true", default=False,
                          help="experimentally use deceleration-propagation decisions")
+    optParser.add_option("--resume-checkpoint", type="string", default=None,
+                         help="resume from a paired SUMO/MCS checkpoint directory")
     options, args = optParser.parse_args()
     if len(args) != 6:
         optParser.error("expected: alpha seed inflow_left inflow_bottom inflow_right inflow_top")
@@ -776,6 +909,7 @@ if __name__ == "__main__":
     bus_share = options.bus_share
     bus_allocation = options.bus_allocation
     fixed_input_path = options.fixed_input
+    resume_checkpoint = options.resume_checkpoint
     if not options.quiet:
         print(args)
     alpha = str(args[0])
@@ -796,6 +930,14 @@ if __name__ == "__main__":
 
     # this is the normal way of using traci. sumo is started as a subprocess and then the python script connects and runs
     sumo_command = [sumoBinary, '-c', os.path.join('junction_four.sumocfg')]
+    if os.environ.get("MCS_CHECKPOINT_DIR") or resume_checkpoint:
+        sumo_command.extend([
+            "--save-state.precision", "16",
+            "--save-state.rng", "true",
+        ])
+    if resume_checkpoint:
+        _, _, sumo_state = mcs_checkpoint.load(resume_checkpoint)
+        sumo_command.extend(["--load-state", str(sumo_state)])
     fcd_output = os.environ.get("MCS_FCD_OUTPUT")
     if fcd_output:
         sumo_command.extend([

@@ -83,3 +83,65 @@ def load(directory):
     with mcs_state.open("rb") as stream:
         payload = pickle.load(stream)
     return manifest, payload, sumo_state
+
+
+def capture_shared_modules(evaluation_metrics, deceleration_prediction, thesis_tiv):
+    """Capture mutable cross-scenario audit and decision state."""
+    return {
+        "evaluation_metrics": {
+            "COUNTS": evaluation_metrics.COUNTS,
+            "GROUPS": evaluation_metrics.GROUPS,
+            "VEHICLES": evaluation_metrics.VEHICLES,
+            "FOLLOWING_VEHICLES": evaluation_metrics.FOLLOWING_VEHICLES,
+            "PENDING": evaluation_metrics.PENDING,
+            "PREDICTION": evaluation_metrics.PREDICTION,
+            "PREDICTION_EVENTS": evaluation_metrics.PREDICTION_EVENTS,
+        },
+        "deceleration_prediction": {
+            "COUNTS": deceleration_prediction.COUNTS,
+            "RECORDS": deceleration_prediction.RECORDS,
+            "ACTIVE_DECISION_UNTIL": deceleration_prediction.ACTIVE_DECISION_UNTIL,
+            "MODE": deceleration_prediction.MODE,
+        },
+        "thesis_tiv": {
+            "COUNTS": thesis_tiv.COUNTS,
+            "EXAMPLES": thesis_tiv.EXAMPLES,
+        },
+    }
+
+
+def _replace_mapping(target, value):
+    target.clear()
+    target.update(value)
+
+
+def restore_shared_modules(
+        state, evaluation_metrics, deceleration_prediction, thesis_tiv):
+    metrics = state["evaluation_metrics"]
+    for name in ("COUNTS", "GROUPS", "VEHICLES", "FOLLOWING_VEHICLES",
+                 "PREDICTION"):
+        _replace_mapping(getattr(evaluation_metrics, name), metrics[name])
+    for name in ("PENDING", "PREDICTION_EVENTS"):
+        getattr(evaluation_metrics, name)[:] = metrics[name]
+    prediction = state["deceleration_prediction"]
+    _replace_mapping(deceleration_prediction.COUNTS, prediction["COUNTS"])
+    deceleration_prediction.RECORDS[:] = prediction["RECORDS"]
+    _replace_mapping(
+        deceleration_prediction.ACTIVE_DECISION_UNTIL,
+        prediction["ACTIVE_DECISION_UNTIL"])
+    deceleration_prediction.MODE = prediction["MODE"]
+    tiv = state["thesis_tiv"]
+    _replace_mapping(thesis_tiv.COUNTS, tiv["COUNTS"])
+    thesis_tiv.EXAMPLES[:] = tiv["EXAMPLES"]
+
+
+def restore_vehicle_controls(traci, vehicles):
+    """Restore TraCI client-side control modes and the pending speed command."""
+    running_ids = set(traci.vehicle.getIDList())
+    for vehicle in vehicles:
+        if vehicle.id not in running_ids:
+            continue
+        traci.vehicle.setLaneChangeMode(vehicle.id, 0b000000000000)
+        traci.vehicle.setSpeedMode(vehicle.id, 0b100000)
+        if vehicle.plannedPath is not None:
+            vehicle.executionDrive()

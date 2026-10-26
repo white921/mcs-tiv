@@ -161,6 +161,7 @@ def run_task(task, args):
     source, initial_hashes = prepare_source(destination, case)
     sumo_home = args.sumo_home.resolve()
     is_three_way = case["folder"] == "junction" and case["script"] == "junction_three_agree.py"
+    supports_replay_checkpoint = name in ("eval3", "eval5", "eval7")
     env = dict(os.environ,
                SUMO_HOME=str(sumo_home),
                PYTHONPATH=str(sumo_home / "tools"),
@@ -174,13 +175,13 @@ def run_task(task, args):
             MCS_NEGOTIATION_AUDIT=str(destination / "negotiations.jsonl"),
             MCS_FCD_OUTPUT=str(destination / "fcd.xml.gz"),
         )
-    if args.diagnostic_traces and is_three_way:
+    if args.diagnostic_traces and supports_replay_checkpoint:
         env.update(
             MCS_VEHICLE_STATE_AUDIT=str(destination / "vehicle-states.jsonl"),
             MCS_CONFLICT_AUDIT=str(destination / "conflicts.jsonl"),
             MCS_RUNTIME_AUDIT=str(destination / "runtime.jsonl"),
         )
-    if is_three_way and args.checkpoint_interval > 0:
+    if supports_replay_checkpoint and args.checkpoint_interval > 0:
         env.update(
             MCS_CHECKPOINT_DIR=str(destination / "checkpoints"),
             MCS_CHECKPOINT_INTERVAL=str(args.checkpoint_interval),
@@ -240,12 +241,12 @@ def run_task(task, args):
         } if args.conditional_priority_hold else {"mode": "off"}),
         "diagnostic_traces_requested": args.diagnostic_traces,
         "diagnostic_traces_enabled": bool(args.diagnostic_traces),
-        "vehicle_state_trace_enabled": bool(args.diagnostic_traces and is_three_way),
-        "conflict_trace_enabled": bool(args.diagnostic_traces and is_three_way),
+        "vehicle_state_trace_enabled": bool(args.diagnostic_traces and supports_replay_checkpoint),
+        "conflict_trace_enabled": bool(args.diagnostic_traces and supports_replay_checkpoint),
         "negotiation_trace_enabled": bool(args.diagnostic_traces),
         "fcd_trace_enabled": bool(args.diagnostic_traces),
         "trace_schema_version": 2 if args.diagnostic_traces else None,
-        "replay_bundle_version": 1 if args.diagnostic_traces and is_three_way else None,
+        "replay_bundle_version": 1 if args.diagnostic_traces and supports_replay_checkpoint else None,
         "checkpointing": ({
             "schema_version": 1,
             "interval_s": args.checkpoint_interval,
@@ -254,7 +255,7 @@ def run_task(task, args):
                          "metric accumulators"],
             "resume_from": (str(args.resume_checkpoint.resolve())
                             if args.resume_checkpoint is not None else None),
-        } if is_three_way and args.checkpoint_interval > 0 else None),
+        } if supports_replay_checkpoint and args.checkpoint_interval > 0 else None),
         "source_sha256": initial_hashes,
         "git": git_metadata(),
         "python_version": sys.version,
@@ -329,9 +330,9 @@ def main():
     parser.add_argument("--priority-hold-max-duration", type=float, default=10.0)
     parser.add_argument("--priority-hold-queue-growth-limit", type=int, default=2)
     parser.add_argument("--checkpoint-interval", type=float, default=60.0,
-                        help="Eval.3 paired SUMO/MCS checkpoint interval (default: 60 s)")
+                        help="Eval.3/5/7 paired SUMO/MCS checkpoint interval (default: 60 s)")
     parser.add_argument("--resume-checkpoint", type=Path,
-                        help="resume one Eval.3 task from a paired checkpoint")
+                        help="resume one Eval.3/5/7 task from a paired checkpoint")
     args = parser.parse_args()
     if args.workers < 1:
         parser.error("--workers must be positive")
@@ -360,8 +361,8 @@ def main():
     except ValueError as error:
         parser.error(str(error))
     if args.resume_checkpoint is not None:
-        if len(tasks) != 1 or tasks[0][0] != "eval3":
-            parser.error("--resume-checkpoint requires exactly one Eval.3 task")
+        if len(tasks) != 1 or tasks[0][0] not in ("eval3", "eval5", "eval7"):
+            parser.error("--resume-checkpoint requires exactly one Eval.3/5/7 task")
         if not (args.resume_checkpoint / "checkpoint.json").is_file():
             parser.error("--resume-checkpoint must name a complete checkpoint directory")
     print(json.dumps({"tasks": len(tasks), "workers": args.workers, "output": str(args.output)}), flush=True)

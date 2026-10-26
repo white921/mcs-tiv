@@ -4,6 +4,7 @@ import sys
 import numpy as np
 import copy
 import thesis_tiv
+import diagnostic_trace
 import thesis_baselines
 import time
 
@@ -603,6 +604,9 @@ class CAV:
                         break
             
             if isCollide:
+                diagnostic_trace.record_conflict(
+                    self, own_path, x, dict, traci,
+                    reason="trajectory_proximity", check_type=s_type)
                 collision_list.append(dict)
             else:
                 notCollision_list.append(x)

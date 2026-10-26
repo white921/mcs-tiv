@@ -26,11 +26,11 @@ events are written to `negotiations.jsonl` as
 
 `scripts/run_thesis_batch.py` now enables diagnostics by default. Every run
 writes FCD (including acceleration and signal bits) and negotiation events.
-Eval.3 additionally writes vehicle-state, conflict, and runtime JSONL files for
-the replay viewer.
+Eval.3, Eval.5, and Eval.7 additionally write vehicle-state, conflict, and
+runtime JSONL files for the replay viewer.
 
-Eval.3 also writes paired checkpoints every 60 seconds by default. Each
-checkpoint contains:
+Eval.3, Eval.5, and Eval.7 also write paired checkpoints every 60 seconds by
+default. Each checkpoint contains:
 
 - SUMO native state with RNG and 16-digit precision;
 - MCS controller instances, planned/desired/alternative trajectories, and
@@ -38,6 +38,9 @@ checkpoint contains:
 - fixed-input cursor and Python random-generator states;
 - online evaluation and prediction accumulators.
 
-Resume a single Eval.3 task with `--resume-checkpoint PATH`. A 20-to-30-second
-test confirmed that continuous and resumed runs produced identical per-frame
-vehicle-state logs and the same aggregate speed.
+Resume one Eval.3, Eval.5, or Eval.7 task with `--resume-checkpoint PATH`.
+Short continuation tests confirmed that all three cases produced identical
+per-frame vehicle-state logs and the same aggregate speed after resuming from
+the paired checkpoint. Eval.7 also reapplies the pending zero-speed command to
+its stationary `stone` obstacle because that TraCI command is not serialized
+in SUMO's native state file.
