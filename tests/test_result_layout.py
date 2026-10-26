@@ -18,6 +18,7 @@ class ResultLayoutTests(unittest.TestCase):
         values = {
             "run_name": None,
             "deceleration_active": True,
+            "deceleration_time_half_life": 0.0,
             "conditional_priority_hold": False,
             "cases": ["eval3"],
             "seeds": [1, 2, 3, 4, 5],
@@ -45,6 +46,16 @@ class ResultLayoutTests(unittest.TestCase):
 
         self.assertEqual(path.parent, ROOT / "results" / "runs")
         self.assertEqual(path.name, "Eval.3-提案-seed-1-5")
+
+    def test_weighted_run_directory_records_half_life(self):
+        now = datetime.datetime(
+            2026, 10, 26, 15, 30, 0,
+            tzinfo=datetime.timezone(datetime.timedelta(hours=9)))
+
+        path = RUNNER.default_run_directory(
+            self.args(deceleration_time_half_life=3.0), now=now)
+
+        self.assertIn("proposal-weighted-3s", path.name)
 
     def test_write_json_has_stable_trailing_newline(self):
         with tempfile.TemporaryDirectory() as directory:

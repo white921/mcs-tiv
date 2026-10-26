@@ -26,6 +26,16 @@ HEADWAY = 1.5
 STANDSTILL_GAP = 5.0
 LANE_TOLERANCE = 2.0
 
+
+def _time_half_life_from_environment():
+    value = float(os.environ.get("MCS_DECELERATION_TIME_HALF_LIFE_S", "0"))
+    if not math.isfinite(value) or value < 0:
+        raise ValueError("MCS_DECELERATION_TIME_HALF_LIFE_S must be non-negative")
+    return value or None
+
+
+TIME_HALF_LIFE_S = _time_half_life_from_environment()
+
 COUNTS = Counter()
 RECORDS = []
 # A desired MCM is normally regenerated every second.  Keep an active
@@ -194,10 +204,14 @@ def _evaluate_detail(receiver, desired, alternative, now):
     accept = _case_profiles(accept_roots, candidates, now)
     if set(reject) != set(accept):
         raise ValueError("counterfactual cases select different follower sets")
-    result = decision_margin(reject, accept, reject)
+    result = decision_margin(
+        reject, accept, reject, time_half_life_s=TIME_HALF_LIFE_S)
     result = {**result, "vehicle_ids": sorted(reject),
               "follower_count": max(0, len(reject) - 2),
               "replan_interval_s": REPLAN_INTERVAL,
+              "time_weighting": ("uniform" if TIME_HALF_LIFE_S is None
+                                 else "exponential-half-life"),
+              "time_half_life_s": TIME_HALF_LIFE_S,
               "follower_replans": max(0, len(reject) - 2) * int(HORIZON / REPLAN_INTERVAL),
               "decision": "accept" if result["reject_minus_accept_m"] >= 0 else "reject"}
     return result, accept, reject
@@ -259,6 +273,8 @@ def _record_evaluation(receiver, desired, alternative, now, mode):
                     "actor_vehicle_ids": actor_ids,
                     "follower_vehicle_ids": sorted(set(chosen_profiles) - set(actor_ids)),
                     "prediction_scope": "sender_receiver_and_detected_followers",
+                    "time_weighting": result["time_weighting"],
+                    "time_half_life_s": result["time_half_life_s"],
                     "accept_loss_m": result["accept_loss_m"],
                     "reject_loss_m": result["reject_loss_m"],
                     "decision_margin_m": result["reject_minus_accept_m"],

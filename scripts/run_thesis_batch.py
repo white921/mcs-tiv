@@ -96,6 +96,9 @@ def default_run_directory(args, now=None):
         now = now or datetime.datetime.now().astimezone()
         timestamp = now.strftime("%Y%m%dT%H%M%S%z")
         method = "proposal" if args.deceleration_active else "yamashita"
+        half_life = getattr(args, "deceleration_time_half_life", 0)
+        if args.deceleration_active and half_life > 0:
+            method += f"-weighted-{duration_label(half_life)}s"
         if args.conditional_priority_hold:
             method += "-conditional-hold"
         cases = "-".join(args.cases)
@@ -232,7 +235,11 @@ def run_task(task, args):
             MCS_CHECKPOINT_INTERVAL=str(args.checkpoint_interval),
         )
     if args.deceleration_active:
-        env["MCS_DECELERATION_AUDIT"] = str(destination / "deceleration-audit.json")
+        env.update(
+            MCS_DECELERATION_AUDIT=str(destination / "deceleration-audit.json"),
+            MCS_DECELERATION_TIME_HALF_LIFE_S=str(
+                args.deceleration_time_half_life),
+        )
     if args.conditional_priority_hold:
         env.update(
             MCS_PRIORITY_HOLD_MODE="conditional",
@@ -281,6 +288,12 @@ def run_task(task, args):
             "prefix_sha256_scope": "canonical vehicle JSONL records with depart_time_s < prefix_duration_s",
         } if fixed_input is not None else None),
         "decision_method": "deceleration-propagation" if args.deceleration_active else "thesis-tiv",
+        "deceleration_prediction": ({
+            "horizon_s": 10.0,
+            "time_weighting": ("uniform" if args.deceleration_time_half_life == 0
+                               else "exponential-half-life"),
+            "time_half_life_s": (args.deceleration_time_half_life or None),
+        } if args.deceleration_active else None),
         "priority_hold": ({
             "mode": "conditional-two-stage",
             "key": "priority vehicle + yielding vehicle + 2 m conflict region",
@@ -376,6 +389,9 @@ def main():
                              "paper-random25 only for original-artifact reproduction")
     parser.add_argument("--deceleration-active", action="store_true",
                         help="use the proposed deceleration-propagation rule")
+    parser.add_argument(
+        "--deceleration-time-half-life", type=float, default=0.0,
+        help="exponential future-loss half-life in seconds; 0 keeps uniform 10 s weighting")
     parser.add_argument("--diagnostic-traces", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="write replay/FCD/negotiation diagnostics (default: enabled)")
@@ -400,12 +416,17 @@ def main():
         parser.error("--duration must be in (0, 600]")
     if args.stop_time is not None and not 0 < args.stop_time <= args.duration:
         parser.error("--stop-time must be in (0, --duration]")
-    if min(args.priority_hold_activation_speed,
+    if not args.deceleration_time_half_life >= 0:
+        parser.error("--deceleration-time-half-life must be non-negative")
+    if min(args.deceleration_time_half_life,
+           args.priority_hold_activation_speed,
            args.priority_hold_progress_timeout,
            args.priority_hold_max_duration,
            args.priority_hold_queue_growth_limit,
            args.checkpoint_interval) < 0:
-        parser.error("priority-hold limits must be non-negative")
+        parser.error("prediction and priority-hold limits must be non-negative")
+    if args.deceleration_time_half_life > 0 and not args.deceleration_active:
+        parser.error("--deceleration-time-half-life requires --deceleration-active")
     if not (args.sumo_home / "bin" / "sumo").is_file() or not (args.sumo_home / "tools" / "traci").is_dir():
         parser.error("--sumo-home must contain bin/sumo and tools/traci")
     if args.paper is not None and not args.paper.is_file():
@@ -449,6 +470,10 @@ def main():
         "started_epoch": started_at.timestamp(),
         "directory": str(args.output),
         "method": "deceleration-propagation" if args.deceleration_active else "yamashita-tiv",
+        "deceleration_time_half_life_s": (
+            args.deceleration_time_half_life
+            if args.deceleration_active and args.deceleration_time_half_life > 0
+            else None),
         "conditional_priority_hold": bool(args.conditional_priority_hold),
         "cases": list(args.cases),
         "tasks": [{"case": case, "seed": seed} for case, seed in tasks],

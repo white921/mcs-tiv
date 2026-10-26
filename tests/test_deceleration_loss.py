@@ -23,6 +23,23 @@ class DecelerationLossTests(unittest.TestCase):
         faster = self.profile((6, 6, 6))
         self.assertAlmostEqual(loss.distance_loss(reference, faster), -.2)
 
+    def test_time_half_life_downweights_distant_loss(self):
+        reference = self.profile((10, 10, 10))
+        slower = self.profile((9, 9, 9))
+
+        weighted = loss.distance_loss(
+            reference, slower, time_half_life_s=.1)
+
+        self.assertAlmostEqual(
+            weighted, .1 * (2 ** -.5 + 2 ** -1.5))
+        self.assertLess(weighted, loss.distance_loss(reference, slower))
+
+    def test_time_half_life_must_be_positive(self):
+        with self.assertRaises(ValueError):
+            loss.distance_loss(
+                self.profile((10, 10, 10)), self.profile((9, 9, 9)),
+                time_half_life_s=0)
+
     def test_margin_uses_reject_minus_accept(self):
         reference = {"v": self.profile((10, 10, 10))}
         accept = {"v": self.profile((9, 9, 9))}
@@ -81,6 +98,24 @@ class DecelerationLossTests(unittest.TestCase):
         self.assertIn("c", result["vehicle_ids"])
         self.assertEqual(result["replan_interval_s"], 1.0)
         self.assertEqual(result["follower_replans"], 10)
+
+    def test_prediction_records_selected_time_half_life(self):
+        def path(veh, kind, x0, speeds):
+            times = [0.0, 5.0, 10.0]
+            return NS(vehID=veh, type=kind, pathID=veh + kind,
+                      t=times, s_d=speeds,
+                      x=[x0 + 8 * time for time in times], y=[0.0] * 3)
+        receiver = NS(
+            id="b", plannedPath=path("b", "planned", 10, [8, 8, 8]),
+            receivedPaths=[path("a", "planned", 20, [8, 8, 8])])
+
+        with patch.object(prediction, "TIME_HALF_LIFE_S", 3.0):
+            result = prediction.evaluate(
+                receiver, path("a", "desired", 20, [10, 10, 10]),
+                path("b", "alter", 10, [6, 6, 6]), 0.0)
+
+        self.assertEqual(result["time_weighting"], "exponential-half-life")
+        self.assertEqual(result["time_half_life_s"], 3.0)
 
     def test_active_decision_is_available_only_in_active_mode(self):
         def path(veh, kind, speeds):
