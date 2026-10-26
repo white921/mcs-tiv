@@ -8,6 +8,7 @@ and propagates each changed leading trajectory to vehicles following it.
 from __future__ import annotations
 
 import atexit
+import copy
 import json
 import math
 import os
@@ -25,6 +26,8 @@ MAX_DECEL = 5.0
 HEADWAY = 1.5
 STANDSTILL_GAP = 5.0
 LANE_TOLERANCE = 2.0
+MERGE_TOLERANCE = 1.6
+ALIGNMENT_COSINE = math.cos(math.radians(30.0))
 
 
 def _time_half_life_from_environment():
@@ -105,11 +108,78 @@ def _position(path, now):
 
 def _heading(path, now):
     x0, y0 = _position(path, now)
-    x1, y1 = _position(path, now + DT)
-    length = math.hypot(x1 - x0, y1 - y0)
-    if length < 1e-6:
-        raise ValueError("trajectory has no usable heading")
-    return (x0, y0, (x1 - x0) / length, (y1 - y0) / length)
+    yaw = getattr(path, "yaw", None)
+    if yaw and len(yaw) == len(path.t):
+        angle = _value_at(path.t, yaw, now)
+        if math.isfinite(angle):
+            return (x0, y0, math.cos(angle), math.sin(angle))
+
+    # Backward compatibility for older MCM logs without yaw.  Search the
+    # trajectory rather than relying on the next 0.1 s sample, because a valid
+    # path may begin with a stationary interval.
+    indices = sorted(range(len(path.t)), key=lambda index: abs(path.t[index] - now))
+    origin = indices[0]
+    for index in range(origin + 1, len(path.t)):
+        dx, dy = path.x[index] - x0, path.y[index] - y0
+        length = math.hypot(dx, dy)
+        if length >= 1e-6:
+            return (x0, y0, dx / length, dy / length)
+    for index in range(origin - 1, -1, -1):
+        dx, dy = x0 - path.x[index], y0 - path.y[index]
+        length = math.hypot(dx, dy)
+        if length >= 1e-6:
+            return (x0, y0, dx / length, dy / length)
+    raise ValueError("trajectory has no usable heading or yaw")
+
+
+def _lane_id(path):
+    value = getattr(path, "lane_id", None)
+    return str(value) if value not in (None, "") else None
+
+
+def _sample_indices(path, now, step=5):
+    indices = [index for index, moment in enumerate(path.t)
+               if moment >= now - 1e-6]
+    sampled = indices[::step]
+    if indices and indices[-1] not in sampled:
+        sampled.append(indices[-1])
+    return sampled
+
+
+def _future_lane_convergence(leader, candidate, now):
+    """Return arrival times where different current lanes share a corridor.
+
+    Lane IDs establish current-lane following.  For merges and turns from
+    different lanes, the already-transmitted future trajectories establish a
+    shared downstream corridor.  Perpendicular conflict crossings are rejected
+    by the heading-alignment test.
+    """
+    best = None
+    for leader_index in _sample_indices(leader, now):
+        leader_yaw = (leader.yaw[leader_index]
+                      if getattr(leader, "yaw", None) and
+                      len(leader.yaw) == len(leader.t) else None)
+        for candidate_index in _sample_indices(candidate, now):
+            distance = math.hypot(
+                leader.x[leader_index] - candidate.x[candidate_index],
+                leader.y[leader_index] - candidate.y[candidate_index])
+            if distance > MERGE_TOLERANCE:
+                continue
+            candidate_yaw = (candidate.yaw[candidate_index]
+                             if getattr(candidate, "yaw", None) and
+                             len(candidate.yaw) == len(candidate.t) else None)
+            if leader_yaw is None or candidate_yaw is None:
+                continue
+            if math.cos(leader_yaw - candidate_yaw) < ALIGNMENT_COSINE:
+                continue
+            leader_time = float(leader.t[leader_index])
+            candidate_time = float(candidate.t[candidate_index])
+            if candidate_time + DT < leader_time:
+                continue
+            key = (max(leader_time, candidate_time), candidate_time - leader_time)
+            if best is None or key < best[0]:
+                best = (key, leader_time, candidate_time)
+    return None if best is None else best[1:]
 
 
 def _latest_planned(receiver):
@@ -124,8 +194,9 @@ def _latest_planned(receiver):
 
 
 def _followers(leader_id, leader_path, candidates, now, excluded):
-    """Return the same-lane queue behind a leader, nearest first."""
+    """Return current-lane and future-merge followers, nearest first."""
     x, y, hx, hy = _heading(leader_path, now)
+    leader_lane = _lane_id(leader_path)
     queue = []
     for vehicle_id, path in candidates.items():
         if vehicle_id in excluded or vehicle_id == leader_id:
@@ -134,9 +205,28 @@ def _followers(leader_id, leader_path, candidates, now, excluded):
         dx, dy = px - x, py - y
         longitudinal = dx * hx + dy * hy
         lateral = abs(dx * hy - dy * hx)
+        candidate_lane = _lane_id(path)
+        if leader_lane is not None and candidate_lane is not None:
+            if leader_lane == candidate_lane:
+                if longitudinal < -0.1:
+                    gap = max(0.0, math.hypot(dx, dy) - 5.0)
+                    queue.append((0, abs(longitudinal), vehicle_id, path, gap))
+                continue
+            convergence = _future_lane_convergence(leader_path, path, now)
+            if convergence is not None:
+                leader_time, candidate_time = convergence
+                candidate_speed = max(0.0, _value_at(path.t, path.s_d, now))
+                gap = max(0.0, candidate_speed * (candidate_time - leader_time) - 5.0)
+                queue.append((1, candidate_time - now, vehicle_id, path, gap))
+            continue
+
+        # Old logs have no lane metadata. Preserve their geometric fallback,
+        # but new simulations always use the explicit lane identity above.
         if longitudinal < -0.1 and lateral <= LANE_TOLERANCE:
-            queue.append((abs(longitudinal), vehicle_id, path))
-    return [(vehicle_id, path) for _, vehicle_id, path in sorted(queue)]
+            gap = max(0.0, math.hypot(dx, dy) - 5.0)
+            queue.append((0, abs(longitudinal), vehicle_id, path, gap))
+    return [(vehicle_id, path, gap)
+            for _, _, vehicle_id, path, gap in sorted(queue)]
 
 
 def _propagate_follower(vehicle_id, base, leader, gap):
@@ -178,9 +268,9 @@ def _case_profiles(roots, candidates, now):
         leader = profiles[root_id]
         leader_path = root_path
         leader_x, leader_y = _position(leader_path, now)
-        for follower_id, follower_path in _followers(root_id, leader_path, candidates, now, assigned):
+        for follower_id, follower_path, gap in _followers(
+                root_id, leader_path, candidates, now, assigned):
             fx, fy = _position(follower_path, now)
-            gap = math.hypot(leader_x - fx, leader_y - fy) - 5.0
             base = _profile(follower_path, follower_id, now)
             leader = _propagate_follower(follower_id, base, leader, gap)
             profiles[follower_id] = leader
@@ -197,9 +287,16 @@ def _evaluate_detail(receiver, desired, alternative, now):
     sender_planned = candidates.get(sender_id)
     if sender_planned is None:
         raise ValueError("sender planned trajectory is unavailable")
-    candidates[receiver_id] = receiver.plannedPath
-    reject_roots = {sender_id: sender_planned, receiver_id: receiver.plannedPath}
-    accept_roots = {sender_id: desired, receiver_id: alternative}
+    receiver_planned = copy.deepcopy(receiver.plannedPath)
+    receiver_alternative = copy.deepcopy(alternative)
+    for path in (receiver_planned, receiver_alternative):
+        if not _lane_id(path):
+            path.lane_id = getattr(receiver, "lane_id", None)
+            path.lane_index = getattr(receiver, "lane", None)
+            path.road_id = getattr(receiver, "road", None)
+    candidates[receiver_id] = receiver_planned
+    reject_roots = {sender_id: sender_planned, receiver_id: receiver_planned}
+    accept_roots = {sender_id: desired, receiver_id: receiver_alternative}
     reject = _case_profiles(reject_roots, candidates, now)
     accept = _case_profiles(accept_roots, candidates, now)
     if set(reject) != set(accept):

@@ -397,7 +397,7 @@ def following_rate(distance, maximum_speed):
     return max(0.0, min(1.0, value))
 
 
-def transmitted_path(path, now):
+def transmitted_path(path, now, lane_context=None):
     """Publish an independent snapshot of the current 10-second horizon."""
     result = copy.deepcopy(path)
     available = min(len(path.t), len(path.x), len(path.y), len(path.s_d))
@@ -413,7 +413,28 @@ def transmitted_path(path, now):
             name in ("t", "x", "y", "s_d") or len(values) == len(path.t)
         ):
             setattr(result, name, values[start:end])
+    if lane_context:
+        for name in ("road_id", "lane_id", "lane_index"):
+            setattr(result, name, lane_context.get(name))
     return result
+
+
+def current_lane_context(vehicle, traci):
+    """Read the map-defined lane identity once and keep it on the CAV state.
+
+    SUMO already assigns stable lane IDs in each network file.  The simulation
+    adapter exposes those IDs to the otherwise simulator-independent MCM
+    packet instead of trying to infer a lane from coordinates.
+    """
+    context = {
+        "road_id": traci.vehicle.getRoadID(vehicle.id),
+        "lane_id": traci.vehicle.getLaneID(vehicle.id),
+        "lane_index": traci.vehicle.getLaneIndex(vehicle.id),
+    }
+    vehicle.road = context["road_id"]
+    vehicle.lane_id = context["lane_id"]
+    vehicle.lane = context["lane_index"]
+    return context
 
 
 def position_at(path, now):
@@ -476,15 +497,17 @@ def score(vehicle, path, point, maximum_speed, maximum_acceleration):
 
 def send_mcm(vehicle, server, traci):
     """Compute desired TIV at the sender, using only its received MCMs."""
+    lane_context = current_lane_context(vehicle, traci)
     vmax = traci.vehicle.getAllowedSpeed(vehicle.id)
     amax = traci.vehicletype.getAccel(vehicle.typeID)
     if vehicle.plannedPath:
-        server.append(transmitted_path(vehicle.plannedPath, vehicle.simTime))
+        server.append(transmitted_path(
+            vehicle.plannedPath, vehicle.simTime, lane_context))
         vehicle.count_send_PT += 1
     for desired in vehicle.desiredPaths or []:
         conflicts, _ = vehicle.checkPathCollision(
             desired, vehicle.receivedPaths, s_type="planned")
-        packet = transmitted_path(desired, vehicle.simTime)
+        packet = transmitted_path(desired, vehicle.simTime, lane_context)
         packet.tiv_by_receiver = {}
         for conflict in conflicts:
             point = (conflict["collide_x"], conflict["collide_y"])
@@ -501,7 +524,8 @@ def send_mcm(vehicle, server, traci):
         vehicle.count_send_DT += 1
         COUNTS["desired_packets"] += 1
     if vehicle.alter_straight_path:
-        server.append(transmitted_path(vehicle.alter_straight_path, vehicle.simTime))
+        server.append(transmitted_path(
+            vehicle.alter_straight_path, vehicle.simTime, lane_context))
         vehicle.count_send_AT += 1
 
 
