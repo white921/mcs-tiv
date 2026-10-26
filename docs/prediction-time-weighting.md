@@ -1,8 +1,8 @@
 # Prediction time weighting
 
 This experiment changes only how the proposed deceleration-propagation method
-integrates its existing 10-second speed profiles. It does not enable either
-the old global priority hold or the conditional two-stage priority hold.
+integrates its existing 10-second speed profiles. Agreement-hold experiments
+belong on a separate improvement branch and are not part of this baseline.
 
 For elapsed prediction time `t`, the loss contribution is multiplied by:
 

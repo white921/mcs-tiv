@@ -216,60 +216,6 @@ class ThesisTIVTests(unittest.TestCase):
         v.waitAgreeID.append("new")
         self.assertEqual(desired.negotiationID, ["2"])
 
-    def test_conditional_hold_remembers_without_yielding_while_priority_blocked(self):
-        v, desired, collisions = self.decision()
-        collisions[0].update(collide_x=20, collide_y=0)
-        v.WithAgreementPhase = True
-        api = traci()
-        api.vehicle.getLeader.return_value = ("24", 1.0)
-        with patch.dict(os.environ, {"MCS_PRIORITY_HOLD_MODE": "conditional"}):
-            tiv.judge_yield(v, collisions, [], api)
-            self.assertEqual(v._mcs_priority_hold["phase"], "awaiting_agreement")
-            v.receiveAgreeID = list(v.waitAgreeID)
-            self.assertFalse(tiv.complete_conditional_agreement(v, [], api))
-        self.assertEqual(v._mcs_priority_hold["phase"], "remembered")
-        self.assertFalse(v.isWaitAgree)
-        self.assertEqual(v.status, "free")
-        self.assertIsNone(v.alter_straight_path)
-
-    def test_conditional_hold_activates_after_priority_can_advance(self):
-        v, desired, collisions = self.decision()
-        collisions[0].update(collide_x=20, collide_y=0)
-        v.WithAgreementPhase = True
-        api = traci()
-        api.vehicle.getLeader.return_value = ("24", 1.0)
-        with patch.dict(os.environ, {"MCS_PRIORITY_HOLD_MODE": "conditional"}):
-            tiv.judge_yield(v, collisions, [], api)
-            v.receiveAgreeID = list(v.waitAgreeID)
-            self.assertFalse(tiv.complete_conditional_agreement(v, [], api))
-            refreshed = copy.deepcopy(desired)
-            refreshed.pathID = "1_2"
-            api.vehicle.getLeader.return_value = None
-            v.generateAlterPath = Mock(return_value=[path("2", "alter")])
-            tiv.judge_yield(v, [{"path": refreshed, "collide_x": 20,
-                                 "collide_y": 0}], [], api)
-        self.assertEqual(v._mcs_priority_hold["phase"], "active")
-        self.assertEqual(v.status, "yield")
-        self.assertEqual(v.leader, "1")
-        self.assertEqual(v.plannedPath.type, "planned")
-
-    def test_conditional_hold_releases_if_participants_change(self):
-        v, desired, collisions = self.decision()
-        collisions[0].update(collide_x=20, collide_y=0)
-        v.WithAgreementPhase = True
-        api = traci()
-        api.vehicle.getLeader.return_value = ("24", 1.0)
-        with patch.dict(os.environ, {"MCS_PRIORITY_HOLD_MODE": "conditional"}):
-            tiv.judge_yield(v, collisions, [], api)
-            v.receiveAgreeID = list(v.waitAgreeID)
-            self.assertFalse(tiv.complete_conditional_agreement(v, [], api))
-            changed = copy.deepcopy(desired)
-            changed.pathID = "1_2"
-            changed.negotiationID = ["2", "3"]
-            self.assertEqual(
-                tiv._release_reason(v, {"path": changed}, api),
-                "conflict_participants_changed")
-
     def test_two_unreachable_paths_not_accepted(self):
         v, _, collisions = self.decision(math.inf)
         v.plannedPath = path("2", speed=0)

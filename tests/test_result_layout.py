@@ -19,7 +19,6 @@ class ResultLayoutTests(unittest.TestCase):
             "run_name": None,
             "deceleration_active": True,
             "deceleration_time_half_life": 0.0,
-            "conditional_priority_hold": False,
             "cases": ["eval3"],
             "seeds": [1, 2, 3, 4, 5],
             "seeds_per_case": None,

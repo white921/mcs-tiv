@@ -125,8 +125,6 @@ def default_run_directory(args, now=None):
         half_life = getattr(args, "deceleration_time_half_life", 0)
         if args.deceleration_active and half_life > 0:
             method += f"-weighted-{duration_label(half_life)}s"
-        if args.conditional_priority_hold:
-            method += "-conditional-hold"
         cases = "-".join(args.cases)
         if args.seeds is not None:
             seeds = "seeds-" + "-".join(str(seed) for seed in args.seeds)
@@ -252,8 +250,6 @@ def run_task(task, args):
                MCS_DECELERATION_MODE=("active" if args.deceleration_active else "off"),
                MCS_DECELERATION_TIME_HALF_LIFE_S=str(
                    args.deceleration_time_half_life if args.deceleration_active else 0.0),
-               MCS_PRIORITY_HOLD_MODE=(
-                   "conditional" if args.conditional_priority_hold else "off"),
                MCS_TIV_AUDIT=str(destination / "tiv-audit.json"),
                MCS_EVALUATION_AUDIT=str(destination / "evaluation-metrics.json"),
                MCS_PHYSICAL_COLLISION_AUDIT=str(
@@ -278,14 +274,6 @@ def run_task(task, args):
     if args.deceleration_active:
         env.update(
             MCS_DECELERATION_AUDIT=str(destination / "deceleration-audit.json"),
-        )
-    if args.conditional_priority_hold:
-        env.update(
-            MCS_PRIORITY_HOLD_MODE="conditional",
-            MCS_PRIORITY_HOLD_ACTIVATION_SPEED=str(args.priority_hold_activation_speed),
-            MCS_PRIORITY_HOLD_PROGRESS_TIMEOUT=str(args.priority_hold_progress_timeout),
-            MCS_PRIORITY_HOLD_MAX_DURATION=str(args.priority_hold_max_duration),
-            MCS_PRIORITY_HOLD_QUEUE_GROWTH_LIMIT=str(args.priority_hold_queue_growth_limit),
         )
     command = [args.python, "-u", case["script"], case["alpha"], str(seed),
                *case["flows"], "--nogui", "--quiet", "--duration", str(args.duration),
@@ -333,14 +321,6 @@ def run_task(task, args):
                                else "exponential-half-life"),
             "time_half_life_s": (args.deceleration_time_half_life or None),
         } if args.deceleration_active else None),
-        "priority_hold": ({
-            "mode": "conditional-two-stage",
-            "key": "priority vehicle + yielding vehicle + 2 m conflict region",
-            "activation_speed_mps": args.priority_hold_activation_speed,
-            "progress_timeout_s": args.priority_hold_progress_timeout,
-            "max_duration_s": args.priority_hold_max_duration,
-            "queue_growth_limit": args.priority_hold_queue_growth_limit,
-        } if args.conditional_priority_hold else {"mode": "off"}),
         "diagnostic_traces_requested": args.diagnostic_traces,
         "diagnostic_traces_enabled": bool(args.diagnostic_traces),
         "vehicle_state_trace_enabled": bool(args.diagnostic_traces and supports_replay_checkpoint),
@@ -442,12 +422,6 @@ def main():
     parser.add_argument("--diagnostic-traces", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="write replay/FCD/negotiation diagnostics (default: enabled)")
-    parser.add_argument("--conditional-priority-hold", action="store_true",
-                        help="remember an agreement, but yield only when the priority vehicle can advance")
-    parser.add_argument("--priority-hold-activation-speed", type=float, default=0.5)
-    parser.add_argument("--priority-hold-progress-timeout", type=float, default=4.0)
-    parser.add_argument("--priority-hold-max-duration", type=float, default=10.0)
-    parser.add_argument("--priority-hold-queue-growth-limit", type=int, default=2)
     parser.add_argument("--checkpoint-interval", type=float, default=60.0,
                         help="Eval.3/5/7 paired SUMO/MCS checkpoint interval (default: 60 s)")
     parser.add_argument("--resume-checkpoint", type=Path,
@@ -465,13 +439,8 @@ def main():
         parser.error("--stop-time must be in (0, --duration]")
     if not args.deceleration_time_half_life >= 0:
         parser.error("--deceleration-time-half-life must be non-negative")
-    if min(args.deceleration_time_half_life,
-           args.priority_hold_activation_speed,
-           args.priority_hold_progress_timeout,
-           args.priority_hold_max_duration,
-           args.priority_hold_queue_growth_limit,
-           args.checkpoint_interval) < 0:
-        parser.error("prediction and priority-hold limits must be non-negative")
+    if min(args.deceleration_time_half_life, args.checkpoint_interval) < 0:
+        parser.error("prediction and checkpoint limits must be non-negative")
     if args.deceleration_time_half_life > 0 and not args.deceleration_active:
         parser.error("--deceleration-time-half-life requires --deceleration-active")
     if not (args.sumo_home / "bin" / "sumo").is_file() or not (args.sumo_home / "tools" / "traci").is_dir():
@@ -521,7 +490,6 @@ def main():
             args.deceleration_time_half_life
             if args.deceleration_active and args.deceleration_time_half_life > 0
             else None),
-        "conditional_priority_hold": bool(args.conditional_priority_hold),
         "cases": list(args.cases),
         "tasks": [{"case": case, "seed": seed} for case, seed in tasks],
         "duration_s": args.duration,

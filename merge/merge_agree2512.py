@@ -510,9 +510,7 @@ def run(alpha='0.0', inflow_0=750, inflow_1=750, quiet=False, save_statistics=Tr
                  "modules": mcs_checkpoint.capture_shared_modules(
                      evaluation_metrics, deceleration_prediction, thesis_tiv)},
                 {"case": "eval7", "seed": int(seed), "alpha": int(alpha),
-                 "fixed_input_path": fixed_input_path,
-                 "priority_hold_mode": os.environ.get(
-                     "MCS_PRIORITY_HOLD_MODE", "off")})
+                 "fixed_input_path": fixed_input_path})
 
     statistics_path = "./statistics/acceptance.csv" if save_statistics else os.devnull
     with open(statistics_path, "a", encoding='utf-8') as f:

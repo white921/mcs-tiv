@@ -722,9 +722,7 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False, save_sta
                 {"globals": _checkpoint_globals(), "run": run_state,
                  "modules": _module_state()},
                 {"case": "eval3", "seed": int(seed), "alpha": int(alpha),
-                 "fixed_input_path": fixed_input_path,
-                 "priority_hold_mode": os.environ.get(
-                     "MCS_PRIORITY_HOLD_MODE", "off")})
+                 "fixed_input_path": fixed_input_path})
 
 
     statistics_path = "./statistics/acceptance_three.csv" if save_statistics else os.devnull
