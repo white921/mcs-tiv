@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "purpose": "derived replay logs; no simulation rerun",
+  "case": "eval5",
+  "seed": 3,
+  "checkpoint_boundary_s": 180,
+  "source_prefix_directory": "/media/yamada/UbuntuData/home-yamada/Documents/卒業研究/mcs-tiv/results/runs/baseline-eval3-eval5-eval7-fixed-300s-default-seeds-20261026T183049+0900/eval5/seed-3",
+  "recovery_directory": "/media/yamada/UbuntuData/home-yamada/Documents/卒業研究/.mcs-tiv-proposal-replay-stitch/results/runs/baseline-recovery-eval5-seed3-from180-sumo128-20261026T202000+0900/eval5/seed-3",
+  "adoption_rule": {
+    "prefix": "records with sim_time <= checkpoint_boundary_s",
+    "recovery": "records with sim_time > checkpoint_boundary_s"
+  },
+  "outputs": {
+    "vehicle-states-full.jsonl.gz": {
+      "records": 3000,
+      "first_time_s": 0.1,
+      "last_time_s": 300.0,
+      "monotonic_non_decreasing": true,
+      "json_valid": true,
+      "expected_frames": 3000,
+      "strict_0_1s_to_300_0s": true,
+      "missing_frames": 0,
+      "duplicate_frames": 0
+    },
+    "negotiations-full.jsonl.gz": {
+      "records": 3029,
+      "first_time_s": 19.4,
+      "last_time_s": 299.8,
+      "monotonic_non_decreasing": true,
+      "json_valid": true
+    },
+    "conflicts-full.jsonl.gz": {
+      "records": 90019,
+      "first_time_s": 19.3,
+      "last_time_s": 300.0,
+      "monotonic_non_decreasing": true,
+      "json_valid": true
+    }
+  },
+  "source_manifest_checks": {
+    "exit_code": 0,
+    "source_unchanged": true
+  },
+  "fcd_status": "not stitched: original prefix FCD gzip stream was interrupted; FCD is not a complete 0.1–300.0 s replay artifact"
+}
