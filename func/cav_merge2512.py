@@ -211,8 +211,11 @@ class CAV:
             
             # check collision among own planned path and other DESIRED paths
             collision_list_desired, _ = self.checkPathCollision(self.plannedPath, self.receivedPaths, s_type="desired")
+            hold_handled = thesis_tiv.maintain_conditional_priority_hold(
+                self, collision_list_desired, ob, traci, merge=True)
             # 他車両の希望経路と重複している場合には、代替経路を生成
-            if len(collision_list_desired) > 0 and self.status != "lanechange":
+            if (len(collision_list_desired) > 0 and self.status != "lanechange"
+                    and not hold_handled):
                 self.judgeYield(collision_list_desired, ob)
 
         # 他の車両が全て交渉を受け入れる場合に代替経路を予定経路に設定
@@ -221,6 +224,9 @@ class CAV:
             self.receiveAgreeID.sort()
             print("\tagree wait id", self.waitAgreeID, "receive id", self.receiveAgreeID)
             if self.waitAgreeID == self.receiveAgreeID:
+                if not thesis_tiv.complete_conditional_agreement(
+                        self, ob, traci, merge=True):
+                    return
                 print("\talter to", self.waitPath.pathID)
                 self.alter_straight_path.type = "planned"
                 self.plannedPath = self.alter_straight_path

@@ -796,6 +796,13 @@ if __name__ == "__main__":
 
     # this is the normal way of using traci. sumo is started as a subprocess and then the python script connects and runs
     sumo_command = [sumoBinary, '-c', os.path.join('junction_four.sumocfg')]
+    fcd_output = os.environ.get("MCS_FCD_OUTPUT")
+    if fcd_output:
+        sumo_command.extend([
+            "--fcd-output", fcd_output,
+            "--fcd-output.acceleration", "true",
+            "--fcd-output.signals", "true",
+        ])
     if options.quiet:
         sumo_command.extend(["--no-step-log", "true"])
 

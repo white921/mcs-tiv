@@ -169,21 +169,38 @@ def run_task(task, args):
                MCS_TIV_AUDIT=str(destination / "tiv-audit.json"),
                MCS_EVALUATION_AUDIT=str(destination / "evaluation-metrics.json"),
                MCS_PREDICTION_EVENT_AUDIT=str(destination / "prediction-events.jsonl"))
+    if args.diagnostic_traces:
+        env.update(
+            MCS_NEGOTIATION_AUDIT=str(destination / "negotiations.jsonl"),
+            MCS_FCD_OUTPUT=str(destination / "fcd.xml.gz"),
+        )
     if args.diagnostic_traces and is_three_way:
         env.update(
             MCS_VEHICLE_STATE_AUDIT=str(destination / "vehicle-states.jsonl"),
             MCS_CONFLICT_AUDIT=str(destination / "conflicts.jsonl"),
-            MCS_NEGOTIATION_AUDIT=str(destination / "negotiations.jsonl"),
             MCS_RUNTIME_AUDIT=str(destination / "runtime.jsonl"),
-            MCS_FCD_OUTPUT=str(destination / "fcd.xml.gz"))
+        )
+    if is_three_way and args.checkpoint_interval > 0:
+        env.update(
+            MCS_CHECKPOINT_DIR=str(destination / "checkpoints"),
+            MCS_CHECKPOINT_INTERVAL=str(args.checkpoint_interval),
+        )
     if args.deceleration_active:
         env["MCS_DECELERATION_AUDIT"] = str(destination / "deceleration-audit.json")
+    if args.conditional_priority_hold:
+        env.update(
+            MCS_PRIORITY_HOLD_MODE="conditional",
+            MCS_PRIORITY_HOLD_ACTIVATION_SPEED=str(args.priority_hold_activation_speed),
+            MCS_PRIORITY_HOLD_PROGRESS_TIMEOUT=str(args.priority_hold_progress_timeout),
+            MCS_PRIORITY_HOLD_MAX_DURATION=str(args.priority_hold_max_duration),
+            MCS_PRIORITY_HOLD_QUEUE_GROWTH_LIMIT=str(args.priority_hold_queue_growth_limit),
+        )
     command = [args.python, "-u", case["script"], case["alpha"], str(seed),
                *case["flows"], "--nogui", "--quiet", "--duration", str(args.duration),
                "--bus-allocation", args.bus_allocation]
     fixed_input = fixed_input_details(
         name, seed, args.duration, args.bus_allocation,
-        prefix_duration=(args.stop_time if args.stop_time is not None else args.duration),
+        prefix_duration=args.duration,
         source_root=source,
     )
     if fixed_input is not None:
@@ -195,6 +212,8 @@ def run_task(task, args):
         command.append("--no-save")
     if args.stop_time is not None:
         command += ["--stop-time", str(args.stop_time)]
+    if args.resume_checkpoint is not None:
+        command += ["--resume-checkpoint", str(args.resume_checkpoint.resolve())]
     manifest = {
         "case": name, "seed": seed, "command": command,
         "input_duration": args.duration, "stop_time": args.stop_time or args.duration,
@@ -211,10 +230,31 @@ def run_task(task, args):
             "prefix_sha256_scope": "canonical vehicle JSONL records with depart_time_s < prefix_duration_s",
         } if fixed_input is not None else None),
         "decision_method": "deceleration-propagation" if args.deceleration_active else "thesis-tiv",
+        "priority_hold": ({
+            "mode": "conditional-two-stage",
+            "key": "priority vehicle + yielding vehicle + 2 m conflict region",
+            "activation_speed_mps": args.priority_hold_activation_speed,
+            "progress_timeout_s": args.priority_hold_progress_timeout,
+            "max_duration_s": args.priority_hold_max_duration,
+            "queue_growth_limit": args.priority_hold_queue_growth_limit,
+        } if args.conditional_priority_hold else {"mode": "off"}),
         "diagnostic_traces_requested": args.diagnostic_traces,
-        "diagnostic_traces_enabled": bool(args.diagnostic_traces and is_three_way),
-        "trace_schema_version": 2 if args.diagnostic_traces and is_three_way else None,
+        "diagnostic_traces_enabled": bool(args.diagnostic_traces),
+        "vehicle_state_trace_enabled": bool(args.diagnostic_traces and is_three_way),
+        "conflict_trace_enabled": bool(args.diagnostic_traces and is_three_way),
+        "negotiation_trace_enabled": bool(args.diagnostic_traces),
+        "fcd_trace_enabled": bool(args.diagnostic_traces),
+        "trace_schema_version": 2 if args.diagnostic_traces else None,
         "replay_bundle_version": 1 if args.diagnostic_traces and is_three_way else None,
+        "checkpointing": ({
+            "schema_version": 1,
+            "interval_s": args.checkpoint_interval,
+            "contains": ["SUMO native state", "MCS controllers and paths",
+                         "agreement state", "fixed-input cursor", "random state",
+                         "metric accumulators"],
+            "resume_from": (str(args.resume_checkpoint.resolve())
+                            if args.resume_checkpoint is not None else None),
+        } if is_three_way and args.checkpoint_interval > 0 else None),
         "source_sha256": initial_hashes,
         "git": git_metadata(),
         "python_version": sys.version,
@@ -248,6 +288,11 @@ def run_task(task, args):
                     negotiation_audit_written=(destination / "negotiations.jsonl").is_file(),
                     runtime_audit_written=(destination / "runtime.jsonl").is_file())
     manifest["fcd_written"] = (destination / "fcd.xml.gz").is_file()
+    checkpoint_root = destination / "checkpoints"
+    manifest["checkpoints_written"] = (
+        len([path for path in checkpoint_root.iterdir()
+             if path.is_dir() and (path / "checkpoint.json").is_file()])
+        if checkpoint_root.is_dir() else 0)
     (destination / "manifest.json").write_text(json.dumps(manifest, indent=2))
     return manifest
 
@@ -274,8 +319,19 @@ def main():
                              "paper-random25 only for original-artifact reproduction")
     parser.add_argument("--deceleration-active", action="store_true",
                         help="use the proposed deceleration-propagation rule")
-    parser.add_argument("--diagnostic-traces", action="store_true",
-                        help="write Eval.3 replay/conflict/negotiation/runtime JSONL traces")
+    parser.add_argument("--diagnostic-traces", action=argparse.BooleanOptionalAction,
+                        default=True,
+                        help="write replay/FCD/negotiation diagnostics (default: enabled)")
+    parser.add_argument("--conditional-priority-hold", action="store_true",
+                        help="remember an agreement, but yield only when the priority vehicle can advance")
+    parser.add_argument("--priority-hold-activation-speed", type=float, default=0.5)
+    parser.add_argument("--priority-hold-progress-timeout", type=float, default=4.0)
+    parser.add_argument("--priority-hold-max-duration", type=float, default=10.0)
+    parser.add_argument("--priority-hold-queue-growth-limit", type=int, default=2)
+    parser.add_argument("--checkpoint-interval", type=float, default=60.0,
+                        help="Eval.3 paired SUMO/MCS checkpoint interval (default: 60 s)")
+    parser.add_argument("--resume-checkpoint", type=Path,
+                        help="resume one Eval.3 task from a paired checkpoint")
     args = parser.parse_args()
     if args.workers < 1:
         parser.error("--workers must be positive")
@@ -287,6 +343,12 @@ def main():
         parser.error("--duration must be in (0, 600]")
     if args.stop_time is not None and not 0 < args.stop_time <= args.duration:
         parser.error("--stop-time must be in (0, --duration]")
+    if min(args.priority_hold_activation_speed,
+           args.priority_hold_progress_timeout,
+           args.priority_hold_max_duration,
+           args.priority_hold_queue_growth_limit,
+           args.checkpoint_interval) < 0:
+        parser.error("priority-hold limits must be non-negative")
     if not (args.sumo_home / "bin" / "sumo").is_file() or not (args.sumo_home / "tools" / "traci").is_dir():
         parser.error("--sumo-home must contain bin/sumo and tools/traci")
     if args.paper is not None and not args.paper.is_file():
@@ -297,6 +359,11 @@ def main():
         tasks = build_tasks(args.cases, args.seeds_per_case, args.seeds)
     except ValueError as error:
         parser.error(str(error))
+    if args.resume_checkpoint is not None:
+        if len(tasks) != 1 or tasks[0][0] != "eval3":
+            parser.error("--resume-checkpoint requires exactly one Eval.3 task")
+        if not (args.resume_checkpoint / "checkpoint.json").is_file():
+            parser.error("--resume-checkpoint must name a complete checkpoint directory")
     print(json.dumps({"tasks": len(tasks), "workers": args.workers, "output": str(args.output)}), flush=True)
     reports = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as pool:
