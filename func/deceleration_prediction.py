@@ -319,17 +319,42 @@ def _evaluate_detail(receiver, desired, alternative, now):
     accept_roots = {sender_id: desired, receiver_id: receiver_alternative}
     reject = _case_profiles(reject_roots, candidates, now)
     accept = _case_profiles(accept_roots, candidates, now)
-    if set(reject) != set(accept):
-        raise ValueError("counterfactual cases select different follower sets")
+
+    # Accepting and rejecting can legitimately affect different following
+    # queues.  Compare both cases over their union instead of dropping the
+    # proposal evaluation.  A vehicle that is affected in only one case keeps
+    # its transmitted planned profile in the other case.  This is the sparse
+    # equivalent of comparing every vehicle: vehicles outside the union are
+    # identical in both cases and therefore cancel from the decision margin.
+    actor_ids = {sender_id, receiver_id}
+    accept_follower_ids = set(accept) - actor_ids
+    reject_follower_ids = set(reject) - actor_ids
+    union_ids = set(accept) | set(reject)
+    reference = {}
+    for vehicle_id in union_ids:
+        planned = candidates.get(vehicle_id)
+        if planned is None:
+            raise ValueError(
+                "planned trajectory is unavailable for union vehicle " +
+                vehicle_id)
+        baseline = _profile(planned, vehicle_id, now)
+        reference[vehicle_id] = baseline
+        accept.setdefault(vehicle_id, baseline)
+        reject.setdefault(vehicle_id, baseline)
+
     result = decision_margin(
-        reject, accept, reject, time_half_life_s=TIME_HALF_LIFE_S)
-    result = {**result, "vehicle_ids": sorted(reject),
-              "follower_count": max(0, len(reject) - 2),
+        reference, accept, reject, time_half_life_s=TIME_HALF_LIFE_S)
+    union_follower_ids = accept_follower_ids | reject_follower_ids
+    result = {**result, "vehicle_ids": sorted(union_ids),
+              "accept_follower_ids": sorted(accept_follower_ids),
+              "reject_follower_ids": sorted(reject_follower_ids),
+              "union_follower_ids": sorted(union_follower_ids),
+              "follower_count": len(union_follower_ids),
               "replan_interval_s": REPLAN_INTERVAL,
               "time_weighting": ("uniform" if TIME_HALF_LIFE_S is None
                                  else "exponential-half-life"),
               "time_half_life_s": TIME_HALF_LIFE_S,
-              "follower_replans": max(0, len(reject) - 2) * int(HORIZON / REPLAN_INTERVAL),
+              "follower_replans": len(union_follower_ids) * int(HORIZON / REPLAN_INTERVAL),
               "decision": "accept" if result["reject_minus_accept_m"] >= 0 else "reject"}
     return result, accept, reject
 
@@ -389,6 +414,9 @@ def _record_evaluation(receiver, desired, alternative, now, mode):
                     "alternative_path_id": str(alternative.pathID),
                     "actor_vehicle_ids": actor_ids,
                     "follower_vehicle_ids": sorted(set(chosen_profiles) - set(actor_ids)),
+                    "accept_follower_ids": result["accept_follower_ids"],
+                    "reject_follower_ids": result["reject_follower_ids"],
+                    "union_follower_ids": result["union_follower_ids"],
                     "prediction_scope": "sender_receiver_and_detected_followers",
                     "time_weighting": result["time_weighting"],
                     "time_half_life_s": result["time_half_life_s"],

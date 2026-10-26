@@ -100,6 +100,40 @@ class DecelerationLossTests(unittest.TestCase):
         self.assertEqual(result["replan_interval_s"], 1.0)
         self.assertEqual(result["follower_replans"], 10)
 
+    def test_counterfactuals_compare_union_of_different_follower_sets(self):
+        def path(veh, kind, lane, y, lane_position, speeds):
+            times = [0.0, 5.0, 10.0]
+            return NS(
+                vehID=veh, type=kind, pathID=veh + kind + lane,
+                t=times, s_d=speeds,
+                x=[20.0 + 8 * time for time in times], y=[y] * 3,
+                yaw=[0.0] * 3, lane_id=lane,
+                lane_position=lane_position)
+
+        sender_planned = path(
+            "a", "planned", "main_0", 0.0, 20.0, [8, 8, 8])
+        desired = path(
+            "a", "desired", "detour_0", 10.0, 20.0, [8, 8, 8])
+        receiver_planned = path(
+            "b", "planned", "receiver_0", 100.0, 20.0, [8, 8, 8])
+        alternative = path(
+            "b", "alter", "receiver_alt_0", 110.0, 20.0, [8, 8, 8])
+        reject_only = path(
+            "c", "planned", "main_0", 0.0, 0.0, [8, 8, 8])
+        accept_only = path(
+            "d", "planned", "detour_0", 10.0, 0.0, [8, 8, 8])
+        receiver = NS(
+            id="b", plannedPath=receiver_planned,
+            receivedPaths=[sender_planned, reject_only, accept_only])
+
+        result = prediction.evaluate(receiver, desired, alternative, 0.0)
+
+        self.assertEqual(result["accept_follower_ids"], ["d"])
+        self.assertEqual(result["reject_follower_ids"], ["c"])
+        self.assertEqual(result["union_follower_ids"], ["c", "d"])
+        self.assertEqual(result["vehicle_ids"], ["a", "b", "c", "d"])
+        self.assertEqual(result["follower_count"], 2)
+
     def test_stationary_path_uses_mcm_yaw_for_same_lane_follower(self):
         def path(veh, x, lane):
             return NS(vehID=veh, type="planned", pathID=veh + "path",
