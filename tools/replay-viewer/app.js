@@ -9,6 +9,7 @@ const state = {
   zoom: 1,
   panX: 0,
   panY: 0,
+  selectedVehicleId: null,
 };
 
 const canvas = document.querySelector('#map');
@@ -97,6 +98,28 @@ function signalState(vehicle) {
   };
 }
 
+function drawLeaderLines(view, currentEvents) {
+  const vehicles = new Map(state.frame.vehicles.map(vehicle => [String(vehicle.vehicle_id), vehicle]));
+  const relatedIds = new Set(currentEvents.flatMap(event => [String(event.sender_id), String(event.receiver_id)]));
+  for (const vehicle of state.frame.vehicles) {
+    if (!vehicle.leader_id) continue;
+    const leader = vehicles.get(String(vehicle.leader_id));
+    if (!leader) continue;
+    const [x1, y1] = view.point(Number(vehicle.x), Number(vehicle.y));
+    const [x2, y2] = view.point(Number(leader.x), Number(leader.y));
+    ctx.save();
+    ctx.globalAlpha = currentEvents.length && !relatedIds.has(String(vehicle.vehicle_id)) ? .1 : .34;
+    ctx.strokeStyle = '#9db1c5';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function drawVehicle(vehicle, view, currentEvents) {
   const [x, y] = view.point(Number(vehicle.x), Number(vehicle.y));
   const angle = Number(vehicle.angle_deg ?? 0) * Math.PI / 180;
@@ -160,7 +183,7 @@ function drawVehicle(vehicle, view, currentEvents) {
   }
   ctx.globalAlpha = related ? 1 : 0.32;
   ctx.fillStyle = '#f5f8fc';
-  ctx.font = '600 11px -apple-system, sans-serif';
+  ctx.font = `${String(vehicle.vehicle_id) === state.selectedVehicleId ? '800' : '600'} 11px -apple-system, sans-serif`;
   ctx.textAlign = 'center';
   ctx.fillText(vehicle.vehicle_id, x, y - 7);
   ctx.globalAlpha = 1;
@@ -176,6 +199,7 @@ function draw() {
   const view = transform();
   drawNetwork(view);
   const currentEvents = eventsAt(Number(state.frame.sim_time));
+  drawLeaderLines(view, currentEvents);
   for (const vehicle of state.frame.vehicles) drawVehicle(vehicle, view, currentEvents);
 }
 
@@ -208,6 +232,36 @@ function renderState() {
   }).length;
   const values = [['車両数', vehicles.length], ['停止', stopped], ['制動灯', braking], ['方向指示', blinking]];
   document.querySelector('#state-grid').innerHTML = values.map(([key, value]) => `<div><dt>${key}</dt><dd>${value}</dd></div>`).join('');
+  renderSelectedVehicle();
+}
+
+function renderSelectedVehicle() {
+  const container = document.querySelector('#vehicle-details');
+  const vehicle = state.frame.vehicles.find(item => String(item.vehicle_id) === state.selectedVehicleId);
+  if (!vehicle) {
+    container.innerHTML = `<div><dt>車両</dt><dd>${state.selectedVehicleId ? `${state.selectedVehicleId} (この時刻は不在)` : '未選択'}</dd></div>`;
+    return;
+  }
+  const signals = signalState(vehicle);
+  const activeSignals = [
+    signals.left_blinker && '左ウインカー',
+    signals.right_blinker && '右ウインカー',
+    signals.emergency_blinker && 'ハザード',
+    signals.brake_light && 'ブレーキ',
+  ].filter(Boolean).join(' / ') || 'なし';
+  const entries = [
+    ['車両', `${vehicle.vehicle_id} · ${vehicle.vehicle_group || vehicle.vehicle_type_id || '—'}`],
+    ['座標', `(${Number(vehicle.x).toFixed(2)}, ${Number(vehicle.y).toFixed(2)})`],
+    ['速度', `${Number(vehicle.speed_mps).toFixed(2)} m/s`],
+    ['加速度', `${Number(vehicle.accel_mps2).toFixed(2)} m/s²`],
+    ['向き', `${Number(vehicle.angle_deg ?? 0).toFixed(1)}°`],
+    ['車線', vehicle.lane_id || '—'],
+    ['先行車', vehicle.leader_id ? `${vehicle.leader_id} (${Number(vehicle.leader_gap_m).toFixed(1)} m)` : 'なし'],
+    ['灯火', activeSignals],
+    ['MCS状態', vehicle.controller_status || '—'],
+    ['予定経路', vehicle.planned_path_id || '—'],
+  ];
+  container.innerHTML = entries.map(([key, value]) => `<div><dt>${key}</dt><dd title="${value}">${value}</dd></div>`).join('');
 }
 
 async function setFrame(index) {
@@ -282,6 +336,25 @@ canvas.addEventListener('wheel', event => {
   state.zoom = Math.min(8, Math.max(.5, state.zoom * (event.deltaY < 0 ? 1.15 : .87)));
   draw();
 }, { passive: false });
+canvas.addEventListener('click', event => {
+  if (!state.frame || !state.network) return;
+  const rect = canvas.getBoundingClientRect();
+  const pointer = [event.clientX - rect.left, event.clientY - rect.top];
+  const view = transform();
+  let nearest = null;
+  let nearestDistance = 24;
+  for (const vehicle of state.frame.vehicles) {
+    const [x, y] = view.point(Number(vehicle.x), Number(vehicle.y));
+    const distance = Math.hypot(pointer[0] - x, pointer[1] - y);
+    if (distance < nearestDistance) {
+      nearest = vehicle;
+      nearestDistance = distance;
+    }
+  }
+  state.selectedVehicleId = nearest ? String(nearest.vehicle_id) : null;
+  renderSelectedVehicle();
+  draw();
+});
 
 initialize().catch(error => {
   document.querySelector('#run-title').textContent = '読み込みに失敗しました';
