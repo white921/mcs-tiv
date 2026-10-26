@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime
 import gzip
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -81,11 +82,21 @@ def read_jsonl(path: Path | None) -> list[dict]:
         return [json.loads(line) for line in stream if line.strip()]
 
 
-def find_network(run_dir: Path) -> Path:
+NETWORK_BY_CASE = {
+    "eval3": "junction_three.net.xml",
+    "eval4": "junction_four.net.xml",
+    "eval5": "junction_four.net.xml",
+    "eval6": "threeLane.net.xml",
+    "eval7": "threeLane.net.xml",
+}
+
+
+def find_network(run_dir: Path, case: str | None = None) -> Path:
     candidates = sorted((run_dir / "source").rglob("*.net.xml"))
     if not candidates:
         candidates = sorted(ROOT.rglob("*.net.xml"))
-    preferred = [path for path in candidates if path.name == "junction_three.net.xml"]
+    expected_name = NETWORK_BY_CASE.get(str(case).lower())
+    preferred = [path for path in candidates if path.name == expected_name]
     if preferred:
         return preferred[0]
     if not candidates:
@@ -136,7 +147,8 @@ class ReplayApplication:
             if (self.run_dir / "manifest.json").is_file() else {}
         self.events = read_jsonl(find_trace(self.run_dir, "negotiations.jsonl"))
         self.events.sort(key=lambda event: float(event.get("sim_time", 0)))
-        self.network = parse_network(find_network(self.run_dir))
+        self.network = parse_network(find_network(
+            self.run_dir, self.manifest.get("case")))
 
     def metadata(self):
         return {
@@ -148,10 +160,143 @@ class ReplayApplication:
             "manifest": self.manifest,
             "fcd_available": (self.run_dir / "fcd.xml.gz").is_file(),
             "event_count": len(self.events),
+            "scenario_note": (
+                "論文上はT字路。引き継ぎ実装は上側流入を使わない十字路ネットワーク。"
+                if str(self.manifest.get("case", "")).lower() == "eval3" else None),
         }
 
 
-def make_handler(app: ReplayApplication):
+def replayable_seed_directories(search_root: Path) -> list[Path]:
+    search_root = search_root.resolve()
+    if ((search_root / "manifest.json").is_file()
+            and find_trace(search_root, "vehicle-states.jsonl") is not None):
+        return [search_root]
+    directories = []
+    for manifest_path in search_root.rglob("manifest.json"):
+        if "source" in manifest_path.relative_to(search_root).parts:
+            continue
+        candidate = manifest_path.parent
+        if find_trace(candidate, "vehicle-states.jsonl") is not None:
+            directories.append(candidate)
+    return sorted(set(directories))
+
+
+def experiment_root(seed_dir: Path, search_root: Path) -> Path:
+    for candidate in [seed_dir, *seed_dir.parents]:
+        if candidate == search_root.parent:
+            break
+        if ((candidate / "experiment-manifest.json").is_file()
+                or (candidate / "summary.json").is_file()):
+            return candidate
+        if candidate == search_root:
+            break
+    if (seed_dir.name.startswith("seed-")
+            and seed_dir.parent.name.lower().startswith("eval")):
+        return seed_dir.parent.parent
+    return seed_dir
+
+
+def relative_label(path: Path, root: Path) -> str:
+    try:
+        relative = path.relative_to(root)
+        return path.name if relative == Path(".") else relative.as_posix()
+    except ValueError:
+        return path.name
+
+
+def format_started_at(manifest: dict) -> str:
+    value = manifest.get("started_epoch")
+    if value is None:
+        return "日時不明"
+    return datetime.datetime.fromtimestamp(float(value)).astimezone().strftime("%m/%d %H:%M")
+
+
+def display_method(experiment_id: str, method: str) -> str:
+    normalized_id = experiment_id.lower()
+    if "priority-hold-gated" in normalized_id:
+        return "条件付き合意保持"
+    if "priority-hold-global" in normalized_id:
+        return "全交渉合意保持"
+    return {
+        "deceleration-propagation": "提案手法",
+        "thesis-tiv": "山下手法",
+    }.get(method, method or "方式不明")
+
+
+def format_duration(duration) -> str:
+    if duration is None:
+        return "時間不明"
+    value = float(duration)
+    return f"{value:g}秒"
+
+
+class ReplayCatalog:
+    def __init__(self, search_root: Path):
+        self.search_root = search_root.resolve()
+        self._entries = []
+        self._entry_by_id = {}
+        self._applications = {}
+        for index, seed_dir in enumerate(
+                replayable_seed_directories(self.search_root)):
+            manifest = json.loads((seed_dir / "manifest.json").read_text())
+            root = experiment_root(seed_dir, self.search_root)
+            experiment_id = relative_label(root, self.search_root)
+            selection_id = str(index)
+            duration = manifest.get("stop_time") or manifest.get("input_duration")
+            method = manifest.get("decision_method") or "方式不明"
+            entry = {
+                "id": selection_id,
+                "experiment_id": experiment_id,
+                "experiment_label": (
+                    f"{format_started_at(manifest)} · "
+                    f"{display_method(experiment_id, method)} · "
+                    f"{format_duration(duration)}"),
+                "case": str(manifest.get("case") or seed_dir.parent.name).lower(),
+                "seed": manifest.get("seed", seed_dir.name.removeprefix("seed-")),
+                "method": method,
+                "duration_s": duration,
+                "status": ("completed" if manifest.get("exit_code") == 0 else "unknown"),
+                "run_dir": str(seed_dir),
+                "started_epoch": manifest.get("started_epoch"),
+            }
+            self._entries.append(entry)
+            self._entry_by_id[selection_id] = entry
+        self._entries.sort(key=lambda entry: (
+            -(float(entry["started_epoch"] or 0)),
+            entry["experiment_id"], entry["case"], str(entry["seed"])))
+        experiments_by_label = {}
+        for entry in reversed(self._entries):
+            experiments = experiments_by_label.setdefault(
+                entry["experiment_label"], [])
+            if entry["experiment_id"] not in experiments:
+                experiments.append(entry["experiment_id"])
+        for entry in self._entries:
+            experiments = experiments_by_label[entry["experiment_label"]]
+            if len(experiments) > 1:
+                rerun = experiments.index(entry["experiment_id"]) + 1
+                entry["experiment_label"] += f" · 再実行{rerun}"
+        if not self._entries:
+            raise FileNotFoundError(
+                f"no replayable manifest and vehicle trace found under {self.search_root}")
+
+    @property
+    def default_id(self):
+        return self._entries[0]["id"]
+
+    def metadata(self):
+        return {"default_id": self.default_id, "entries": self._entries}
+
+    def application(self, selection_id: str | None):
+        selection_id = selection_id or self.default_id
+        if selection_id not in self._entry_by_id:
+            raise KeyError(selection_id)
+        if selection_id not in self._applications:
+            self._applications[selection_id] = ReplayApplication(
+                Path(self._entry_by_id[selection_id]["run_dir"]))
+        return self._applications[selection_id]
+
+
+def make_handler(catalog: ReplayCatalog):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format_, *args):
             return
@@ -167,6 +312,16 @@ def make_handler(app: ReplayApplication):
 
         def do_GET(self):
             parsed = urllib.parse.urlparse(self.path)
+            query = urllib.parse.parse_qs(parsed.query)
+            if parsed.path == "/api/catalog":
+                self.send_json(catalog.metadata())
+                return
+            try:
+                app = catalog.application(query.get("selection", [None])[0])
+            except KeyError:
+                self.send_json({"error": "unknown replay selection"},
+                               HTTPStatus.NOT_FOUND)
+                return
             if parsed.path == "/api/meta":
                 self.send_json(app.metadata())
                 return
@@ -177,7 +332,6 @@ def make_handler(app: ReplayApplication):
                 self.send_json(app.events)
                 return
             if parsed.path == "/api/frame":
-                query = urllib.parse.parse_qs(parsed.query)
                 try:
                     index = int(query.get("index", ["0"])[0])
                     self.send_json(app.frames.get(index))
@@ -194,6 +348,7 @@ def make_handler(app: ReplayApplication):
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", mimetypes.guess_type(asset.name)[0] or "application/octet-stream")
             self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(payload)
 
@@ -202,15 +357,19 @@ def make_handler(app: ReplayApplication):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("run_dir", type=Path, help="one result's eval*/seed-* directory")
+    parser.add_argument(
+        "result_path", type=Path, nargs="?", default=ROOT / "results",
+        help="results root or one result's eval*/seed-* directory (default: results)")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--no-open", action="store_true")
     args = parser.parse_args()
-    app = ReplayApplication(args.run_dir)
-    server = ThreadingHTTPServer((args.host, args.port), make_handler(app))
+    catalog = ReplayCatalog(args.result_path)
+    server = ThreadingHTTPServer((args.host, args.port), make_handler(catalog))
     url = f"http://{server.server_address[0]}:{server.server_address[1]}/"
-    print(json.dumps({"url": url, **app.metadata()}, ensure_ascii=False), flush=True)
+    print(json.dumps({"url": url, "search_root": str(catalog.search_root),
+                      "replay_count": len(catalog.metadata()["entries"])},
+                     ensure_ascii=False), flush=True)
     if not args.no_open:
         threading.Timer(0.2, lambda: webbrowser.open(url)).start()
     try:

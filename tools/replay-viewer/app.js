@@ -1,4 +1,6 @@
 const state = {
+  catalog: null,
+  selectionId: null,
   meta: null,
   network: null,
   events: [],
@@ -10,6 +12,10 @@ const state = {
   panX: 0,
   panY: 0,
   selectedVehicleId: null,
+  dragPointerId: null,
+  dragX: 0,
+  dragY: 0,
+  dragMoved: false,
 };
 
 const canvas = document.querySelector('#map');
@@ -17,11 +23,68 @@ const ctx = canvas.getContext('2d');
 const timeline = document.querySelector('#timeline');
 const playButton = document.querySelector('#play');
 const speedSelect = document.querySelector('#speed');
+const experimentSelect = document.querySelector('#experiment-select');
+const caseSelect = document.querySelector('#case-select');
+const seedSelect = document.querySelector('#seed-select');
 
 async function getJSON(url) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${response.status} ${url}`);
   return response.json();
+}
+
+function apiURL(path, parameters = {}) {
+  const query = new URLSearchParams(parameters);
+  if (state.selectionId !== null) query.set('selection', state.selectionId);
+  return `${path}?${query}`;
+}
+
+function caseLabel(value) {
+  const match = String(value).match(/^eval(\d+)$/i);
+  return match ? `Eval.${match[1]}` : value;
+}
+
+function setOptions(select, entries, valueOf, labelOf, selectedValue) {
+  select.innerHTML = '';
+  for (const entry of entries) {
+    const option = document.createElement('option');
+    option.value = String(valueOf(entry));
+    option.textContent = labelOf(entry);
+    option.selected = option.value === String(selectedValue);
+    select.append(option);
+  }
+  select.disabled = entries.length <= 1;
+}
+
+function uniqueBy(items, keyOf) {
+  return [...new Map(items.map(item => [String(keyOf(item)), item])).values()];
+}
+
+function experimentEntries(experimentId = experimentSelect.value) {
+  return state.catalog.entries.filter(entry => entry.experiment_id === experimentId);
+}
+
+function refreshCaseAndSeed(preferredCase, preferredSeed) {
+  const entries = experimentEntries();
+  const cases = uniqueBy(entries, entry => entry.case).sort((left, right) =>
+    String(left.case).localeCompare(String(right.case), undefined, { numeric: true }));
+  const selectedCase = cases.some(entry => entry.case === preferredCase)
+    ? preferredCase : cases[0].case;
+  setOptions(caseSelect, cases, entry => entry.case,
+    entry => caseLabel(entry.case), selectedCase);
+  const seeds = entries.filter(entry => entry.case === selectedCase).sort((left, right) =>
+    Number(left.seed) - Number(right.seed));
+  const selectedSeed = seeds.some(entry => String(entry.seed) === String(preferredSeed))
+    ? preferredSeed : seeds[0].seed;
+  setOptions(seedSelect, seeds, entry => entry.seed,
+    entry => `Seed ${entry.seed}`, selectedSeed);
+}
+
+function selectedCatalogEntry() {
+  return state.catalog.entries.find(entry =>
+    entry.experiment_id === experimentSelect.value
+    && entry.case === caseSelect.value
+    && String(entry.seed) === seedSelect.value);
 }
 
 function closestFrameIndex(time) {
@@ -43,6 +106,18 @@ function eventsAt(time) {
 
 function nearbyEvents(time) {
   return state.events.filter(event => Math.abs(Number(event.sim_time) - time) <= 3);
+}
+
+function eventLabel(event) {
+  if (event.accept === true) return '承諾';
+  if (event.accept === false) return '拒否';
+  if (event.event === 'suppressed') return '重複判定省略';
+  return event.event;
+}
+
+function eventReason(event) {
+  if (event.reason === 'decision_locked') return '判断済みのため省略';
+  return event.reason || event.event || '';
 }
 
 function resizeCanvas() {
@@ -215,8 +290,7 @@ function renderEvents() {
   for (const event of events) {
     const button = document.createElement('button');
     button.className = `event ${Math.abs(Number(event.sim_time) - Number(state.frame.sim_time)) < 0.051 ? 'current' : ''}`;
-    const decision = event.accept === true ? '承諾' : event.accept === false ? '拒否' : event.event;
-    button.innerHTML = `<time>${Number(event.sim_time).toFixed(1)}s</time><span><strong>${event.sender_id} → ${event.receiver_id} · ${decision}</strong><small>${event.reason || event.event || ''}</small></span>`;
+    button.innerHTML = `<time>${Number(event.sim_time).toFixed(1)}s</time><span><strong>${event.sender_id} → ${event.receiver_id} · ${eventLabel(event)}</strong><small>${eventReason(event)}</small></span>`;
     button.addEventListener('click', () => setFrame(closestFrameIndex(Number(event.sim_time))));
     container.append(button);
   }
@@ -266,7 +340,7 @@ function renderSelectedVehicle() {
 
 async function setFrame(index) {
   state.index = Math.max(0, Math.min(Number(index), state.meta.frame_count - 1));
-  state.frame = await getJSON(`/api/frame?index=${state.index}`);
+  state.frame = await getJSON(apiURL('/api/frame', { index: state.index }));
   timeline.value = String(state.index);
   document.querySelector('#time-badge').textContent = `${Number(state.frame.sim_time).toFixed(1)} s`;
   document.querySelector('#frame-badge').textContent = `${state.index + 1} / ${state.meta.frame_count}`;
@@ -305,17 +379,52 @@ function jumpEvent(direction) {
   if (candidates.length) setFrame(closestFrameIndex(Number(candidates[0].sim_time)));
 }
 
-async function initialize() {
+async function loadSelection(selectionId) {
+  clearTimeout(state.timer);
+  state.playing = false;
+  playButton.textContent = '▶';
+  state.selectionId = String(selectionId);
+  state.selectedVehicleId = null;
+  state.zoom = 1;
+  state.panX = 0;
+  state.panY = 0;
   [state.meta, state.network, state.events] = await Promise.all([
-    getJSON('/api/meta'), getJSON('/api/network'), getJSON('/api/events'),
+    getJSON(apiURL('/api/meta')), getJSON(apiURL('/api/network')),
+    getJSON(apiURL('/api/events')),
   ]);
   timeline.max = String(Math.max(0, state.meta.frame_count - 1));
   const manifest = state.meta.manifest;
-  document.querySelector('#run-title').textContent = `${manifest.case || 'シミュレーション'} · Seed ${manifest.seed ?? '—'}`;
+  document.querySelector('#run-title').textContent = `${caseLabel(manifest.case || 'シミュレーション')} · Seed ${manifest.seed ?? '—'}`;
   document.querySelector('#run-meta').innerHTML = `${manifest.decision_method || '方式不明'}<br>${state.meta.start_time ?? '—'}–${state.meta.end_time ?? '—'} s · ${state.meta.frame_count}フレーム · FCD ${state.meta.fcd_available ? 'あり' : 'なし'}`;
+  const note = document.querySelector('#scenario-note');
+  note.textContent = state.meta.scenario_note || '';
+  note.hidden = !state.meta.scenario_note;
   await setFrame(0);
   resizeCanvas();
 }
+
+async function initialize() {
+  state.catalog = await getJSON('/api/catalog');
+  const experiments = uniqueBy(state.catalog.entries, entry => entry.experiment_id);
+  const defaultEntry = state.catalog.entries.find(
+    entry => entry.id === state.catalog.default_id) || state.catalog.entries[0];
+  setOptions(experimentSelect, experiments, entry => entry.experiment_id,
+    entry => entry.experiment_label, defaultEntry.experiment_id);
+  refreshCaseAndSeed(defaultEntry.case, defaultEntry.seed);
+  await loadSelection(defaultEntry.id);
+}
+
+experimentSelect.addEventListener('change', async () => {
+  refreshCaseAndSeed(null, null);
+  await loadSelection(selectedCatalogEntry().id);
+});
+caseSelect.addEventListener('change', async () => {
+  refreshCaseAndSeed(caseSelect.value, null);
+  await loadSelection(selectedCatalogEntry().id);
+});
+seedSelect.addEventListener('change', async () => {
+  await loadSelection(selectedCatalogEntry().id);
+});
 
 document.querySelector('#prev').addEventListener('click', () => setFrame(state.index - 1));
 document.querySelector('#next').addEventListener('click', () => setFrame(state.index + 1));
@@ -331,16 +440,68 @@ window.addEventListener('keydown', event => {
   if (event.key === 'ArrowRight') setFrame(state.index + 1);
   if (event.key === ' ') { event.preventDefault(); togglePlay(); }
 });
+
+function zoomAtPointer(event, zoomFactor) {
+  const rect = canvas.getBoundingClientRect();
+  const pointerX = event.clientX - rect.left;
+  const pointerY = event.clientY - rect.top;
+  const previousZoom = state.zoom;
+  state.zoom = Math.min(8, Math.max(.5, previousZoom * zoomFactor));
+  const appliedFactor = state.zoom / previousZoom;
+  state.panX = pointerX - canvas.clientWidth / 2
+    - (pointerX - canvas.clientWidth / 2 - state.panX) * appliedFactor;
+  state.panY = pointerY - canvas.clientHeight / 2
+    - (pointerY - canvas.clientHeight / 2 - state.panY) * appliedFactor;
+}
+
 canvas.addEventListener('wheel', event => {
-  // Keep ordinary wheel/two-finger gestures available for page scrolling.
-  // Browsers expose trackpad pinch as a ctrl-modified wheel event, so the
-  // same branch also supports pinch-to-zoom without hijacking scrolling.
-  if (!event.ctrlKey && !event.metaKey) return;
   event.preventDefault();
-  state.zoom = Math.min(8, Math.max(.5, state.zoom * (event.deltaY < 0 ? 1.15 : .87)));
+  if (!event.ctrlKey && !event.metaKey && Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+    state.panX -= event.deltaX;
+    state.panY -= event.deltaY;
+    draw();
+    return;
+  }
+
+  const zoomFactor = event.ctrlKey || event.metaKey
+    ? Math.exp(-event.deltaY * .01)
+    : (event.deltaY < 0 ? 1.15 : .87);
+  zoomAtPointer(event, zoomFactor);
   draw();
 }, { passive: false });
+canvas.addEventListener('pointerdown', event => {
+  if (event.button !== 0) return;
+  state.dragPointerId = event.pointerId;
+  state.dragX = event.clientX;
+  state.dragY = event.clientY;
+  state.dragMoved = false;
+  canvas.setPointerCapture(event.pointerId);
+  canvas.classList.add('dragging');
+});
+canvas.addEventListener('pointermove', event => {
+  if (state.dragPointerId !== event.pointerId) return;
+  const deltaX = event.clientX - state.dragX;
+  const deltaY = event.clientY - state.dragY;
+  if (Math.abs(deltaX) + Math.abs(deltaY) > 1) state.dragMoved = true;
+  state.panX += deltaX;
+  state.panY += deltaY;
+  state.dragX = event.clientX;
+  state.dragY = event.clientY;
+  draw();
+});
+function finishDrag(event) {
+  if (state.dragPointerId !== event.pointerId) return;
+  if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+  state.dragPointerId = null;
+  canvas.classList.remove('dragging');
+}
+canvas.addEventListener('pointerup', finishDrag);
+canvas.addEventListener('pointercancel', finishDrag);
 canvas.addEventListener('click', event => {
+  if (state.dragMoved) {
+    state.dragMoved = false;
+    return;
+  }
   if (!state.frame || !state.network) return;
   const rect = canvas.getBoundingClientRect();
   const pointer = [event.clientX - rect.left, event.clientY - rect.top];

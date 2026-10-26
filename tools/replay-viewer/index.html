@@ -12,8 +12,20 @@
       <p class="eyebrow">MCS REPLAY VIEWER</p>
       <h1 id="run-title">ログを読み込み中</h1>
     </div>
+    <div class="run-picker" aria-label="再生ログ選択">
+      <label>実験Run
+        <select id="experiment-select" aria-label="実験Run"></select>
+      </label>
+      <label>Eval
+        <select id="case-select" aria-label="Eval"></select>
+      </label>
+      <label>Seed
+        <select id="seed-select" aria-label="Seed"></select>
+      </label>
+    </div>
     <div class="run-meta" id="run-meta"></div>
   </header>
+  <p class="scenario-note" id="scenario-note" hidden></p>
 
   <main>
     <section class="map-panel">
@@ -28,6 +40,7 @@
         <span><i class="ring stopped"></i>停止</span>
         <span><i class="ring sender"></i>交渉要求側</span>
         <span><i class="ring receiver"></i>判断側</span>
+        <span><i class="leader-link"></i>先行車への追従</span>
         <span><i class="lamp blinker"></i>ウインカー</span>
         <span><i class="lamp brake"></i>ブレーキランプ</span>
       </div>
