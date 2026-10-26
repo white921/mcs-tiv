@@ -332,6 +332,10 @@ window.addEventListener('keydown', event => {
   if (event.key === ' ') { event.preventDefault(); togglePlay(); }
 });
 canvas.addEventListener('wheel', event => {
+  // Keep ordinary wheel/two-finger gestures available for page scrolling.
+  // Browsers expose trackpad pinch as a ctrl-modified wheel event, so the
+  // same branch also supports pinch-to-zoom without hijacking scrolling.
+  if (!event.ctrlKey && !event.metaKey) return;
   event.preventDefault();
   state.zoom = Math.min(8, Math.max(.5, state.zoom * (event.deltaY < 0 ? 1.15 : .87)));
   draw();

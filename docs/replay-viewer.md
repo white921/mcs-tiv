@@ -23,6 +23,8 @@ Use `--port 0` to choose an available port or `--no-open` for a headless host.
   from logged values, not from inferred movement;
 - previous/next, play/pause, playback rate, timeline slider, keyboard arrows,
   and jump-to-negotiation controls are always available;
+- ordinary wheel/two-finger gestures scroll the page; map zoom uses trackpad
+  pinch or Ctrl/Command plus wheel so the canvas does not trap scrolling;
 - stopped vehicles (`speed < 0.1 m/s`) have a red ring;
 - negotiation senders have a pink ring and receivers a purple ring;
 - when a negotiation is active, unrelated vehicles remain visible but faint;
