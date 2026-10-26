@@ -36,6 +36,7 @@ def vehicle(veh="1"):
 def traci():
     return NS(vehicle=NS(getAllowedSpeed=Mock(return_value=10),
                          getRoadID=Mock(return_value="sender-road"),
+                         getLaneID=Mock(return_value="sender-road_1"),
                          getLaneIndex=Mock(return_value=1),
                          getSpeed=Mock(return_value=2),
                          getPosition=Mock(return_value=(0, 0)),
@@ -152,6 +153,10 @@ class ThesisTIVTests(unittest.TestCase):
         tiv.send_mcm(sender, server, api)
         packet = server[1]
         self.assertAlmostEqual(packet.tiv_by_receiver["2"]["value"], 1.3)
+        self.assertEqual(packet.road_id, "sender-road")
+        self.assertEqual(packet.lane_id, "sender-road_1")
+        self.assertEqual(packet.lane_index, 1)
+        self.assertEqual(sender.lane_id, "sender-road_1")
         desired.x[0] = 999
         self.assertEqual(packet.x[0], 0)
         api.vehicle.getAllowedSpeed.assert_called_once_with("1")

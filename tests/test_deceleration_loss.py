@@ -99,6 +99,47 @@ class DecelerationLossTests(unittest.TestCase):
         self.assertEqual(result["replan_interval_s"], 1.0)
         self.assertEqual(result["follower_replans"], 10)
 
+    def test_stationary_path_uses_mcm_yaw_for_same_lane_follower(self):
+        def path(veh, x, lane):
+            return NS(vehID=veh, type="planned", pathID=veh + "path",
+                      t=[0.0, 5.0, 10.0], s_d=[0.0, 0.0, 0.0],
+                      x=[x, x, x], y=[0.0, 0.0, 0.0],
+                      yaw=[0.0, 0.0, 0.0], lane_id=lane)
+        leader = path("a", 10.0, "left_0")
+        follower = path("b", 0.0, "left_0")
+
+        found = prediction._followers(
+            "a", leader, {"b": follower}, 0.0, {"a"})
+
+        self.assertEqual([entry[0] for entry in found], ["b"])
+
+    def test_adjacent_parallel_lane_is_not_a_follower(self):
+        def path(veh, x, lane, y):
+            return NS(vehID=veh, type="planned", pathID=veh + "path",
+                      t=[0.0, 5.0, 10.0], s_d=[8.0, 8.0, 8.0],
+                      x=[x, x + 40.0, x + 80.0], y=[y, y, y],
+                      yaw=[0.0, 0.0, 0.0], lane_id=lane)
+        leader = path("a", 10.0, "main_0", 0.0)
+        adjacent = path("b", 0.0, "main_1", 3.2)
+
+        self.assertEqual(prediction._followers(
+            "a", leader, {"b": adjacent}, 0.0, {"a"}), [])
+
+    def test_different_lanes_that_share_downstream_path_are_merge_followers(self):
+        leader = NS(vehID="a", type="planned", pathID="apath",
+                    t=[0.0, 5.0, 10.0], s_d=[8.0, 8.0, 8.0],
+                    x=[0.0, 40.0, 80.0], y=[0.0, 0.0, 0.0],
+                    yaw=[0.0, 0.0, 0.0], lane_id="main_0")
+        merging = NS(vehID="b", type="planned", pathID="bpath",
+                     t=[0.0, 5.0, 10.0], s_d=[8.0, 8.0, 8.0],
+                     x=[-10.0, 40.0, 80.0], y=[3.2, 0.0, 0.0],
+                     yaw=[0.0, 0.0, 0.0], lane_id="ramp_0")
+
+        found = prediction._followers(
+            "a", leader, {"b": merging}, 0.0, {"a"})
+
+        self.assertEqual([entry[0] for entry in found], ["b"])
+
     def test_prediction_records_selected_time_half_life(self):
         def path(veh, kind, x0, speeds):
             times = [0.0, 5.0, 10.0]
