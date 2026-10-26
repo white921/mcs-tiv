@@ -129,6 +129,7 @@ class FrenetPath:
         self.road_id = None
         self.lane_id = None
         self.lane_index = None
+        self.lane_position = None
         self.vehLength = 5.0
         self.vehWidth = 1.8
         # 交渉に参加してほしい車両ID

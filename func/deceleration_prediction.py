@@ -137,6 +137,15 @@ def _lane_id(path):
     return str(value) if value not in (None, "") else None
 
 
+def _lane_position(path):
+    value = getattr(path, "lane_position", None)
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
+
+
 def _sample_indices(path, now, step=5):
     indices = [index for index, moment in enumerate(path.t)
                if moment >= now - 1e-6]
@@ -197,6 +206,7 @@ def _followers(leader_id, leader_path, candidates, now, excluded):
     """Return current-lane and future-merge followers, nearest first."""
     x, y, hx, hy = _heading(leader_path, now)
     leader_lane = _lane_id(leader_path)
+    leader_lane_position = _lane_position(leader_path)
     queue = []
     for vehicle_id, path in candidates.items():
         if vehicle_id in excluded or vehicle_id == leader_id:
@@ -208,7 +218,16 @@ def _followers(leader_id, leader_path, candidates, now, excluded):
         candidate_lane = _lane_id(path)
         if leader_lane is not None and candidate_lane is not None:
             if leader_lane == candidate_lane:
-                if longitudinal < -0.1:
+                candidate_lane_position = _lane_position(path)
+                if (leader_lane_position is not None and
+                        candidate_lane_position is not None):
+                    lane_separation = leader_lane_position - candidate_lane_position
+                    if lane_separation > 0.1:
+                        gap = max(0.0, lane_separation - 5.0)
+                        queue.append((0, lane_separation, vehicle_id, path, gap))
+                elif longitudinal < -0.1:
+                    # Compatibility with packets produced before lane position
+                    # became part of the MCM context.
                     gap = max(0.0, math.hypot(dx, dy) - 5.0)
                     queue.append((0, abs(longitudinal), vehicle_id, path, gap))
                 continue
@@ -293,6 +312,7 @@ def _evaluate_detail(receiver, desired, alternative, now):
         if not _lane_id(path):
             path.lane_id = getattr(receiver, "lane_id", None)
             path.lane_index = getattr(receiver, "lane", None)
+            path.lane_position = getattr(receiver, "lane_position", None)
             path.road_id = getattr(receiver, "road", None)
     candidates[receiver_id] = receiver_planned
     reject_roots = {sender_id: sender_planned, receiver_id: receiver_planned}
