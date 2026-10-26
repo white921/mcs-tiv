@@ -63,7 +63,7 @@ def transmitted_path(path, now, lane_context=None):
         ):
             setattr(result, name, values[start:end])
     if lane_context:
-        for name in ("road_id", "lane_id", "lane_index"):
+        for name in ("road_id", "lane_id", "lane_index", "lane_position"):
             setattr(result, name, lane_context.get(name))
     return result
 
@@ -79,10 +79,12 @@ def current_lane_context(vehicle, traci):
         "road_id": traci.vehicle.getRoadID(vehicle.id),
         "lane_id": traci.vehicle.getLaneID(vehicle.id),
         "lane_index": traci.vehicle.getLaneIndex(vehicle.id),
+        "lane_position": traci.vehicle.getLanePosition(vehicle.id),
     }
     vehicle.road = context["road_id"]
     vehicle.lane_id = context["lane_id"]
     vehicle.lane = context["lane_index"]
+    vehicle.lane_position = context["lane_position"]
     return context
 
 

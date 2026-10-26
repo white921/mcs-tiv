@@ -1,3 +1,4 @@
+import math
 import sys
 import unittest
 from pathlib import Path
@@ -124,6 +125,23 @@ class DecelerationLossTests(unittest.TestCase):
 
         self.assertEqual(prediction._followers(
             "a", leader, {"b": adjacent}, 0.0, {"a"}), [])
+
+    def test_curved_same_lane_uses_lane_progress_not_tangent_projection(self):
+        leader = NS(vehID="a", type="planned", pathID="apath",
+                    t=[0.0, 5.0, 10.0], s_d=[5.0, 5.0, 5.0],
+                    x=[10.0, 10.0, 10.0], y=[0.0, 25.0, 50.0],
+                    yaw=[math.pi / 2] * 3, lane_id=":turn_0",
+                    lane_position=20.0)
+        follower = NS(vehID="b", type="planned", pathID="bpath",
+                      t=[0.0, 5.0, 10.0], s_d=[5.0, 5.0, 5.0],
+                      x=[0.0, 10.0, 10.0], y=[0.0, 15.0, 40.0],
+                      yaw=[0.0, math.pi / 2, math.pi / 2],
+                      lane_id=":turn_0", lane_position=10.0)
+
+        found = prediction._followers(
+            "a", leader, {"b": follower}, 0.0, {"a"})
+
+        self.assertEqual([entry[0] for entry in found], ["b"])
 
     def test_different_lanes_that_share_downstream_path_are_merge_followers(self):
         leader = NS(vehID="a", type="planned", pathID="apath",

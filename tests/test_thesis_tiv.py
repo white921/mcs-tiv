@@ -38,6 +38,7 @@ def traci():
                          getRoadID=Mock(return_value="sender-road"),
                          getLaneID=Mock(return_value="sender-road_1"),
                          getLaneIndex=Mock(return_value=1),
+                         getLanePosition=Mock(return_value=12.5),
                          getSpeed=Mock(return_value=2),
                          getPosition=Mock(return_value=(0, 0)),
                          getLeader=Mock(return_value=None),
@@ -156,6 +157,7 @@ class ThesisTIVTests(unittest.TestCase):
         self.assertEqual(packet.road_id, "sender-road")
         self.assertEqual(packet.lane_id, "sender-road_1")
         self.assertEqual(packet.lane_index, 1)
+        self.assertEqual(packet.lane_position, 12.5)
         self.assertEqual(sender.lane_id, "sender-road_1")
         desired.x[0] = 999
         self.assertEqual(packet.x[0], 0)
