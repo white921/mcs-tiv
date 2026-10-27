@@ -192,6 +192,19 @@ class DecelerationLossTests(unittest.TestCase):
 
         self.assertEqual([entry[0] for entry in found], ["b"])
 
+    def test_perpendicular_crossing_path_is_not_a_merge_follower(self):
+        leader = NS(vehID="a", type="planned", pathID="apath",
+                    t=[0.0, 5.0, 10.0], s_d=[8.0, 8.0, 8.0],
+                    x=[0.0, 40.0, 80.0], y=[0.0, 0.0, 0.0],
+                    yaw=[0.0, 0.0, 0.0], lane_id="eastbound_0")
+        crossing = NS(vehID="b", type="planned", pathID="bpath",
+                      t=[0.0, 5.0, 10.0], s_d=[8.0, 8.0, 8.0],
+                      x=[40.0, 40.0, 40.0], y=[-40.0, 0.0, 40.0],
+                      yaw=[math.pi / 2] * 3, lane_id="northbound_0")
+
+        self.assertEqual(prediction._followers(
+            "a", leader, {"b": crossing}, 0.0, {"a"}), [])
+
     def test_prediction_records_selected_time_half_life(self):
         def path(veh, kind, x0, speeds):
             times = [0.0, 5.0, 10.0]

@@ -62,6 +62,11 @@ CONTROLLED_MCS_ENV = {
     "MCS_VEHICLE_STATE_AUDIT",
 }
 
+# This branch intentionally evaluates lane-aware following without any
+# agreement-hold extension.  Record that choice explicitly so a completed
+# result can be audited without inferring it from absent CLI flags.
+PRIORITY_HOLD_MANIFEST = {"mode": "off", "enabled": False}
+
 # These are the five published result families for which the audited source
 # contains an exact scenario runner.  Eval.1/2 need their comparison matrices
 # audited separately before they can be called paper reproductions.
@@ -315,6 +320,7 @@ def run_task(task, args):
             "prefix_sha256_scope": "canonical vehicle JSONL records with depart_time_s < prefix_duration_s",
         } if fixed_input is not None else None),
         "decision_method": "deceleration-propagation" if args.deceleration_active else "thesis-tiv",
+        "priority_hold": dict(PRIORITY_HOLD_MANIFEST),
         "deceleration_prediction": ({
             "horizon_s": 10.0,
             "time_weighting": ("uniform" if args.deceleration_time_half_life == 0

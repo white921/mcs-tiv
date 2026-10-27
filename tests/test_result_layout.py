@@ -78,6 +78,11 @@ class ResultLayoutTests(unittest.TestCase):
 
         self.assertEqual(cleaned, {"PATH": "/usr/bin"})
 
+    def test_lane_aware_run_explicitly_records_priority_hold_as_off(self):
+        self.assertEqual(
+            RUNNER.PRIORITY_HOLD_MANIFEST,
+            {"mode": "off", "enabled": False})
+
 
 if __name__ == "__main__":
     unittest.main()
