@@ -336,8 +336,12 @@ def run_task(task, args):
         "priority_hold": ({
             "mode": "conditional-two-stage",
             "key": "priority vehicle + yielding vehicle + 2 m conflict region",
-            "activation_speed_mps": args.priority_hold_activation_speed,
-            "progress_timeout_s": args.priority_hold_progress_timeout,
+            "activation_authority": "priority sender desired MCM",
+            "activation_inputs": [
+                "prepared yield trajectories",
+                "ordinary planned trajectories",
+            ],
+            "current_speed_gate": False,
             "max_duration_s": args.priority_hold_max_duration,
             "queue_growth_limit": args.priority_hold_queue_growth_limit,
         } if args.conditional_priority_hold else {"mode": "off"}),

@@ -89,51 +89,91 @@ def _following_queue_size(traci, vehicle_id):
 
 
 def _priority_motion(vehicle, desired, point, traci, hold):
-    """Return whether the priority vehicle can physically advance now."""
+    """Read the priority sender's trajectory-based activation decision.
+
+    The yielding receiver must not infer readiness from the sender's current
+    speed.  A stopped sender may be able to start as soon as the agreed yield
+    path is applied.  The sender therefore checks its desired trajectory
+    against the prepared yield paths and all ordinary planned paths, then
+    publishes the result in the desired MCM.
+    """
     priority_id = str(desired.vehID)
     speed = float(traci.vehicle.getSpeed(priority_id))
     position = traci.vehicle.getPosition(priority_id)
     distance = math.hypot(position[0] - point[0], position[1] - point[1])
-    previous_distance = hold.get("last_distance")
-    actual_progress = (previous_distance is not None
-                       and previous_distance - distance >= 0.1)
     hold["last_distance"] = distance
-    if actual_progress or speed >= _hold_float("MCS_PRIORITY_HOLD_ACTIVATION_SPEED", "0.5"):
-        hold["last_progress_time"] = vehicle.simTime
-
-    planned_progress = False
-    try:
-        indices = [i for i, timestamp in enumerate(desired.t)
-                   if timestamp >= vehicle.simTime - 1e-6]
-        if indices:
-            now_index = indices[0]
-            future_index = min(indices[-1], now_index + 10)
-            distance_now = math.hypot(desired.x[now_index] - point[0],
-                                      desired.y[now_index] - point[1])
-            distance_future = math.hypot(desired.x[future_index] - point[0],
-                                         desired.y[future_index] - point[1])
-            planned_progress = distance_now - distance_future >= 0.2
-    except (AttributeError, IndexError, TypeError, ValueError):
-        planned_progress = False
-
-    blocked = False
-    get_leader = getattr(traci.vehicle, "getLeader", None)
-    if get_leader is not None:
-        try:
-            leader = get_leader(priority_id, 50.0)
-            blocked = bool(leader and leader[0]
-                           and float(leader[1]) <= max(5.0, speed * 1.5 + 2.0))
-        except (AttributeError, KeyError, TypeError, ValueError):
-            blocked = False
-    return (not blocked and planned_progress
-            and (speed >= _hold_float("MCS_PRIORITY_HOLD_ACTIVATION_SPEED", "0.5")
-                 or actual_progress)), {
+    signal = getattr(desired, "priority_activation", None)
+    signal_participants = sorted(
+        str(value) for value in (signal or {}).get("participants", []))
+    valid = bool(
+        isinstance(signal, dict)
+        and str(signal.get("sender")) == priority_id
+        and str(signal.get("desired_path_id")) == str(desired.pathID)
+        and str(hold["yielding_vehicle"]) in signal_participants
+    )
+    ready = bool(valid and signal.get("ready"))
+    return ready, {
         "priority_speed_mps": speed,
         "priority_distance_m": distance,
-        "planned_progress": planned_progress,
-        "actual_progress": actual_progress,
-        "blocked_by_leader": blocked,
+        "activation_signal_valid": valid,
+        "activation_ready": ready,
+        "activation_reason": (signal or {}).get("reason", "missing_signal"),
+        "activation_blocker_ids": (signal or {}).get("blocker_ids", []),
+        "prepared_yield_ids": (signal or {}).get("prepared_ids", []),
     }
+
+
+def _latest_paths(paths, predicate):
+    latest = {}
+    for candidate in paths:
+        if not predicate(candidate):
+            continue
+        previous = latest.get(str(candidate.vehID))
+        if previous is None or candidate.t[0] > previous.t[0]:
+            latest[str(candidate.vehID)] = candidate
+    return latest
+
+
+def _priority_activation(vehicle, desired):
+    """Prepare the sender-authoritative activation state for a desired MCM."""
+    participants = _agreement_participants(desired)
+    base = {
+        "sender": str(vehicle.id),
+        "desired_path_id": str(desired.pathID),
+        "participants": sorted(participants),
+        "ready": False,
+        "prepared_ids": [],
+        "blocker_ids": [],
+        "checked_at": vehicle.simTime,
+    }
+    if not participants:
+        return {**base, "reason": "no_yield_participants"}
+
+    prepared = _latest_paths(
+        vehicle.receivedPaths,
+        lambda path: (path.type == "alter"
+                      and str(getattr(path, "yieldTo", "")) == str(vehicle.id)
+                      and str(path.vehID) in participants),
+    )
+    base["prepared_ids"] = sorted(prepared)
+    missing = participants.difference(prepared)
+    if missing:
+        return {**base, "reason": "waiting_for_prepared_yield_paths",
+                "missing_ids": sorted(missing)}
+
+    ordinary = _latest_paths(
+        vehicle.receivedPaths,
+        lambda path: path.type == "planned" and str(path.vehID) not in participants,
+    )
+    evaluation_paths = list(ordinary.values()) + list(prepared.values())
+    conflicts, _ = vehicle.checkPathCollision(
+        desired, evaluation_paths, s_type="all")
+    blocker_ids = sorted({str(entry["path"].vehID) for entry in conflicts})
+    if blocker_ids:
+        return {**base, "reason": "priority_trajectory_blocked",
+                "blocker_ids": blocker_ids}
+    return {**base, "ready": True,
+            "reason": "priority_trajectory_safe_with_prepared_yields"}
 
 
 def _clear_agreement_state(vehicle):
@@ -206,12 +246,6 @@ def _release_reason(vehicle, collision, traci, collisions=None):
     now = vehicle.simTime
     if now - hold["created_at"] >= _hold_float("MCS_PRIORITY_HOLD_MAX_DURATION", "10"):
         return "max_duration"
-    participants = _agreement_participants(collision["path"])
-    if participants != hold["participants"]:
-        return "conflict_participants_changed"
-    if collisions is not None and any(
-            not _same_priority_relation(vehicle, entry) for entry in collisions):
-        return "additional_conflict"
     queue = _following_queue_size(traci, vehicle.id)
     baseline = hold.get("baseline_queue")
     if (queue is not None and baseline is not None
@@ -260,6 +294,7 @@ def _activate_priority_hold(vehicle, collision, obstacles, merge=False):
     diagnostic_trace.record_negotiation(
         vehicle, desired, "applied", accept=True,
         reason="conditional_priority_hold", collision=collision)
+    _clear_agreement_state(vehicle)
     return True
 
 
@@ -308,10 +343,6 @@ def _maintain_priority_hold(vehicle, collisions, obstacles, traci, merge=False):
     if reason is not None:
         _release_priority_hold(vehicle, reason, matching)
         return False
-    if hold["phase"] == "awaiting_agreement":
-        if vehicle.waitPath.pathID == matching["path"].pathID:
-            return True
-        return _refresh_waiting_alternative(vehicle, matching, obstacles, merge)
     if hold["phase"] == "active":
         vehicle.leadPath = matching["path"]
         return True
@@ -319,17 +350,19 @@ def _maintain_priority_hold(vehicle, collisions, obstacles, traci, merge=False):
         vehicle, matching["path"], hold["point"], traci, hold)
     if can_advance:
         return _activate_priority_hold(vehicle, matching, obstacles, merge)
-    if (vehicle.simTime - hold["last_progress_time"] >= _hold_float(
-            "MCS_PRIORITY_HOLD_PROGRESS_TIMEOUT", "4")):
-        _release_priority_hold(
-            vehicle, "priority_not_progressing", matching, motion)
-        return False
+    if (vehicle.waitPath is None
+            or vehicle.waitPath.pathID != matching["path"].pathID):
+        if not _refresh_waiting_alternative(
+                vehicle, matching, obstacles, merge):
+            return False
+    if hold["phase"] == "awaiting_agreement":
+        hold["phase"] = "remembered"
     second = int(vehicle.simTime)
     if hold.get("last_pending_log") != second:
         hold["last_pending_log"] = second
         diagnostic_trace.record_negotiation(
             vehicle, matching["path"], "priority_hold_pending", accept=True,
-            reason="priority_vehicle_cannot_advance", collision=matching,
+            reason="sender_has_not_activated_yield", collision=matching,
             details={"hold_key": hold["key"], **motion})
     return True
 
@@ -361,9 +394,8 @@ def complete_conditional_agreement(vehicle, obstacles, traci, merge=False):
     hold["remembered_at"] = vehicle.simTime
     diagnostic_trace.record_negotiation(
         vehicle, desired, "priority_hold_pending", accept=True,
-        reason="agreement_complete_but_priority_blocked", details={
+        reason="agreement_prepared_waiting_for_sender_activation", details={
             "hold_key": hold["key"], **motion})
-    _clear_agreement_state(vehicle)
     return False
 
 
@@ -510,6 +542,8 @@ def send_mcm(vehicle, server, traci):
         conflicts, _ = vehicle.checkPathCollision(
             desired, vehicle.receivedPaths, s_type="planned")
         packet = transmitted_path(desired, vehicle.simTime, lane_context)
+        if conditional_priority_hold_enabled() and vehicle.WithAgreementPhase:
+            packet.priority_activation = _priority_activation(vehicle, desired)
         packet.tiv_by_receiver = {}
         for conflict in conflicts:
             point = (conflict["collide_x"], conflict["collide_y"])

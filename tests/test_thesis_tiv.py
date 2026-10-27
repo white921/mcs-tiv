@@ -235,9 +235,9 @@ class ThesisTIVTests(unittest.TestCase):
             v.receiveAgreeID = list(v.waitAgreeID)
             self.assertFalse(tiv.complete_conditional_agreement(v, [], api))
         self.assertEqual(v._mcs_priority_hold["phase"], "remembered")
-        self.assertFalse(v.isWaitAgree)
+        self.assertTrue(v.isWaitAgree)
         self.assertEqual(v.status, "free")
-        self.assertIsNone(v.alter_straight_path)
+        self.assertIsNotNone(v.alter_straight_path)
 
     def test_conditional_hold_activates_after_priority_can_advance(self):
         v, desired, collisions = self.decision()
@@ -251,7 +251,12 @@ class ThesisTIVTests(unittest.TestCase):
             self.assertFalse(tiv.complete_conditional_agreement(v, [], api))
             refreshed = copy.deepcopy(desired)
             refreshed.pathID = "1_2"
-            api.vehicle.getLeader.return_value = None
+            refreshed.priority_activation = {
+                "sender": "1", "desired_path_id": "1_2",
+                "participants": ["2"], "ready": True,
+                "reason": "priority_trajectory_safe_with_prepared_yields",
+                "prepared_ids": ["2"], "blocker_ids": [],
+            }
             v.generateAlterPath = Mock(return_value=[path("2", "alter")])
             tiv.judge_yield(v, [{"path": refreshed, "collide_x": 20,
                                  "collide_y": 0}], [], api)
@@ -260,7 +265,7 @@ class ThesisTIVTests(unittest.TestCase):
         self.assertEqual(v.leader, "1")
         self.assertEqual(v.plannedPath.type, "planned")
 
-    def test_conditional_hold_releases_if_participants_change(self):
+    def test_conditional_hold_accepts_sender_signal_after_participants_change(self):
         v, desired, collisions = self.decision()
         collisions[0].update(collide_x=20, collide_y=0)
         v.WithAgreementPhase = True
@@ -273,9 +278,65 @@ class ThesisTIVTests(unittest.TestCase):
             changed = copy.deepcopy(desired)
             changed.pathID = "1_2"
             changed.negotiationID = ["2", "3"]
-            self.assertEqual(
-                tiv._release_reason(v, {"path": changed}, api),
-                "conflict_participants_changed")
+            changed.priority_activation = {
+                "sender": "1", "desired_path_id": "1_2",
+                "participants": ["2", "3"], "ready": True,
+                "reason": "priority_trajectory_safe_with_prepared_yields",
+                "prepared_ids": ["2", "3"], "blocker_ids": [],
+            }
+            v.generateAlterPath = Mock(return_value=[path("2", "alter")])
+            tiv.judge_yield(v, [{"path": changed, "collide_x": 20,
+                                 "collide_y": 0}], [], api)
+        self.assertEqual(v._mcs_priority_hold["phase"], "active")
+
+    def test_stopped_priority_vehicle_activates_from_trajectory_signal(self):
+        v, desired, collisions = self.decision()
+        collisions[0].update(collide_x=20, collide_y=0)
+        v.WithAgreementPhase = True
+        api = traci()
+        api.vehicle.getSpeed.return_value = 0
+        desired.priority_activation = {
+            "sender": "1", "desired_path_id": desired.pathID,
+            "participants": ["2"], "ready": True,
+            "reason": "priority_trajectory_safe_with_prepared_yields",
+            "prepared_ids": ["2"], "blocker_ids": [],
+        }
+        with patch.dict(os.environ, {"MCS_PRIORITY_HOLD_MODE": "conditional"}):
+            tiv.judge_yield(v, collisions, [], api)
+            v.receiveAgreeID = list(v.waitAgreeID)
+            self.assertTrue(tiv.complete_conditional_agreement(v, [], api))
+
+    def test_sender_activation_waits_for_all_prepared_yield_paths(self):
+        sender = vehicle("1")
+        sender.WithAgreementPhase = True
+        desired = path("1", "desired")
+        desired.negotiationID = ["2", "3"]
+        prepared = path("2", "alter")
+        prepared.yieldTo = "1"
+        sender.receivedPaths = [prepared]
+        state = tiv._priority_activation(sender, desired)
+        self.assertFalse(state["ready"])
+        self.assertEqual(state["missing_ids"], ["3"])
+
+    def test_sender_activation_checks_ordinary_traffic_with_prepared_yields(self):
+        sender = vehicle("1")
+        sender.WithAgreementPhase = True
+        desired = path("1", "desired")
+        desired.negotiationID = ["2"]
+        prepared = path("2", "alter")
+        prepared.yieldTo = "1"
+        oncoming = path("9", "planned", y=3)
+        sender.receivedPaths = [prepared, oncoming]
+        sender.checkPathCollision = Mock(return_value=([], []))
+        state = tiv._priority_activation(sender, desired)
+        self.assertTrue(state["ready"])
+        checked = sender.checkPathCollision.call_args.args[1]
+        self.assertEqual({candidate.vehID for candidate in checked}, {"2", "9"})
+
+        sender.checkPathCollision.return_value = ([{"path": oncoming}], [])
+        state = tiv._priority_activation(sender, desired)
+        self.assertFalse(state["ready"])
+        self.assertEqual(state["blocker_ids"], ["9"])
 
     def test_two_unreachable_paths_not_accepted(self):
         v, _, collisions = self.decision(math.inf)
