@@ -43,7 +43,8 @@ def traci():
                          getPosition=Mock(return_value=(0, 0)),
                          getLeader=Mock(return_value=None),
                          getFollower=Mock(return_value=("", -1))),
-              vehicletype=NS(getAccel=Mock(return_value=3)))
+              vehicletype=NS(getAccel=Mock(return_value=3),
+                             getMaxSpeed=Mock(return_value=12)))
 
 
 class ThesisTIVTests(unittest.TestCase):
@@ -158,7 +159,9 @@ class ThesisTIVTests(unittest.TestCase):
         self.assertEqual(packet.lane_id, "sender-road_1")
         self.assertEqual(packet.lane_index, 1)
         self.assertEqual(packet.lane_position, 12.5)
+        self.assertEqual(packet.allowed_speed_mps, 10)
         self.assertEqual(sender.lane_id, "sender-road_1")
+        self.assertEqual(sender.allowed_speed_mps, 10)
         desired.x[0] = 999
         self.assertEqual(packet.x[0], 0)
         api.vehicle.getAllowedSpeed.assert_called_once_with("1")

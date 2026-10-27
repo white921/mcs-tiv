@@ -8,6 +8,7 @@ from collections import Counter
 import deceleration_prediction
 import diagnostic_trace
 import evaluation_metrics
+from trajectory_arrival import arrival_delay as shared_arrival_delay
 
 COUNTS = Counter()
 EXAMPLES = []
@@ -63,7 +64,8 @@ def transmitted_path(path, now, lane_context=None):
         ):
             setattr(result, name, values[start:end])
     if lane_context:
-        for name in ("road_id", "lane_id", "lane_index", "lane_position"):
+        for name in ("road_id", "lane_id", "lane_index", "lane_position",
+                     "allowed_speed_mps"):
             setattr(result, name, lane_context.get(name))
     return result
 
@@ -75,16 +77,26 @@ def current_lane_context(vehicle, traci):
     adapter exposes those IDs to the otherwise simulator-independent MCM
     packet instead of trying to infer a lane from coordinates.
     """
+    road_allowed_speed = float(traci.vehicle.getAllowedSpeed(vehicle.id))
+    try:
+        vehicle_max_speed = float(traci.vehicletype.getMaxSpeed(vehicle.typeID))
+    except (AttributeError, TypeError, ValueError):
+        vehicle_max_speed = road_allowed_speed
+    allowed_speed = min(road_allowed_speed, vehicle_max_speed)
+    if not math.isfinite(allowed_speed) or allowed_speed <= 0:
+        allowed_speed = None
     context = {
         "road_id": traci.vehicle.getRoadID(vehicle.id),
         "lane_id": traci.vehicle.getLaneID(vehicle.id),
         "lane_index": traci.vehicle.getLaneIndex(vehicle.id),
         "lane_position": traci.vehicle.getLanePosition(vehicle.id),
+        "allowed_speed_mps": allowed_speed,
     }
     vehicle.road = context["road_id"]
     vehicle.lane_id = context["lane_id"]
     vehicle.lane = context["lane_index"]
     vehicle.lane_position = context["lane_position"]
+    vehicle.allowed_speed_mps = context["allowed_speed_mps"]
     return context
 
 
@@ -99,18 +111,7 @@ def arrival_delay(path, point, now):
     Sampling and unreachable-point handling are implementation assumptions,
     not parameters explicitly defined in the paper.
     """
-    indices = [i for i, t in enumerate(path.t) if t >= now - 1e-6]
-    if not indices:
-        return math.inf
-    distances = [(path.x[i] - point[0]) ** 2 + (path.y[i] - point[1]) ** 2
-                 for i in indices]
-    j = min(range(len(indices)), key=distances.__getitem__)
-    if distances[j] > .9 ** 2 and all(
-        abs(path.x[k] - path.x[indices[j]]) < 1e-5
-        and abs(path.y[k] - path.y[indices[j]]) < 1e-5 for k in indices[j:]
-    ):
-        return math.inf
-    return max(0.0, path.t[indices[j]] - now)
+    return shared_arrival_delay(path, point, now)
 
 
 def environmental_term(vehicle, own_path, maximum_speed):
@@ -149,7 +150,9 @@ def score(vehicle, path, point, maximum_speed, maximum_acceleration):
 def send_mcm(vehicle, server, traci):
     """Compute desired TIV at the sender, using only its received MCMs."""
     lane_context = current_lane_context(vehicle, traci)
-    vmax = traci.vehicle.getAllowedSpeed(vehicle.id)
+    vmax = lane_context["allowed_speed_mps"]
+    if vmax is None:
+        vmax = traci.vehicle.getAllowedSpeed(vehicle.id)
     amax = traci.vehicletype.getAccel(vehicle.typeID)
     if vehicle.plannedPath:
         server.append(transmitted_path(
@@ -236,10 +239,19 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
         # Shadow mode is intentionally read-only: it observes the same
         # physically feasible alternative considered by the baseline TIV
         # implementation and never changes the decision below.
+        received_packet = getattr(desired, "tiv_by_receiver", {}).get(
+            str(vehicle.id)) or getattr(desired, "tiv_by_receiver", {}).get(
+                vehicle.id)
+        if "collide_x" in collision and "collide_y" in collision:
+            point = (collision["collide_x"], collision["collide_y"])
+        else:
+            point = (received_packet or {}).get("point")
         deceleration_prediction.record_shadow(
-            vehicle, desired, vehicle.alter_straight_path, vehicle.simTime)
+            vehicle, desired, vehicle.alter_straight_path, vehicle.simTime,
+            point)
         accept = deceleration_prediction.active_decision(
-            vehicle, desired, vehicle.alter_straight_path, vehicle.simTime)
+            vehicle, desired, vehicle.alter_straight_path, vehicle.simTime,
+            point)
         if accept is None:
             received = getattr(desired, "tiv_by_receiver", {}).get(vehicle.id)
             if received is None:

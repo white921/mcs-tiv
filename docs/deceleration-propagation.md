@@ -8,7 +8,10 @@
 ## 実装済み
 
 - 速度差を区間積分して、単位mの符号付き距離損失を得る純粋関数。
-- `L_reject - L_accept`を明示して比較する関数。
+- 距離損失を各車両の交渉時点の許容速度で割り、秒相当へ換算する。
+- 判断値は `M = (t_request - t_receiver) + lambda *
+  (T_loss_accept - T_loss_reject)`。`M <= 0`なら承諾、`M > 0`なら拒否する。
+  初期値は`lambda=1.0`。到着時間項と距離損失換算後の項はともに秒である。
 - MCMの終端速度保持（既存`extendPath`と同じ速度側の規則）で、0.1秒刻み
   101点の評価窓を構成する。
 - 地図定義の道路ID・車線ID・車線番号・車線内進行位置を車両状態とMCM軌道に保持する。
@@ -27,8 +30,9 @@
 `shadow`は実車状態、TraCI、経路、乱数、TIVtepの判定を変更しない。
 拒否ケースは両車の交渉前`planned`を維持する。
 
-`active`は評価が成功した交渉だけ提案判断（`L_reject - L_accept >= 0`なら
-承諾）を使う。軌道不足などで評価不能なら既存TIVtepへ安全にフォールバック
+`active`は評価が成功した交渉だけ上記の時間換算判断を使う。要求軌道が
+衝突点へ到達不能なら拒否する。許容速度が欠落、非有限、または0以下なら
+既存TIVtepへ安全にフォールバック
 する。したがって、提案手法を使ったSUMO評価と、影響を隔離した比較評価の
 両方を同じランナーで行える。
 
@@ -60,7 +64,7 @@ T字路Eval.3は、隔離コピー・seedごとの監査ログ・実行manifest�
 python3 scripts/run_thesis_batch.py \
   --sumo-home /path/to/sumo --python python3 \
   --run-name eval3-proposal-600s --cases eval3 --workers 1 \
-  --deceleration-active
+  --deceleration-active --deceleration-loss-lambda 1
 ```
 
 各`seed-*`の`manifest.json`に平均速度、`deceleration-audit.json`に各交渉の

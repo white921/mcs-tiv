@@ -19,6 +19,7 @@ import concurrent.futures
 import datetime
 import hashlib
 import json
+import math
 import os
 import platform
 from pathlib import Path
@@ -45,6 +46,7 @@ CONTROLLED_MCS_ENV = {
     "MCS_CONFLICT_AUDIT",
     "MCS_DECELERATION_AUDIT",
     "MCS_DECELERATION_MODE",
+    "MCS_DECELERATION_LOSS_LAMBDA",
     "MCS_DECELERATION_TIME_HALF_LIFE_S",
     "MCS_EVALUATION_AUDIT",
     "MCS_FCD_OUTPUT",
@@ -155,6 +157,24 @@ def clean_experiment_environment(parent=None):
     return env
 
 
+def deceleration_prediction_manifest(args):
+    """Return the complete active-proposal condition recorded per run."""
+    if not args.deceleration_active:
+        return None
+    return {
+        "horizon_s": 10.0,
+        "time_weighting": (
+            "uniform" if args.deceleration_time_half_life == 0
+            else "exponential-half-life"),
+        "time_half_life_s": (args.deceleration_time_half_life or None),
+        "decision_formula": (
+            "M=(t_request-t_receiver)+lambda*"
+            "(accept_time_loss-reject_time_loss); accept iff M<=0"),
+        "loss_lambda": args.deceleration_loss_lambda,
+        "distance_to_time_speed": "per-vehicle allowed speed at negotiation",
+    }
+
+
 def fixed_input_details(
     name, seed, duration, bus_allocation, prefix_duration=None, source_root=ROOT
 ):
@@ -255,6 +275,8 @@ def run_task(task, args):
                MCS_DECELERATION_MODE=("active" if args.deceleration_active else "off"),
                MCS_DECELERATION_TIME_HALF_LIFE_S=str(
                    args.deceleration_time_half_life if args.deceleration_active else 0.0),
+               MCS_DECELERATION_LOSS_LAMBDA=str(
+                   args.deceleration_loss_lambda if args.deceleration_active else 1.0),
                MCS_TIV_AUDIT=str(destination / "tiv-audit.json"),
                MCS_EVALUATION_AUDIT=str(destination / "evaluation-metrics.json"),
                MCS_PHYSICAL_COLLISION_AUDIT=str(
@@ -321,12 +343,7 @@ def run_task(task, args):
         } if fixed_input is not None else None),
         "decision_method": "deceleration-propagation" if args.deceleration_active else "thesis-tiv",
         "priority_hold": dict(PRIORITY_HOLD_MANIFEST),
-        "deceleration_prediction": ({
-            "horizon_s": 10.0,
-            "time_weighting": ("uniform" if args.deceleration_time_half_life == 0
-                               else "exponential-half-life"),
-            "time_half_life_s": (args.deceleration_time_half_life or None),
-        } if args.deceleration_active else None),
+        "deceleration_prediction": deceleration_prediction_manifest(args),
         "diagnostic_traces_requested": args.diagnostic_traces,
         "diagnostic_traces_enabled": bool(args.diagnostic_traces),
         "vehicle_state_trace_enabled": bool(args.diagnostic_traces and supports_replay_checkpoint),
@@ -425,6 +442,9 @@ def main():
     parser.add_argument(
         "--deceleration-time-half-life", type=float, default=0.0,
         help="exponential future-loss half-life in seconds; 0 keeps uniform 10 s weighting")
+    parser.add_argument(
+        "--deceleration-loss-lambda", type=float, default=1.0,
+        help="weight on Accept-minus-Reject time-equivalent loss (default: 1.0)")
     parser.add_argument("--diagnostic-traces", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="write replay/FCD/negotiation diagnostics (default: enabled)")
@@ -445,6 +465,9 @@ def main():
         parser.error("--stop-time must be in (0, --duration]")
     if not args.deceleration_time_half_life >= 0:
         parser.error("--deceleration-time-half-life must be non-negative")
+    if (not math.isfinite(args.deceleration_loss_lambda) or
+            args.deceleration_loss_lambda < 0):
+        parser.error("--deceleration-loss-lambda must be finite and non-negative")
     if min(args.deceleration_time_half_life, args.checkpoint_interval) < 0:
         parser.error("prediction and checkpoint limits must be non-negative")
     if args.deceleration_time_half_life > 0 and not args.deceleration_active:
@@ -496,6 +519,8 @@ def main():
             args.deceleration_time_half_life
             if args.deceleration_active and args.deceleration_time_half_life > 0
             else None),
+        "deceleration_loss_lambda": (
+            args.deceleration_loss_lambda if args.deceleration_active else None),
         "cases": list(args.cases),
         "tasks": [{"case": case, "seed": seed} for case, seed in tasks],
         "duration_s": args.duration,

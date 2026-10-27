@@ -14,8 +14,9 @@ import math
 import os
 from collections import Counter
 
-from deceleration_loss import SpeedProfile, decision_margin
+from deceleration_loss import SpeedProfile, time_equivalent_decision
 import evaluation_metrics
+from trajectory_arrival import arrival_delay
 
 DT = 0.1
 HORIZON = 10.0
@@ -38,6 +39,16 @@ def _time_half_life_from_environment():
 
 
 TIME_HALF_LIFE_S = _time_half_life_from_environment()
+
+
+def _loss_lambda_from_environment():
+    value = float(os.environ.get("MCS_DECELERATION_LOSS_LAMBDA", "1"))
+    if not math.isfinite(value) or value < 0:
+        raise ValueError("MCS_DECELERATION_LOSS_LAMBDA must be finite and non-negative")
+    return value
+
+
+LOSS_LAMBDA = _loss_lambda_from_environment()
 
 COUNTS = Counter()
 RECORDS = []
@@ -299,7 +310,7 @@ def _case_profiles(roots, candidates, now):
     return profiles
 
 
-def _evaluate_detail(receiver, desired, alternative, now):
+def _evaluate_detail(receiver, desired, alternative, now, conflict_point):
     """Return the comparison and both case profiles for instrumentation."""
     sender_id, receiver_id = str(desired.vehID), str(receiver.id)
     candidates = _latest_planned(receiver)
@@ -309,11 +320,15 @@ def _evaluate_detail(receiver, desired, alternative, now):
     receiver_planned = copy.deepcopy(receiver.plannedPath)
     receiver_alternative = copy.deepcopy(alternative)
     for path in (receiver_planned, receiver_alternative):
-        if not _lane_id(path):
-            path.lane_id = getattr(receiver, "lane_id", None)
-            path.lane_index = getattr(receiver, "lane", None)
-            path.lane_position = getattr(receiver, "lane_position", None)
-            path.road_id = getattr(receiver, "road", None)
+        for name, value in (
+            ("lane_id", getattr(receiver, "lane_id", None)),
+            ("lane_index", getattr(receiver, "lane", None)),
+            ("lane_position", getattr(receiver, "lane_position", None)),
+            ("road_id", getattr(receiver, "road", None)),
+            ("allowed_speed_mps", getattr(receiver, "allowed_speed_mps", None)),
+        ):
+            if getattr(path, name, None) in (None, ""):
+                setattr(path, name, value)
     candidates[receiver_id] = receiver_planned
     reject_roots = {sender_id: sender_planned, receiver_id: receiver_planned}
     accept_roots = {sender_id: desired, receiver_id: receiver_alternative}
@@ -342,8 +357,22 @@ def _evaluate_detail(receiver, desired, alternative, now):
         accept.setdefault(vehicle_id, baseline)
         reject.setdefault(vehicle_id, baseline)
 
-    result = decision_margin(
-        reference, accept, reject, time_half_life_s=TIME_HALF_LIFE_S)
+    if conflict_point is None or len(conflict_point) != 2:
+        raise ValueError("conflict point is unavailable")
+    allowed_speeds = {}
+    for vehicle_id in union_ids:
+        value = getattr(candidates[vehicle_id], "allowed_speed_mps", None)
+        if value is None:
+            raise ValueError(
+                "allowed speed is unavailable for vehicle " + vehicle_id)
+        allowed_speeds[vehicle_id] = value
+    result = time_equivalent_decision(
+        reference, accept, reject, allowed_speeds,
+        request_arrival_s=arrival_delay(desired, conflict_point, now),
+        receiver_arrival_s=arrival_delay(
+            receiver_planned, conflict_point, now),
+        loss_lambda=LOSS_LAMBDA,
+        time_half_life_s=TIME_HALF_LIFE_S)
     union_follower_ids = accept_follower_ids | reject_follower_ids
     result = {**result, "vehicle_ids": sorted(union_ids),
               "accept_follower_ids": sorted(accept_follower_ids),
@@ -354,14 +383,13 @@ def _evaluate_detail(receiver, desired, alternative, now):
               "time_weighting": ("uniform" if TIME_HALF_LIFE_S is None
                                  else "exponential-half-life"),
               "time_half_life_s": TIME_HALF_LIFE_S,
-              "follower_replans": len(union_follower_ids) * int(HORIZON / REPLAN_INTERVAL),
-              "decision": "accept" if result["reject_minus_accept_m"] >= 0 else "reject"}
+              "follower_replans": len(union_follower_ids) * int(HORIZON / REPLAN_INTERVAL)}
     return result, accept, reject
 
 
-def evaluate(receiver, desired, alternative, now):
+def evaluate(receiver, desired, alternative, now, conflict_point):
     """Evaluate accept/reject with every detectable following queue."""
-    return _evaluate_detail(receiver, desired, alternative, now)[0]
+    return _evaluate_detail(receiver, desired, alternative, now, conflict_point)[0]
 
 
 def direct_tiv_profiles(receiver, desired, alternative, now, decision):
@@ -386,13 +414,14 @@ def direct_tiv_profiles(receiver, desired, alternative, now, decision):
             for vehicle_id, path in roots.items()}
 
 
-def _record_evaluation(receiver, desired, alternative, now, mode):
+def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode):
     """Evaluate and audit a proposal decision without mutating vehicle state."""
     if MODE != mode:
         return None
     COUNTS[mode + "_attempts"] += 1
     try:
-        result, accept_profiles, reject_profiles = _evaluate_detail(receiver, desired, alternative, now)
+        result, accept_profiles, reject_profiles = _evaluate_detail(
+            receiver, desired, alternative, now, conflict_point)
     except (AttributeError, IndexError, TypeError, ValueError, ZeroDivisionError) as error:
         COUNTS[mode + "_unsupported"] += 1
         record = {"time": now, "receiver": str(receiver.id),
@@ -423,6 +452,14 @@ def _record_evaluation(receiver, desired, alternative, now, mode):
                     "accept_loss_m": result["accept_loss_m"],
                     "reject_loss_m": result["reject_loss_m"],
                     "decision_margin_m": result["reject_minus_accept_m"],
+                    "request_arrival_s": result["request_arrival_s"],
+                    "receiver_arrival_s": result["receiver_arrival_s"],
+                    "arrival_margin_s": result["arrival_margin_s"],
+                    "accept_time_equivalent_loss_s": result["accept_time_equivalent_loss_s"],
+                    "reject_time_equivalent_loss_s": result["reject_time_equivalent_loss_s"],
+                    "weighted_loss_margin_s": result["weighted_loss_margin_s"],
+                    "final_margin_s": result["final_margin_s"],
+                    "loss_lambda": result["loss_lambda"],
                 })
         record = {"time": now, "receiver": str(receiver.id), "sender": str(desired.vehID),
                   "desired_path_id": desired.pathID, "alternative_path_id": alternative.pathID,
@@ -433,18 +470,20 @@ def _record_evaluation(receiver, desired, alternative, now, mode):
     return record
 
 
-def record_shadow(receiver, desired, alternative, now):
+def record_shadow(receiver, desired, alternative, now, conflict_point):
     """Record a full 10-second comparison and leave the TIV decision intact."""
-    return _record_evaluation(receiver, desired, alternative, now, "shadow")
+    return _record_evaluation(
+        receiver, desired, alternative, now, conflict_point, "shadow")
 
 
-def active_decision(receiver, desired, alternative, now):
+def active_decision(receiver, desired, alternative, now, conflict_point):
     """Return the proposed decision, or ``None`` if prediction is unavailable.
 
     Keeping the unavailable case as ``None`` lets the caller retain the
     baseline TIV rule rather than creating an unsafe synthetic decision.
     """
-    record = _record_evaluation(receiver, desired, alternative, now, "active")
+    record = _record_evaluation(
+        receiver, desired, alternative, now, conflict_point, "active")
     if record is None or record["status"] != "evaluated":
         return None
     key = (str(receiver.id), str(desired.vehID), str(desired.pathID))
@@ -464,8 +503,18 @@ def record_tiv_comparison(proposal_accept, tiv_accept):
 def _write_audit():
     destination = os.environ.get("MCS_DECELERATION_AUDIT")
     if destination:
+        def clean(value):
+            if isinstance(value, float) and not math.isfinite(value):
+                return "unreached" if value > 0 else "never"
+            if isinstance(value, dict):
+                return {key: clean(item) for key, item in value.items()}
+            if isinstance(value, list):
+                return [clean(item) for item in value]
+            return value
         with open(destination, "w") as stream:
-            json.dump({"mode": MODE, "counts": dict(COUNTS), "records": RECORDS}, stream, indent=2)
+            json.dump(clean({"mode": MODE, "counts": dict(COUNTS),
+                             "records": RECORDS}), stream, indent=2,
+                      allow_nan=False)
 
 
 atexit.register(_write_audit)
