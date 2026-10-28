@@ -20,6 +20,7 @@ class ResultLayoutTests(unittest.TestCase):
             "deceleration_active": True,
             "deceleration_time_half_life": 0.0,
             "deceleration_loss_lambda": 1.0,
+            "deceleration_loss_normalization": "sum",
             "cases": ["eval3"],
             "seeds": [1, 2, 3, 4, 5],
             "seeds_per_case": None,
@@ -72,6 +73,7 @@ class ResultLayoutTests(unittest.TestCase):
             "MCS_DECELERATION_MODE": "active",
             "MCS_DECELERATION_TIME_HALF_LIFE_S": "99",
             "MCS_DECELERATION_LOSS_LAMBDA": "99",
+            "MCS_DECELERATION_LOSS_NORMALIZATION": "sqrt-followers",
             "MCS_FCD_OUTPUT": "/tmp/old-fcd.xml",
             "MCS_CHECKPOINT_DIR": "/tmp/old-checkpoint",
         }
@@ -90,6 +92,7 @@ class ResultLayoutTests(unittest.TestCase):
             self.args(deceleration_loss_lambda=1.25))
 
         self.assertEqual(manifest["loss_lambda"], 1.25)
+        self.assertEqual(manifest["loss_normalization"], "sum")
         self.assertIn("accept iff M<=0", manifest["decision_formula"])
         self.assertEqual(
             manifest["loss_scope"],
@@ -97,6 +100,13 @@ class ResultLayoutTests(unittest.TestCase):
         self.assertEqual(
             manifest["excluded_loss_roles"],
             ["request_vehicle", "receiver_vehicle"])
+
+    def test_manifest_records_sqrt_follower_normalization(self):
+        manifest = RUNNER.deceleration_prediction_manifest(
+            self.args(deceleration_loss_normalization="sqrt-followers"))
+
+        self.assertEqual(manifest["loss_normalization"], "sqrt-followers")
+        self.assertIn("sqrt(follower_count)", manifest["loss_aggregation"])
 
 
 if __name__ == "__main__":

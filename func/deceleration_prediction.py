@@ -50,6 +50,17 @@ def _loss_lambda_from_environment():
 
 LOSS_LAMBDA = _loss_lambda_from_environment()
 
+
+def _loss_normalization_from_environment():
+    value = os.environ.get("MCS_DECELERATION_LOSS_NORMALIZATION", "sum")
+    if value not in ("sum", "sqrt-followers"):
+        raise ValueError(
+            "MCS_DECELERATION_LOSS_NORMALIZATION must be sum or sqrt-followers")
+    return value
+
+
+LOSS_NORMALIZATION = _loss_normalization_from_environment()
+
 COUNTS = Counter()
 RECORDS = []
 # A desired MCM is normally regenerated every second.  Keep an active
@@ -380,6 +391,7 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_point):
         receiver_arrival_s=arrival_delay(
             receiver_planned, conflict_point, now),
         loss_lambda=LOSS_LAMBDA,
+        loss_normalization=LOSS_NORMALIZATION,
         time_half_life_s=TIME_HALF_LIFE_S)
     union_follower_ids = accept_follower_ids | reject_follower_ids
     result = {**result, "vehicle_ids": sorted(union_ids),
@@ -476,6 +488,13 @@ def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode
                     "weighted_loss_margin_s": result["weighted_loss_margin_s"],
                     "final_margin_s": result["final_margin_s"],
                     "loss_lambda": result["loss_lambda"],
+                    "loss_normalization": result["loss_normalization"],
+                    "loss_normalization_vehicle_count": result[
+                        "loss_normalization_vehicle_count"],
+                    "loss_normalization_divisor": result[
+                        "loss_normalization_divisor"],
+                    "normalized_loss_margin_s": result[
+                        "normalized_loss_margin_s"],
                 })
         record = {"time": now, "receiver": str(receiver.id), "sender": str(desired.vehID),
                   "desired_path_id": desired.pathID, "alternative_path_id": alternative.pathID,
@@ -521,7 +540,9 @@ def _write_audit():
     if destination:
         with open(destination, "w") as stream:
             json.dump(evaluation_metrics.json_safe({
-                "mode": MODE, "counts": dict(COUNTS), "records": RECORDS,
+                "mode": MODE,
+                "loss_normalization": LOSS_NORMALIZATION,
+                "counts": dict(COUNTS), "records": RECORDS,
             }), stream, indent=2,
                       allow_nan=False)
 

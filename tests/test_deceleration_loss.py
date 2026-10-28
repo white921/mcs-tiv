@@ -119,6 +119,38 @@ class DecelerationLossTests(unittest.TestCase):
             bus["accept_time_equivalent_loss_s"],
             car["accept_time_equivalent_loss_s"] * 2)
 
+    def test_sqrt_follower_normalization_scales_aggregate_loss_margin(self):
+        def profile(vehicle_id, speed):
+            return loss.SpeedProfile(
+                vehicle_id, (0.0, 0.1, 0.2), (speed, speed, speed))
+
+        reference = {vehicle_id: profile(vehicle_id, 10)
+                     for vehicle_id in ("a", "b")}
+        accept = {vehicle_id: profile(vehicle_id, 5)
+                  for vehicle_id in ("a", "b")}
+        result = loss.time_equivalent_decision(
+            reference, accept, reference, {"a": 10, "b": 10},
+            request_arrival_s=0, receiver_arrival_s=0,
+            loss_normalization="sqrt-followers")
+
+        self.assertEqual(result["loss_normalization"], "sqrt-followers")
+        self.assertEqual(result["loss_normalization_vehicle_count"], 2)
+        self.assertAlmostEqual(result["loss_normalization_divisor"], math.sqrt(2))
+        self.assertAlmostEqual(
+            result["normalized_loss_margin_s"],
+            result["loss_margin_s"] / math.sqrt(2))
+        self.assertAlmostEqual(
+            result["weighted_loss_margin_s"],
+            result["normalized_loss_margin_s"])
+
+    def test_unknown_loss_normalization_is_rejected(self):
+        reference = {"v": self.profile((10, 10, 10))}
+        with self.assertRaises(ValueError):
+            loss.time_equivalent_decision(
+                reference, reference, reference, {"v": 10},
+                request_arrival_s=1, receiver_arrival_s=2,
+                loss_normalization="unknown")
+
     def test_shadow_does_not_mutate_live_paths_or_decision_state(self):
         def path(veh, kind, speeds):
             return NS(vehID=veh, type=kind, pathID=veh + "_path",

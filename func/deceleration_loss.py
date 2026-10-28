@@ -101,17 +101,24 @@ def time_equivalent_decision(
     request_arrival_s: float,
     receiver_arrival_s: float,
     loss_lambda: float = 1.0,
+    loss_normalization: str = "sum",
     time_half_life_s: float | None = None,
 ) -> dict:
     """Compare Accept and Reject on one time-equivalent scale.
 
-    ``M = (t_request - t_receiver) + lambda *
-    (loss_accept_seconds - loss_reject_seconds)``.  ``M <= 0`` accepts.
+    ``M = (t_request - t_receiver) + lambda * normalized_loss_margin``.
+    ``M <= 0`` accepts.  ``sum`` preserves the original aggregate, while
+    ``sqrt-followers`` divides the aggregate loss margin by the square root of
+    the number of selected follower vehicles.  The latter keeps a long queue
+    influential without letting the loss scale grow linearly with queue size.
     Distance losses are converted with each vehicle's positive finite allowed
     speed, never its instantaneous speed.
     """
     if not math.isfinite(loss_lambda) or loss_lambda < 0:
         raise ValueError("loss lambda must be finite and non-negative")
+    if loss_normalization not in ("sum", "sqrt-followers"):
+        raise ValueError(
+            "loss normalization must be sum or sqrt-followers")
     vehicle_ids = set(reference)
     if vehicle_ids != set(accept) or vehicle_ids != set(reject):
         raise ValueError("reference, accept and reject must cover identical vehicle IDs")
@@ -147,7 +154,11 @@ def time_equivalent_decision(
     request_arrival_s = float(request_arrival_s)
     receiver_arrival_s = float(receiver_arrival_s)
     loss_margin_s = accept_loss_s - reject_loss_s
-    weighted_loss_margin_s = loss_lambda * loss_margin_s
+    loss_normalization_divisor = (
+        math.sqrt(len(vehicle_ids))
+        if loss_normalization == "sqrt-followers" and vehicle_ids else 1.0)
+    normalized_loss_margin_s = loss_margin_s / loss_normalization_divisor
+    weighted_loss_margin_s = loss_lambda * normalized_loss_margin_s
     request_reached = math.isfinite(request_arrival_s)
     receiver_reached = math.isfinite(receiver_arrival_s)
     if (not request_reached and request_arrival_s > 0 and
@@ -191,6 +202,10 @@ def time_equivalent_decision(
         "reject_time_equivalent_loss_s": reject_loss_s,
         "loss_margin_s": loss_margin_s,
         "loss_lambda": loss_lambda,
+        "loss_normalization": loss_normalization,
+        "loss_normalization_vehicle_count": len(vehicle_ids),
+        "loss_normalization_divisor": loss_normalization_divisor,
+        "normalized_loss_margin_s": normalized_loss_margin_s,
         "weighted_loss_margin_s": weighted_loss_margin_s,
         "final_margin_s": final_margin_s,
         "vehicle_loss_details": details,
