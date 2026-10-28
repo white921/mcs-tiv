@@ -9,9 +9,12 @@
 
 - 速度差を区間積分して、単位mの符号付き距離損失を得る純粋関数。
 - 距離損失を各車両の交渉時点の許容速度で割り、秒相当へ換算する。
+- 到着時間項で直接評価する要求車・受入判断車は距離損失の集計から除外し、
+  損失項は検出できた後続車だけを対象にする。
 - 判断値は `M = (t_request - t_receiver) + lambda *
   (T_loss_accept - T_loss_reject)`。`M <= 0`なら承諾、`M > 0`なら拒否する。
-  初期値は`lambda=1.0`。到着時間項と距離損失換算後の項はともに秒である。
+  `lambda`は実験条件として明示する。到着時間項は直接2台、距離損失換算後の
+  項は後続車群を表すため、同じ秒単位でも意味と集計対象は異なる。
 - MCMの終端速度保持（既存`extendPath`と同じ速度側の規則）で、0.1秒刻み
   101点の評価窓を構成する。
 - 地図定義の道路ID・車線ID・車線番号・車線内進行位置を車両状態とMCM軌道に保持する。
@@ -25,7 +28,8 @@
 - 物理的に実行可能な既存の`alternative`が生成された後に、承諾／拒否の
   2ケースを評価するフック。
 - JSON監査ログ（`MCS_DECELERATION_AUDIT`）と、未対応理由のカウンタ。監査ログには
-  `accept_follower_ids`、`reject_follower_ids`、`union_follower_ids`も残す。
+  `accept_follower_ids`、`reject_follower_ids`、`union_follower_ids`、
+  `loss_vehicle_ids`、`excluded_loss_vehicle_ids`も残す。
 
 `shadow`は実車状態、TraCI、経路、乱数、TIVtepの判定を変更しない。
 拒否ケースは両車の交渉前`planned`を維持する。

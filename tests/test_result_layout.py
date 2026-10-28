@@ -91,6 +91,12 @@ class ResultLayoutTests(unittest.TestCase):
 
         self.assertEqual(manifest["loss_lambda"], 1.25)
         self.assertIn("accept iff M<=0", manifest["decision_formula"])
+        self.assertEqual(
+            manifest["loss_scope"],
+            "detected followers excluding request and receiver vehicles")
+        self.assertEqual(
+            manifest["excluded_loss_roles"],
+            ["request_vehicle", "receiver_vehicle"])
 
 
 if __name__ == "__main__":

@@ -148,11 +148,24 @@ def time_equivalent_decision(
     receiver_arrival_s = float(receiver_arrival_s)
     loss_margin_s = accept_loss_s - reject_loss_s
     weighted_loss_margin_s = loss_lambda * loss_margin_s
-    if math.isinf(request_arrival_s) and request_arrival_s > 0:
+    request_reached = math.isfinite(request_arrival_s)
+    receiver_reached = math.isfinite(receiver_arrival_s)
+    if (not request_reached and request_arrival_s > 0 and
+            not receiver_reached and receiver_arrival_s > 0):
+        arrival_status = "both_unreached"
+        decision_basis = "unreachable_arrival"
+        arrival_margin_s = math.inf
+        final_margin_s = math.inf
+        decision = "reject"
+    elif math.isinf(request_arrival_s) and request_arrival_s > 0:
+        arrival_status = "request_unreached"
+        decision_basis = "unreachable_arrival"
         arrival_margin_s = math.inf
         final_margin_s = math.inf
         decision = "reject"
     elif math.isinf(receiver_arrival_s) and receiver_arrival_s > 0:
+        arrival_status = "receiver_unreached"
+        decision_basis = "unreachable_arrival"
         arrival_margin_s = -math.inf
         final_margin_s = -math.inf
         decision = "accept"
@@ -160,6 +173,8 @@ def time_equivalent_decision(
               math.isfinite(receiver_arrival_s)):
         raise ValueError("arrival delays must be finite or positive infinity")
     else:
+        arrival_status = "both_reached"
+        decision_basis = "combined_margin"
         arrival_margin_s = request_arrival_s - receiver_arrival_s
         final_margin_s = arrival_margin_s + weighted_loss_margin_s
         decision = "accept" if final_margin_s <= 0 else "reject"
@@ -167,6 +182,10 @@ def time_equivalent_decision(
         **distance,
         "request_arrival_s": request_arrival_s,
         "receiver_arrival_s": receiver_arrival_s,
+        "request_arrival_reached": request_reached,
+        "receiver_arrival_reached": receiver_reached,
+        "arrival_status": arrival_status,
+        "decision_basis": decision_basis,
         "arrival_margin_s": arrival_margin_s,
         "accept_time_equivalent_loss_s": accept_loss_s,
         "reject_time_equivalent_loss_s": reject_loss_s,

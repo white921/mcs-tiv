@@ -80,6 +80,19 @@ class DecelerationLossTests(unittest.TestCase):
                 request_arrival_s=math.inf,
                 receiver_arrival_s=receiver_arrival)
             self.assertEqual(result["decision"], "reject")
+            self.assertFalse(result["request_arrival_reached"])
+            self.assertEqual(result["decision_basis"], "unreachable_arrival")
+
+    def test_receiver_unreachable_is_explicit_and_accepts(self):
+        reference = {"v": self.profile((10, 10, 10))}
+        result = loss.time_equivalent_decision(
+            reference, reference, reference, {"v": 10},
+            request_arrival_s=2, receiver_arrival_s=math.inf)
+
+        self.assertEqual(result["decision"], "accept")
+        self.assertEqual(result["arrival_status"], "receiver_unreached")
+        self.assertTrue(result["request_arrival_reached"])
+        self.assertFalse(result["receiver_arrival_reached"])
 
     def test_invalid_allowed_speed_is_unsupported(self):
         reference = {"v": self.profile((10, 10, 10))}
@@ -163,6 +176,33 @@ class DecelerationLossTests(unittest.TestCase):
         self.assertIn("c", result["vehicle_ids"])
         self.assertEqual(result["replan_interval_s"], 1.0)
         self.assertEqual(result["follower_replans"], 10)
+        self.assertEqual(result["loss_vehicle_ids"], ["c"])
+        self.assertEqual(result["excluded_loss_vehicle_ids"], ["a", "b"])
+        self.assertEqual(set(result["vehicle_loss_details"]), {"c"})
+
+    def test_negotiating_actors_are_excluded_from_loss_but_follower_is_included(self):
+        def path(veh, kind, x0, speeds):
+            times = [0.0, 5.0, 10.0]
+            return NS(vehID=veh, type=kind, pathID=veh + kind,
+                      t=times, s_d=speeds,
+                      x=[x0 + 8 * time for time in times], y=[0.0] * 3,
+                      yaw=[0.0] * 3, allowed_speed_mps=10.0)
+
+        sender_planned = path("a", "planned", 20, [8, 8, 8])
+        desired = path("a", "desired", 20, [0, 0, 0])
+        receiver_planned = path("b", "planned", 100, [8, 8, 8])
+        alternative = path("b", "alter", 100, [0, 0, 0])
+        follower = path("c", "planned", 0, [8, 8, 8])
+        receiver = NS(id="b", plannedPath=receiver_planned,
+                      receivedPaths=[sender_planned, follower])
+
+        result = prediction.evaluate(
+            receiver, desired, alternative, 0.0, (40.0, 0.0))
+
+        self.assertEqual(result["loss_vehicle_ids"], ["c"])
+        self.assertEqual(result["excluded_loss_vehicle_ids"], ["a", "b"])
+        self.assertEqual(set(result["vehicle_loss_details"]), {"c"})
+        self.assertNotEqual(result["accept_time_equivalent_loss_s"], 0.0)
 
     def test_counterfactuals_compare_union_of_different_follower_sets(self):
         def path(veh, kind, lane, y, lane_position, speeds):

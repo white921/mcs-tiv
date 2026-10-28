@@ -171,6 +171,8 @@ def deceleration_prediction_manifest(args):
             "M=(t_request-t_receiver)+lambda*"
             "(accept_time_loss-reject_time_loss); accept iff M<=0"),
         "loss_lambda": args.deceleration_loss_lambda,
+        "loss_scope": "detected followers excluding request and receiver vehicles",
+        "excluded_loss_roles": ["request_vehicle", "receiver_vehicle"],
         "distance_to_time_speed": "per-vehicle allowed speed at negotiation",
     }
 

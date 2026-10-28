@@ -359,15 +359,23 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_point):
 
     if conflict_point is None or len(conflict_point) != 2:
         raise ValueError("conflict point is unavailable")
+    # Arrival time already evaluates the two negotiating actors directly.
+    # The loss term is therefore restricted to other vehicles whose following
+    # motion changes under Accept or Reject.  This avoids counting the sender
+    # and receiver once in arrival priority and again in aggregate delay.
+    loss_vehicle_ids = union_ids - actor_ids
     allowed_speeds = {}
-    for vehicle_id in union_ids:
+    for vehicle_id in loss_vehicle_ids:
         value = getattr(candidates[vehicle_id], "allowed_speed_mps", None)
         if value is None:
             raise ValueError(
                 "allowed speed is unavailable for vehicle " + vehicle_id)
         allowed_speeds[vehicle_id] = value
     result = time_equivalent_decision(
-        reference, accept, reject, allowed_speeds,
+        {vehicle_id: reference[vehicle_id] for vehicle_id in loss_vehicle_ids},
+        {vehicle_id: accept[vehicle_id] for vehicle_id in loss_vehicle_ids},
+        {vehicle_id: reject[vehicle_id] for vehicle_id in loss_vehicle_ids},
+        allowed_speeds,
         request_arrival_s=arrival_delay(desired, conflict_point, now),
         receiver_arrival_s=arrival_delay(
             receiver_planned, conflict_point, now),
@@ -375,6 +383,8 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_point):
         time_half_life_s=TIME_HALF_LIFE_S)
     union_follower_ids = accept_follower_ids | reject_follower_ids
     result = {**result, "vehicle_ids": sorted(union_ids),
+              "loss_vehicle_ids": sorted(loss_vehicle_ids),
+              "excluded_loss_vehicle_ids": sorted(actor_ids),
               "accept_follower_ids": sorted(accept_follower_ids),
               "reject_follower_ids": sorted(reject_follower_ids),
               "union_follower_ids": sorted(union_follower_ids),
@@ -442,6 +452,8 @@ def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode
                     "desired_path_id": str(desired.pathID),
                     "alternative_path_id": str(alternative.pathID),
                     "actor_vehicle_ids": actor_ids,
+                    "loss_vehicle_ids": result["loss_vehicle_ids"],
+                    "excluded_loss_vehicle_ids": result["excluded_loss_vehicle_ids"],
                     "follower_vehicle_ids": sorted(set(chosen_profiles) - set(actor_ids)),
                     "accept_follower_ids": result["accept_follower_ids"],
                     "reject_follower_ids": result["reject_follower_ids"],
@@ -454,6 +466,10 @@ def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode
                     "decision_margin_m": result["reject_minus_accept_m"],
                     "request_arrival_s": result["request_arrival_s"],
                     "receiver_arrival_s": result["receiver_arrival_s"],
+                    "request_arrival_reached": result["request_arrival_reached"],
+                    "receiver_arrival_reached": result["receiver_arrival_reached"],
+                    "arrival_status": result["arrival_status"],
+                    "decision_basis": result["decision_basis"],
                     "arrival_margin_s": result["arrival_margin_s"],
                     "accept_time_equivalent_loss_s": result["accept_time_equivalent_loss_s"],
                     "reject_time_equivalent_loss_s": result["reject_time_equivalent_loss_s"],
@@ -503,17 +519,10 @@ def record_tiv_comparison(proposal_accept, tiv_accept):
 def _write_audit():
     destination = os.environ.get("MCS_DECELERATION_AUDIT")
     if destination:
-        def clean(value):
-            if isinstance(value, float) and not math.isfinite(value):
-                return "unreached" if value > 0 else "never"
-            if isinstance(value, dict):
-                return {key: clean(item) for key, item in value.items()}
-            if isinstance(value, list):
-                return [clean(item) for item in value]
-            return value
         with open(destination, "w") as stream:
-            json.dump(clean({"mode": MODE, "counts": dict(COUNTS),
-                             "records": RECORDS}), stream, indent=2,
+            json.dump(evaluation_metrics.json_safe({
+                "mode": MODE, "counts": dict(COUNTS), "records": RECORDS,
+            }), stream, indent=2,
                       allow_nan=False)
 
 

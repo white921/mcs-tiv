@@ -1,3 +1,5 @@
+import json
+import math
 import os
 import sys
 import unittest
@@ -8,6 +10,18 @@ import evaluation_metrics
 
 
 class EvaluationMetricsTests(unittest.TestCase):
+    def test_strict_json_line_encodes_unreachable_values_and_parses(self):
+        encoded = evaluation_metrics.strict_json_line({
+            "request_arrival_s": math.inf,
+            "receiver_arrival_s": -math.inf,
+            "arrival_status": "both_unreached",
+        })
+
+        decoded = json.loads(encoded)
+        self.assertEqual(decoded["request_arrival_s"], "positive_infinity")
+        self.assertEqual(decoded["receiver_arrival_s"], "negative_infinity")
+        self.assertEqual(decoded["arrival_status"], "both_unreached")
+
     def setUp(self):
         self.original_audit = evaluation_metrics.AUDIT
         evaluation_metrics.AUDIT = "enabled-for-test"
