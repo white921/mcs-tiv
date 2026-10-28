@@ -1,6 +1,7 @@
 import os
 from re import S
 import sys
+import math
 import numpy as np
 import copy
 import thesis_tiv
@@ -574,29 +575,10 @@ class CAV_bus:
                     other_dx = (other_pos_x - x.x[startItr_x+i-1]) / timeStep
                     other_dy = (other_pos_y - x.y[startItr_x+i-1]) / timeStep
 
-                    if own_pos_y > 0:
-                        if own_pos_x > other_pos_x:
-                            if abs(own_pos_x - other_pos_x) < max(self.length, abs(own_dx)*tau) and abs(own_pos_y - other_pos_y) < self.width:
-                                isCollide = True
-                        else:
-                            if abs(own_pos_x - other_pos_x) < max(self.length, abs(other_dx)*tau) and abs(own_pos_y - other_pos_y) < self.width:
-                                isCollide = True
-                    
-                    elif own_pos_y > -3.2:
-                        if own_pos_x < other_pos_x:
-                            if abs(own_pos_x - other_pos_x) < max(self.length, abs(own_dx)*tau) and abs(own_pos_y - other_pos_y) < self.width:
-                                isCollide = True
-                        else:
-                            if abs(own_pos_x - other_pos_x) < max(self.length, abs(other_dx)*tau) and abs(own_pos_y - other_pos_y) < self.width:
-                                isCollide = True
-
-                    else:
-                        if own_pos_y < other_pos_y:
-                            if abs(own_pos_y - other_pos_y) < max(self.length, abs(own_dy)*tau) and abs(own_pos_x - other_pos_x) < self.width:
-                                isCollide = True
-                        else:
-                            if abs(own_pos_y - other_pos_y) < max(self.length, abs(other_dy)*tau) and abs(own_pos_x - other_pos_x) < self.width:
-                                isCollide = True
+                    isCollide = thesis_tiv.trajectories_are_too_close(
+                        own_pos_x, own_pos_y, other_pos_x, other_pos_y,
+                        own_dx, own_dy, other_dx, other_dy,
+                        self.length, self.width, tau)
 
                     if isCollide:
                         # print("collide at", own_path.pathID, own_path.type, "other", x.pathID, x.type, "time", x.t[startItr_x+i],\
@@ -606,7 +588,7 @@ class CAV_bus:
                         dict["collideID"] = x.vehID
                         dict["collide_x"] = other_pos_x
                         dict["collide_y"] = other_pos_y
-                        dict["speed"] = other_dx
+                        dict["speed"] = math.hypot(other_dx, other_dy)
                         dict["duration"] = x.t[startItr_x+i] - self.simTime
                         break
             

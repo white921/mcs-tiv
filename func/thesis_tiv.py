@@ -27,6 +27,25 @@ def planned_update_interval(vehicle, legacy_interval):
     return 1.0 if enabled(vehicle) else legacy_interval
 
 
+def trajectories_are_too_close(
+        own_x, own_y, other_x, other_y,
+        own_dx, own_dy, other_dx, other_dy,
+        vehicle_length, vehicle_width, headway):
+    """Check proximity using the longitudinal axis of this four-way map."""
+    if abs(own_y) > 3.2:
+        longitudinal_gap = abs(own_y - other_y)
+        lateral_gap = abs(own_x - other_x)
+        following_speed = max(abs(own_dy), abs(other_dy))
+    else:
+        longitudinal_gap = abs(own_x - other_x)
+        lateral_gap = abs(own_y - other_y)
+        following_speed = max(abs(own_dx), abs(other_dx))
+    return (
+        longitudinal_gap < max(vehicle_length, following_speed * headway)
+        and lateral_gap < vehicle_width
+    )
+
+
 def following_rate(distance, maximum_speed):
     """Eq. 4.2, bounded by the text's R in [0,1]."""
     if distance < 0 or maximum_speed <= 0:

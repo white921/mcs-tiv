@@ -45,6 +45,24 @@ def traci():
 
 
 class ThesisTIVTests(unittest.TestCase):
+    def test_vertical_opposing_lanes_are_not_treated_as_same_corridor(self):
+        self.assertFalse(tiv.trajectories_are_too_close(
+            148.4, 32, 151.6, 32,
+            0, -5, 0, 5,
+            5, 1.8, 1.5))
+
+    def test_vertical_same_lane_close_vehicles_are_detected(self):
+        self.assertTrue(tiv.trajectories_are_too_close(
+            148.4, 32, 148.4, 36,
+            0, -5, 0, -5,
+            5, 1.8, 1.5))
+
+    def test_horizontal_opposing_lanes_are_not_treated_as_same_corridor(self):
+        self.assertFalse(tiv.trajectories_are_too_close(
+            100, -1.6, 100, 1.6,
+            5, 0, -5, 0,
+            5, 1.8, 1.5))
+
     def test_point_one_second_trajectory_samples_keep_small_acceleration(self):
         import frenet_three_junction as planner
         with patch.dict(os.environ, {"MCS_TIV_IMPLEMENTATION": "thesis"}):
