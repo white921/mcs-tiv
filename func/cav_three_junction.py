@@ -59,6 +59,8 @@ class CAV:
         self.route = traci.vehicle.getRouteID(self.id)
         self.road = None
         self.lane = None
+        self.lane_id = traci.vehicle.getLaneID(self.id)
+        self.lane_position = traci.vehicle.getLanePosition(self.id)
         self.status = None # free, follow, stop, lanechange, turn, yield
         self.type = "Car"
         self.passjunctionstatus = None
@@ -124,6 +126,8 @@ class CAV:
         self.accel = min(traci.vehicle.getAcceleration(self.id), maxAccel)
         self.road = traci.vehicle.getRoadID(self.id)
         self.lane = traci.vehicle.getLaneIndex(self.id)
+        self.lane_id = traci.vehicle.getLaneID(self.id)
+        self.lane_position = traci.vehicle.getLanePosition(self.id)
 
         # leaderがシミュレーション範囲から出たらleaderを初期化
         if self.leader not in running_list:

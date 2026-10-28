@@ -19,6 +19,7 @@ class ResultLayoutTests(unittest.TestCase):
             "run_name": None,
             "deceleration_active": True,
             "deceleration_time_half_life": 0.0,
+            "deceleration_loss_lambda": 1.0,
             "cases": ["eval3"],
             "seeds": [1, 2, 3, 4, 5],
             "seeds_per_case": None,
@@ -70,6 +71,7 @@ class ResultLayoutTests(unittest.TestCase):
             "MCS_PRIORITY_HOLD_MODE": "conditional",
             "MCS_DECELERATION_MODE": "active",
             "MCS_DECELERATION_TIME_HALF_LIFE_S": "99",
+            "MCS_DECELERATION_LOSS_LAMBDA": "99",
             "MCS_FCD_OUTPUT": "/tmp/old-fcd.xml",
             "MCS_CHECKPOINT_DIR": "/tmp/old-checkpoint",
         }
@@ -77,6 +79,24 @@ class ResultLayoutTests(unittest.TestCase):
         cleaned = RUNNER.clean_experiment_environment(stale)
 
         self.assertEqual(cleaned, {"PATH": "/usr/bin"})
+
+    def test_lane_aware_run_explicitly_records_priority_hold_as_off(self):
+        self.assertEqual(
+            RUNNER.PRIORITY_HOLD_MANIFEST,
+            {"mode": "off", "enabled": False})
+
+    def test_manifest_records_time_equivalent_loss_lambda(self):
+        manifest = RUNNER.deceleration_prediction_manifest(
+            self.args(deceleration_loss_lambda=1.25))
+
+        self.assertEqual(manifest["loss_lambda"], 1.25)
+        self.assertIn("accept iff M<=0", manifest["decision_formula"])
+        self.assertEqual(
+            manifest["loss_scope"],
+            "detected followers excluding request and receiver vehicles")
+        self.assertEqual(
+            manifest["excluded_loss_roles"],
+            ["request_vehicle", "receiver_vehicle"])
 
 
 if __name__ == "__main__":

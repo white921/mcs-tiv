@@ -8,13 +8,15 @@ and propagates each changed leading trajectory to vehicles following it.
 from __future__ import annotations
 
 import atexit
+import copy
 import json
 import math
 import os
 from collections import Counter
 
-from deceleration_loss import SpeedProfile, decision_margin
+from deceleration_loss import SpeedProfile, time_equivalent_decision
 import evaluation_metrics
+from trajectory_arrival import arrival_delay
 
 DT = 0.1
 HORIZON = 10.0
@@ -25,6 +27,8 @@ MAX_DECEL = 5.0
 HEADWAY = 1.5
 STANDSTILL_GAP = 5.0
 LANE_TOLERANCE = 2.0
+MERGE_TOLERANCE = 1.6
+ALIGNMENT_COSINE = math.cos(math.radians(30.0))
 
 
 def _time_half_life_from_environment():
@@ -35,6 +39,16 @@ def _time_half_life_from_environment():
 
 
 TIME_HALF_LIFE_S = _time_half_life_from_environment()
+
+
+def _loss_lambda_from_environment():
+    value = float(os.environ.get("MCS_DECELERATION_LOSS_LAMBDA", "1"))
+    if not math.isfinite(value) or value < 0:
+        raise ValueError("MCS_DECELERATION_LOSS_LAMBDA must be finite and non-negative")
+    return value
+
+
+LOSS_LAMBDA = _loss_lambda_from_environment()
 
 COUNTS = Counter()
 RECORDS = []
@@ -105,11 +119,87 @@ def _position(path, now):
 
 def _heading(path, now):
     x0, y0 = _position(path, now)
-    x1, y1 = _position(path, now + DT)
-    length = math.hypot(x1 - x0, y1 - y0)
-    if length < 1e-6:
-        raise ValueError("trajectory has no usable heading")
-    return (x0, y0, (x1 - x0) / length, (y1 - y0) / length)
+    yaw = getattr(path, "yaw", None)
+    if yaw and len(yaw) == len(path.t):
+        angle = _value_at(path.t, yaw, now)
+        if math.isfinite(angle):
+            return (x0, y0, math.cos(angle), math.sin(angle))
+
+    # Backward compatibility for older MCM logs without yaw.  Search the
+    # trajectory rather than relying on the next 0.1 s sample, because a valid
+    # path may begin with a stationary interval.
+    indices = sorted(range(len(path.t)), key=lambda index: abs(path.t[index] - now))
+    origin = indices[0]
+    for index in range(origin + 1, len(path.t)):
+        dx, dy = path.x[index] - x0, path.y[index] - y0
+        length = math.hypot(dx, dy)
+        if length >= 1e-6:
+            return (x0, y0, dx / length, dy / length)
+    for index in range(origin - 1, -1, -1):
+        dx, dy = x0 - path.x[index], y0 - path.y[index]
+        length = math.hypot(dx, dy)
+        if length >= 1e-6:
+            return (x0, y0, dx / length, dy / length)
+    raise ValueError("trajectory has no usable heading or yaw")
+
+
+def _lane_id(path):
+    value = getattr(path, "lane_id", None)
+    return str(value) if value not in (None, "") else None
+
+
+def _lane_position(path):
+    value = getattr(path, "lane_position", None)
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
+
+
+def _sample_indices(path, now, step=5):
+    indices = [index for index, moment in enumerate(path.t)
+               if moment >= now - 1e-6]
+    sampled = indices[::step]
+    if indices and indices[-1] not in sampled:
+        sampled.append(indices[-1])
+    return sampled
+
+
+def _future_lane_convergence(leader, candidate, now):
+    """Return arrival times where different current lanes share a corridor.
+
+    Lane IDs establish current-lane following.  For merges and turns from
+    different lanes, the already-transmitted future trajectories establish a
+    shared downstream corridor.  Perpendicular conflict crossings are rejected
+    by the heading-alignment test.
+    """
+    best = None
+    for leader_index in _sample_indices(leader, now):
+        leader_yaw = (leader.yaw[leader_index]
+                      if getattr(leader, "yaw", None) and
+                      len(leader.yaw) == len(leader.t) else None)
+        for candidate_index in _sample_indices(candidate, now):
+            distance = math.hypot(
+                leader.x[leader_index] - candidate.x[candidate_index],
+                leader.y[leader_index] - candidate.y[candidate_index])
+            if distance > MERGE_TOLERANCE:
+                continue
+            candidate_yaw = (candidate.yaw[candidate_index]
+                             if getattr(candidate, "yaw", None) and
+                             len(candidate.yaw) == len(candidate.t) else None)
+            if leader_yaw is None or candidate_yaw is None:
+                continue
+            if math.cos(leader_yaw - candidate_yaw) < ALIGNMENT_COSINE:
+                continue
+            leader_time = float(leader.t[leader_index])
+            candidate_time = float(candidate.t[candidate_index])
+            if candidate_time + DT < leader_time:
+                continue
+            key = (max(leader_time, candidate_time), candidate_time - leader_time)
+            if best is None or key < best[0]:
+                best = (key, leader_time, candidate_time)
+    return None if best is None else best[1:]
 
 
 def _latest_planned(receiver):
@@ -124,8 +214,10 @@ def _latest_planned(receiver):
 
 
 def _followers(leader_id, leader_path, candidates, now, excluded):
-    """Return the same-lane queue behind a leader, nearest first."""
+    """Return current-lane and future-merge followers, nearest first."""
     x, y, hx, hy = _heading(leader_path, now)
+    leader_lane = _lane_id(leader_path)
+    leader_lane_position = _lane_position(leader_path)
     queue = []
     for vehicle_id, path in candidates.items():
         if vehicle_id in excluded or vehicle_id == leader_id:
@@ -134,9 +226,37 @@ def _followers(leader_id, leader_path, candidates, now, excluded):
         dx, dy = px - x, py - y
         longitudinal = dx * hx + dy * hy
         lateral = abs(dx * hy - dy * hx)
+        candidate_lane = _lane_id(path)
+        if leader_lane is not None and candidate_lane is not None:
+            if leader_lane == candidate_lane:
+                candidate_lane_position = _lane_position(path)
+                if (leader_lane_position is not None and
+                        candidate_lane_position is not None):
+                    lane_separation = leader_lane_position - candidate_lane_position
+                    if lane_separation > 0.1:
+                        gap = max(0.0, lane_separation - 5.0)
+                        queue.append((0, lane_separation, vehicle_id, path, gap))
+                elif longitudinal < -0.1:
+                    # Compatibility with packets produced before lane position
+                    # became part of the MCM context.
+                    gap = max(0.0, math.hypot(dx, dy) - 5.0)
+                    queue.append((0, abs(longitudinal), vehicle_id, path, gap))
+                continue
+            convergence = _future_lane_convergence(leader_path, path, now)
+            if convergence is not None:
+                leader_time, candidate_time = convergence
+                candidate_speed = max(0.0, _value_at(path.t, path.s_d, now))
+                gap = max(0.0, candidate_speed * (candidate_time - leader_time) - 5.0)
+                queue.append((1, candidate_time - now, vehicle_id, path, gap))
+            continue
+
+        # Old logs have no lane metadata. Preserve their geometric fallback,
+        # but new simulations always use the explicit lane identity above.
         if longitudinal < -0.1 and lateral <= LANE_TOLERANCE:
-            queue.append((abs(longitudinal), vehicle_id, path))
-    return [(vehicle_id, path) for _, vehicle_id, path in sorted(queue)]
+            gap = max(0.0, math.hypot(dx, dy) - 5.0)
+            queue.append((0, abs(longitudinal), vehicle_id, path, gap))
+    return [(vehicle_id, path, gap)
+            for _, _, vehicle_id, path, gap in sorted(queue)]
 
 
 def _propagate_follower(vehicle_id, base, leader, gap):
@@ -178,9 +298,9 @@ def _case_profiles(roots, candidates, now):
         leader = profiles[root_id]
         leader_path = root_path
         leader_x, leader_y = _position(leader_path, now)
-        for follower_id, follower_path in _followers(root_id, leader_path, candidates, now, assigned):
+        for follower_id, follower_path, gap in _followers(
+                root_id, leader_path, candidates, now, assigned):
             fx, fy = _position(follower_path, now)
-            gap = math.hypot(leader_x - fx, leader_y - fy) - 5.0
             base = _profile(follower_path, follower_id, now)
             leader = _propagate_follower(follower_id, base, leader, gap)
             profiles[follower_id] = leader
@@ -190,36 +310,96 @@ def _case_profiles(roots, candidates, now):
     return profiles
 
 
-def _evaluate_detail(receiver, desired, alternative, now):
+def _evaluate_detail(receiver, desired, alternative, now, conflict_point):
     """Return the comparison and both case profiles for instrumentation."""
     sender_id, receiver_id = str(desired.vehID), str(receiver.id)
     candidates = _latest_planned(receiver)
     sender_planned = candidates.get(sender_id)
     if sender_planned is None:
         raise ValueError("sender planned trajectory is unavailable")
-    candidates[receiver_id] = receiver.plannedPath
-    reject_roots = {sender_id: sender_planned, receiver_id: receiver.plannedPath}
-    accept_roots = {sender_id: desired, receiver_id: alternative}
+    receiver_planned = copy.deepcopy(receiver.plannedPath)
+    receiver_alternative = copy.deepcopy(alternative)
+    for path in (receiver_planned, receiver_alternative):
+        for name, value in (
+            ("lane_id", getattr(receiver, "lane_id", None)),
+            ("lane_index", getattr(receiver, "lane", None)),
+            ("lane_position", getattr(receiver, "lane_position", None)),
+            ("road_id", getattr(receiver, "road", None)),
+            ("allowed_speed_mps", getattr(receiver, "allowed_speed_mps", None)),
+        ):
+            if getattr(path, name, None) in (None, ""):
+                setattr(path, name, value)
+    candidates[receiver_id] = receiver_planned
+    reject_roots = {sender_id: sender_planned, receiver_id: receiver_planned}
+    accept_roots = {sender_id: desired, receiver_id: receiver_alternative}
     reject = _case_profiles(reject_roots, candidates, now)
     accept = _case_profiles(accept_roots, candidates, now)
-    if set(reject) != set(accept):
-        raise ValueError("counterfactual cases select different follower sets")
-    result = decision_margin(
-        reject, accept, reject, time_half_life_s=TIME_HALF_LIFE_S)
-    result = {**result, "vehicle_ids": sorted(reject),
-              "follower_count": max(0, len(reject) - 2),
+
+    # Accepting and rejecting can legitimately affect different following
+    # queues.  Compare both cases over their union instead of dropping the
+    # proposal evaluation.  A vehicle that is affected in only one case keeps
+    # its transmitted planned profile in the other case.  This is the sparse
+    # equivalent of comparing every vehicle: vehicles outside the union are
+    # identical in both cases and therefore cancel from the decision margin.
+    actor_ids = {sender_id, receiver_id}
+    accept_follower_ids = set(accept) - actor_ids
+    reject_follower_ids = set(reject) - actor_ids
+    union_ids = set(accept) | set(reject)
+    reference = {}
+    for vehicle_id in union_ids:
+        planned = candidates.get(vehicle_id)
+        if planned is None:
+            raise ValueError(
+                "planned trajectory is unavailable for union vehicle " +
+                vehicle_id)
+        baseline = _profile(planned, vehicle_id, now)
+        reference[vehicle_id] = baseline
+        accept.setdefault(vehicle_id, baseline)
+        reject.setdefault(vehicle_id, baseline)
+
+    if conflict_point is None or len(conflict_point) != 2:
+        raise ValueError("conflict point is unavailable")
+    # Arrival time already evaluates the two negotiating actors directly.
+    # The loss term is therefore restricted to other vehicles whose following
+    # motion changes under Accept or Reject.  This avoids counting the sender
+    # and receiver once in arrival priority and again in aggregate delay.
+    loss_vehicle_ids = union_ids - actor_ids
+    allowed_speeds = {}
+    for vehicle_id in loss_vehicle_ids:
+        value = getattr(candidates[vehicle_id], "allowed_speed_mps", None)
+        if value is None:
+            raise ValueError(
+                "allowed speed is unavailable for vehicle " + vehicle_id)
+        allowed_speeds[vehicle_id] = value
+    result = time_equivalent_decision(
+        {vehicle_id: reference[vehicle_id] for vehicle_id in loss_vehicle_ids},
+        {vehicle_id: accept[vehicle_id] for vehicle_id in loss_vehicle_ids},
+        {vehicle_id: reject[vehicle_id] for vehicle_id in loss_vehicle_ids},
+        allowed_speeds,
+        request_arrival_s=arrival_delay(desired, conflict_point, now),
+        receiver_arrival_s=arrival_delay(
+            receiver_planned, conflict_point, now),
+        loss_lambda=LOSS_LAMBDA,
+        time_half_life_s=TIME_HALF_LIFE_S)
+    union_follower_ids = accept_follower_ids | reject_follower_ids
+    result = {**result, "vehicle_ids": sorted(union_ids),
+              "loss_vehicle_ids": sorted(loss_vehicle_ids),
+              "excluded_loss_vehicle_ids": sorted(actor_ids),
+              "accept_follower_ids": sorted(accept_follower_ids),
+              "reject_follower_ids": sorted(reject_follower_ids),
+              "union_follower_ids": sorted(union_follower_ids),
+              "follower_count": len(union_follower_ids),
               "replan_interval_s": REPLAN_INTERVAL,
               "time_weighting": ("uniform" if TIME_HALF_LIFE_S is None
                                  else "exponential-half-life"),
               "time_half_life_s": TIME_HALF_LIFE_S,
-              "follower_replans": max(0, len(reject) - 2) * int(HORIZON / REPLAN_INTERVAL),
-              "decision": "accept" if result["reject_minus_accept_m"] >= 0 else "reject"}
+              "follower_replans": len(union_follower_ids) * int(HORIZON / REPLAN_INTERVAL)}
     return result, accept, reject
 
 
-def evaluate(receiver, desired, alternative, now):
+def evaluate(receiver, desired, alternative, now, conflict_point):
     """Evaluate accept/reject with every detectable following queue."""
-    return _evaluate_detail(receiver, desired, alternative, now)[0]
+    return _evaluate_detail(receiver, desired, alternative, now, conflict_point)[0]
 
 
 def direct_tiv_profiles(receiver, desired, alternative, now, decision):
@@ -244,13 +424,14 @@ def direct_tiv_profiles(receiver, desired, alternative, now, decision):
             for vehicle_id, path in roots.items()}
 
 
-def _record_evaluation(receiver, desired, alternative, now, mode):
+def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode):
     """Evaluate and audit a proposal decision without mutating vehicle state."""
     if MODE != mode:
         return None
     COUNTS[mode + "_attempts"] += 1
     try:
-        result, accept_profiles, reject_profiles = _evaluate_detail(receiver, desired, alternative, now)
+        result, accept_profiles, reject_profiles = _evaluate_detail(
+            receiver, desired, alternative, now, conflict_point)
     except (AttributeError, IndexError, TypeError, ValueError, ZeroDivisionError) as error:
         COUNTS[mode + "_unsupported"] += 1
         record = {"time": now, "receiver": str(receiver.id),
@@ -271,13 +452,30 @@ def _record_evaluation(receiver, desired, alternative, now, mode):
                     "desired_path_id": str(desired.pathID),
                     "alternative_path_id": str(alternative.pathID),
                     "actor_vehicle_ids": actor_ids,
+                    "loss_vehicle_ids": result["loss_vehicle_ids"],
+                    "excluded_loss_vehicle_ids": result["excluded_loss_vehicle_ids"],
                     "follower_vehicle_ids": sorted(set(chosen_profiles) - set(actor_ids)),
+                    "accept_follower_ids": result["accept_follower_ids"],
+                    "reject_follower_ids": result["reject_follower_ids"],
+                    "union_follower_ids": result["union_follower_ids"],
                     "prediction_scope": "sender_receiver_and_detected_followers",
                     "time_weighting": result["time_weighting"],
                     "time_half_life_s": result["time_half_life_s"],
                     "accept_loss_m": result["accept_loss_m"],
                     "reject_loss_m": result["reject_loss_m"],
                     "decision_margin_m": result["reject_minus_accept_m"],
+                    "request_arrival_s": result["request_arrival_s"],
+                    "receiver_arrival_s": result["receiver_arrival_s"],
+                    "request_arrival_reached": result["request_arrival_reached"],
+                    "receiver_arrival_reached": result["receiver_arrival_reached"],
+                    "arrival_status": result["arrival_status"],
+                    "decision_basis": result["decision_basis"],
+                    "arrival_margin_s": result["arrival_margin_s"],
+                    "accept_time_equivalent_loss_s": result["accept_time_equivalent_loss_s"],
+                    "reject_time_equivalent_loss_s": result["reject_time_equivalent_loss_s"],
+                    "weighted_loss_margin_s": result["weighted_loss_margin_s"],
+                    "final_margin_s": result["final_margin_s"],
+                    "loss_lambda": result["loss_lambda"],
                 })
         record = {"time": now, "receiver": str(receiver.id), "sender": str(desired.vehID),
                   "desired_path_id": desired.pathID, "alternative_path_id": alternative.pathID,
@@ -288,18 +486,20 @@ def _record_evaluation(receiver, desired, alternative, now, mode):
     return record
 
 
-def record_shadow(receiver, desired, alternative, now):
+def record_shadow(receiver, desired, alternative, now, conflict_point):
     """Record a full 10-second comparison and leave the TIV decision intact."""
-    return _record_evaluation(receiver, desired, alternative, now, "shadow")
+    return _record_evaluation(
+        receiver, desired, alternative, now, conflict_point, "shadow")
 
 
-def active_decision(receiver, desired, alternative, now):
+def active_decision(receiver, desired, alternative, now, conflict_point):
     """Return the proposed decision, or ``None`` if prediction is unavailable.
 
     Keeping the unavailable case as ``None`` lets the caller retain the
     baseline TIV rule rather than creating an unsafe synthetic decision.
     """
-    record = _record_evaluation(receiver, desired, alternative, now, "active")
+    record = _record_evaluation(
+        receiver, desired, alternative, now, conflict_point, "active")
     if record is None or record["status"] != "evaluated":
         return None
     key = (str(receiver.id), str(desired.vehID), str(desired.pathID))
@@ -320,7 +520,10 @@ def _write_audit():
     destination = os.environ.get("MCS_DECELERATION_AUDIT")
     if destination:
         with open(destination, "w") as stream:
-            json.dump({"mode": MODE, "counts": dict(COUNTS), "records": RECORDS}, stream, indent=2)
+            json.dump(evaluation_metrics.json_safe({
+                "mode": MODE, "counts": dict(COUNTS), "records": RECORDS,
+            }), stream, indent=2,
+                      allow_nan=False)
 
 
 atexit.register(_write_audit)

@@ -30,6 +30,24 @@ PHYSICAL_COLLISION_FRAMES = []
 ACTIVE_PHYSICAL_COLLISIONS = set()
 
 
+def json_safe(value):
+    """Return strict-JSON data while preserving non-finite value meaning."""
+    if isinstance(value, float) and not math.isfinite(value):
+        if math.isnan(value):
+            return "not_a_number"
+        return "positive_infinity" if value > 0 else "negative_infinity"
+    if isinstance(value, dict):
+        return {key: json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [json_safe(item) for item in value]
+    return value
+
+
+def strict_json_line(record):
+    """Serialize one audit record without JavaScript-only NaN/Infinity."""
+    return json.dumps(json_safe(record), allow_nan=False)
+
+
 def _collision_record(collision):
     """Convert a SUMO TraCI collision object into stable JSON data."""
     return {
@@ -333,11 +351,11 @@ def _write_audit():
     if PREDICTION_EVENT_AUDIT:
         with open(PREDICTION_EVENT_AUDIT, "w") as stream:
             for event in PREDICTION_EVENTS:
-                stream.write(json.dumps(event) + "\n")
+                stream.write(strict_json_line(event) + "\n")
     if PHYSICAL_COLLISION_AUDIT:
         with open(PHYSICAL_COLLISION_AUDIT, "w") as stream:
             for frame in PHYSICAL_COLLISION_FRAMES:
-                stream.write(json.dumps(frame) + "\n")
+                stream.write(strict_json_line(frame) + "\n")
 
 
 atexit.register(_write_audit)
