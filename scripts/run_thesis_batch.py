@@ -51,6 +51,7 @@ CONTROLLED_MCS_ENV = {
     "MCS_EVALUATION_AUDIT",
     "MCS_EVAL3_DOWNSTREAM_SLOW_ZONE",
     "MCS_EVAL3_SLOW_ZONE_LENGTH_M",
+    "MCS_EVAL3_SLOW_ZONE_LOCATION",
     "MCS_EVAL3_SLOW_ZONE_SPEED_LIMIT_MPS",
     "MCS_EVAL3_SLOW_ZONE_START_OFFSET_M",
     "MCS_FCD_OUTPUT",
@@ -200,6 +201,11 @@ def eval3_slow_zone_manifest(args):
         return None
     return {
         **EVAL3_DOWNSTREAM_SLOW_ZONE_MANIFEST,
+        "location": args.eval3_slow_zone_location,
+        "edge_id": ("right" if args.eval3_slow_zone_location == "downstream"
+                    else "left"),
+        "lane_id": ("right_0" if args.eval3_slow_zone_location == "downstream"
+                    else "left_0"),
         "start_offset_m": args.eval3_slow_zone_start_offset,
         "length_m": args.eval3_slow_zone_length,
         "speed_limit_mps": args.eval3_slow_zone_speed_limit,
@@ -305,6 +311,7 @@ def run_task(task, args):
                MCS_TIV_IMPLEMENTATION="thesis",
                MCS_EVAL3_DOWNSTREAM_SLOW_ZONE=(
                    "1" if args.eval3_downstream_slow_zone else "0"),
+               MCS_EVAL3_SLOW_ZONE_LOCATION=args.eval3_slow_zone_location,
                MCS_EVAL3_SLOW_ZONE_START_OFFSET_M=str(
                    args.eval3_slow_zone_start_offset),
                MCS_EVAL3_SLOW_ZONE_LENGTH_M=str(args.eval3_slow_zone_length),
@@ -483,8 +490,13 @@ def main():
         help=("add a configurable speed hump downstream on Eval.3's "
               "right outgoing edge; applies equally to both decision methods"))
     parser.add_argument(
+        "--eval3-slow-zone-location", choices=("downstream", "upstream"),
+        default="downstream",
+        help="place the speed hump after or before the Eval.3 intersection")
+    parser.add_argument(
         "--eval3-slow-zone-start-offset", type=float, default=15.0,
-        help="speed-hump start offset on the right outgoing edge in metres")
+        help=("distance from the junction-side edge boundary to the speed "
+              "hump in metres"))
     parser.add_argument(
         "--eval3-slow-zone-length", type=float, default=2.0,
         help="speed-hump length in metres (default: 2.0)")

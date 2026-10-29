@@ -14,10 +14,12 @@ import os
 
 
 ENVIRONMENT_SWITCH = "MCS_EVAL3_DOWNSTREAM_SLOW_ZONE"
+ENVIRONMENT_LOCATION = "MCS_EVAL3_SLOW_ZONE_LOCATION"
 ENVIRONMENT_START_OFFSET = "MCS_EVAL3_SLOW_ZONE_START_OFFSET_M"
 ENVIRONMENT_LENGTH = "MCS_EVAL3_SLOW_ZONE_LENGTH_M"
 ENVIRONMENT_SPEED_LIMIT = "MCS_EVAL3_SLOW_ZONE_SPEED_LIMIT_MPS"
 RIGHT_EDGE_START_X_M = 157.2
+LEFT_EDGE_END_X_M = 142.8
 
 # The outgoing ``right`` edge starts at x=157.2 m.  The speed-hump section is
 # deliberately short and begins 15 m downstream of the conflict area so the
@@ -26,6 +28,7 @@ RIGHT_EDGE_START_X_M = 157.2
 # and recover within the 10 s prediction horizon when planning upstream.
 DEFAULT_ZONE = {
     "case": "eval3",
+    "location": "downstream",
     "edge_id": "right",
     "lane_id": "right_0",
     "start_offset_m": 15.0,
@@ -41,6 +44,11 @@ def zone_from_environment(environment=None):
     """Build one validated zone from the runner-controlled environment."""
     environment = os.environ if environment is None else environment
     zone = dict(DEFAULT_ZONE)
+    location = environment.get(ENVIRONMENT_LOCATION, zone["location"])
+    if location not in ("downstream", "upstream"):
+        raise ValueError(
+            f"{ENVIRONMENT_LOCATION} must be downstream or upstream")
+    zone["location"] = location
     parameters = (
         (ENVIRONMENT_START_OFFSET, "start_offset_m", True),
         (ENVIRONMENT_LENGTH, "length_m", False),
@@ -54,8 +62,16 @@ def zone_from_environment(environment=None):
             qualifier = "non-negative" if allow_zero else "positive"
             raise ValueError(f"{variable} must be a finite {qualifier} number")
         zone[field] = value
-    zone["start_x_m"] = RIGHT_EDGE_START_X_M + zone["start_offset_m"]
-    zone["end_x_m"] = zone["start_x_m"] + zone["length_m"]
+    if location == "downstream":
+        zone["edge_id"] = "right"
+        zone["lane_id"] = "right_0"
+        zone["start_x_m"] = RIGHT_EDGE_START_X_M + zone["start_offset_m"]
+        zone["end_x_m"] = zone["start_x_m"] + zone["length_m"]
+    else:
+        zone["edge_id"] = "left"
+        zone["lane_id"] = "left_0"
+        zone["end_x_m"] = LEFT_EDGE_END_X_M - zone["start_offset_m"]
+        zone["start_x_m"] = zone["end_x_m"] - zone["length_m"]
     return zone
 
 

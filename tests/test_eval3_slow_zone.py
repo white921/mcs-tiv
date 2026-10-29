@@ -62,6 +62,19 @@ class Eval3SlowZoneTests(unittest.TestCase):
         self.assertEqual(zone["start_x_m"], 169.2)
         self.assertEqual(zone["end_x_m"], 179.2)
 
+    def test_zone_can_be_placed_before_the_intersection(self):
+        zone = SLOW_ZONE.zone_from_environment({
+            SLOW_ZONE.ENVIRONMENT_LOCATION: "upstream",
+            SLOW_ZONE.ENVIRONMENT_START_OFFSET: "15",
+            SLOW_ZONE.ENVIRONMENT_LENGTH: "10",
+            SLOW_ZONE.ENVIRONMENT_SPEED_LIMIT: "5.56",
+        })
+
+        self.assertEqual(zone["edge_id"], "left")
+        self.assertEqual(zone["lane_id"], "left_0")
+        self.assertAlmostEqual(zone["start_x_m"], 117.8)
+        self.assertAlmostEqual(zone["end_x_m"], 127.8)
+
     def test_zone_parameters_reject_non_positive_length_and_limit(self):
         for variable in (
             SLOW_ZONE.ENVIRONMENT_LENGTH,
