@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT / "func"))
 from fixed_vehicle_inputs import load_fixed_vehicle_input  # noqa: E402
 
 
-OUTPUT = ROOT / "fixed_inputs" / "experiments" / "eval3-platoon-search"
+OUTPUT = ROOT / "fixed_inputs" / "experiments"
 APPROACH_ORDER = {"bottom": 0, "left": 1, "right": 2}
 EPISODE_STARTS = (10.1, 50.1, 90.1, 130.1, 170.1, 210.1, 250.1)
 COUNT_PER_APPROACH = 66
@@ -42,6 +42,14 @@ CONDITIONS = {
     },
 }
 
+TIMING_CONDITIONS = {
+    "singleton-early-1p5": -1.5,
+    "singleton-early-0p5": -0.5,
+    "singleton-same-time": 0.0,
+    "singleton-late-0p5": 0.5,
+    "singleton-late-1p5": 1.5,
+}
+
 
 def route_for(approach):
     return {"left": "LR", "bottom": "BR", "right": "RB"}[approach]
@@ -53,7 +61,8 @@ def controlled_events(condition):
     events = []
     for start in EPISODE_STARTS:
         events.append({
-            "depart_time_s": start,
+            "depart_time_s": round(
+                start + condition.get("singleton_offset_s", 0.0), 1),
             "approach": singleton,
             "depart_lane": "0",
             "route": route_for(singleton),
@@ -105,7 +114,7 @@ def fill_to_full_schedule(events):
     return events
 
 
-def write_condition(name, condition):
+def write_condition(directory, name, condition):
     events = fill_to_full_schedule(controlled_events(condition))
     metadata = {
         "record_type": "metadata",
@@ -122,7 +131,7 @@ def write_condition(name, condition):
     records = [metadata]
     for sequence, event in enumerate(events):
         records.append({"record_type": "vehicle", "sequence": sequence, **event})
-    destination = OUTPUT / f"{name}.jsonl"
+    destination = OUTPUT / directory / f"{name}.jsonl"
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text("".join(
         json.dumps(record, separators=(",", ":")) + "\n"
@@ -141,7 +150,16 @@ def write_condition(name, condition):
 
 def main():
     for name, condition in CONDITIONS.items():
-        write_condition(name, condition)
+        write_condition("eval3-platoon-search", name, condition)
+        print(name)
+    for name, offset in TIMING_CONDITIONS.items():
+        write_condition("eval3-platoon-timing-search", name, {
+            "platoon_approach": "left",
+            "platoon_size": 6,
+            "headway_s": 1.2,
+            "bus_leader": False,
+            "singleton_offset_s": offset,
+        })
         print(name)
 
 

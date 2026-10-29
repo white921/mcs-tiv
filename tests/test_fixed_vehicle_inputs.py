@@ -115,10 +115,18 @@ class FixedVehicleInputTests(unittest.TestCase):
         self.assertIsNone(fixed_input_details("eval4", 1, 600, "fixed"))
 
     def test_platoon_search_inputs_are_valid_and_selectable_by_override(self):
-        paths = sorted((
-            ROOT / "fixed_inputs" / "experiments" / "eval3-platoon-search"
-        ).glob("*.jsonl"))
-        self.assertEqual(len(paths), 5)
+        directories = (
+            "eval3-platoon-search",
+            "eval3-platoon-timing-search",
+        )
+        for directory in directories:
+            paths = sorted((
+                ROOT / "fixed_inputs" / "experiments" / directory
+            ).glob("*.jsonl"))
+            self.assertEqual(len(paths), 5)
+            self._assert_experiment_inputs_are_selectable(paths)
+
+    def _assert_experiment_inputs_are_selectable(self, paths):
         for path in paths:
             with self.subTest(path=path):
                 schedule = load_fixed_vehicle_input(
