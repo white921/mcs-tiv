@@ -1,4 +1,4 @@
-"""Predictable downstream speed restriction for the Eval.3 experiment.
+"""Predictable speed restriction around the Eval.3 intersection.
 
 The restriction represents a fixed road rule (for example, a raised crossing),
 not an unexpected disturbance.  Candidate trajectories and the trajectory
@@ -36,7 +36,7 @@ DEFAULT_ZONE = {
     "lane_center_y_m": -1.6,
     "lateral_tolerance_m": 1.0,
     "speed_limit_mps": 8.33,
-    "reason": "fixed-predictable-downstream-speed-hump",
+    "reason": "fixed-predictable-speed-hump",
 }
 
 

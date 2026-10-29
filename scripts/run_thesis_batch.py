@@ -81,7 +81,7 @@ EVAL3_DOWNSTREAM_SLOW_ZONE_MANIFEST = {
     "start_offset_m": 15.0,
     "length_m": 2.0,
     "speed_limit_mps": 8.33,
-    "reason": "fixed-predictable-downstream-speed-hump",
+    "reason": "fixed-predictable-speed-hump",
     "affects": ["candidate_trajectories", "live_path_following"],
 }
 
