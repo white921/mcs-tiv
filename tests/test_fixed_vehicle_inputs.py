@@ -150,6 +150,23 @@ class FixedVehicleInputTests(unittest.TestCase):
                 self.assertEqual(
                     details["prefix_event_count"], len(schedule.events))
 
+    def test_timing_validation_inputs_cover_five_seeds_per_condition(self):
+        root = (
+            ROOT / "fixed_inputs" / "experiments" /
+            "eval3-platoon-timing-validation"
+        )
+        condition_directories = sorted(path for path in root.iterdir()
+                                       if path.is_dir())
+        self.assertEqual(len(condition_directories), 5)
+        for condition in condition_directories:
+            paths = sorted(condition.glob("seed-*.jsonl"))
+            self.assertEqual(len(paths), 5)
+            for seed, path in enumerate(paths, 1):
+                schedule = load_fixed_vehicle_input(
+                    path, expected_case="eval3", expected_seed=seed,
+                    prefix_duration_s=300.0)
+                self.assertTrue(schedule.events)
+
     def test_prefix_is_stable_and_uses_strictly_earlier_events(self):
         path = ROOT / "fixed_inputs" / "thesis" / "eval3" / "seed-1.jsonl"
         empty = load_fixed_vehicle_input(path, prefix_duration_s=0.1)

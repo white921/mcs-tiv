@@ -114,13 +114,13 @@ def fill_to_full_schedule(events):
     return events
 
 
-def write_condition(directory, name, condition):
+def write_condition(directory, name, condition, *, seed=1):
     events = fill_to_full_schedule(controlled_events(condition))
     metadata = {
         "record_type": "metadata",
         "schema_version": 1,
         "case": "eval3",
-        "seed": 1,
+        "seed": seed,
         "duration_s": 600.0,
         "scenario": "t_junction",
         "flows_vph": {"left": 400, "bottom": 400, "right": 400},
@@ -140,7 +140,7 @@ def write_condition(directory, name, condition):
     load_fixed_vehicle_input(
         destination,
         expected_case="eval3",
-        expected_seed=1,
+        expected_seed=seed,
         expected_duration_s=600.0,
         expected_flows_vph={"left": 400, "bottom": 400, "right": 400},
         expected_bus_share=0.25,
@@ -153,14 +153,19 @@ def main():
         write_condition("eval3-platoon-search", name, condition)
         print(name)
     for name, offset in TIMING_CONDITIONS.items():
-        write_condition("eval3-platoon-timing-search", name, {
+        condition = {
             "platoon_approach": "left",
             "platoon_size": 6,
             "headway_s": 1.2,
             "bus_leader": False,
             "singleton_offset_s": offset,
-        })
+        }
+        write_condition("eval3-platoon-timing-search", name, condition)
         print(name)
+        for seed in range(1, 6):
+            write_condition(
+                f"eval3-platoon-timing-validation/{name}",
+                f"seed-{seed}", condition, seed=seed)
 
 
 if __name__ == "__main__":
