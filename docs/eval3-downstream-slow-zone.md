@@ -5,7 +5,7 @@
 This experiment changes only the road condition shared by both decision
 methods.  It adds a predictable speed hump to the `right` outgoing edge after
 the Eval.3 conflict area.  The existing arrival-time term is therefore not
-changed by moving the restriction upstream of the intersection.
+changed by keeping the restriction downstream of the intersection.
 
 The hypothesis is that Yamashita TIV sees the recovered terminal speed, while
 the proposal also evaluates the temporary speed loss and its propagation to
