@@ -114,6 +114,34 @@ class FixedVehicleInputTests(unittest.TestCase):
         self.assertIsNone(fixed_input_details("eval3", 1, 600, "paper-random25"))
         self.assertIsNone(fixed_input_details("eval4", 1, 600, "fixed"))
 
+    def test_platoon_search_inputs_are_valid_and_selectable_by_override(self):
+        paths = sorted((
+            ROOT / "fixed_inputs" / "experiments" / "eval3-platoon-search"
+        ).glob("*.jsonl"))
+        self.assertEqual(len(paths), 5)
+        for path in paths:
+            with self.subTest(path=path):
+                schedule = load_fixed_vehicle_input(
+                    path,
+                    expected_case="eval3",
+                    expected_seed=1,
+                    expected_duration_s=600.0,
+                    expected_flows_vph={"left": 400, "bottom": 400, "right": 400},
+                    expected_bus_share=0.25,
+                    prefix_duration_s=300.0,
+                )
+                self.assertTrue(schedule.events)
+                self.assertTrue(all(
+                    event["depart_time_s"] < 300 for event in schedule.events))
+                relative = path.relative_to(ROOT)
+                details = fixed_input_details(
+                    "eval3", 1, 300, "fixed",
+                    relative_path_override=relative,
+                )
+                self.assertEqual(details["relative_path"], relative.as_posix())
+                self.assertEqual(
+                    details["prefix_event_count"], len(schedule.events))
+
     def test_prefix_is_stable_and_uses_strictly_earlier_events(self):
         path = ROOT / "fixed_inputs" / "thesis" / "eval3" / "seed-1.jsonl"
         empty = load_fixed_vehicle_input(path, prefix_duration_s=0.1)

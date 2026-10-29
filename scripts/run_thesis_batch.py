@@ -213,11 +213,12 @@ def eval3_slow_zone_manifest(args):
 
 
 def fixed_input_details(
-    name, seed, duration, bus_allocation, prefix_duration=None, source_root=ROOT
+    name, seed, duration, bus_allocation, prefix_duration=None, source_root=ROOT,
+    relative_path_override=None,
 ):
     """Return the committed 600-second input selected for a batch task."""
     pattern = CASES[name].get("fixed_input")
-    if pattern is None or bus_allocation != "fixed":
+    if (pattern is None and relative_path_override is None) or bus_allocation != "fixed":
         return None
     if not 0 < duration <= 600:
         raise ValueError("fixed vehicle input duration must be in (0, 600]")
@@ -225,7 +226,10 @@ def fixed_input_details(
         prefix_duration = duration
     if not 0 < prefix_duration <= duration:
         raise ValueError("fixed vehicle input prefix must be in (0, duration]")
-    relative_path = Path(pattern.format(seed=seed))
+    relative_path = (Path(relative_path_override) if relative_path_override is not None
+                     else Path(pattern.format(seed=seed)))
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        raise ValueError("fixed input override must be relative to the repository")
     path = source_root / relative_path
     schedule = load_fixed_vehicle_input(path, prefix_duration_s=prefix_duration)
     metadata = schedule.metadata
@@ -354,6 +358,7 @@ def run_task(task, args):
         name, seed, args.duration, args.bus_allocation,
         prefix_duration=args.duration,
         source_root=source,
+        relative_path_override=args.fixed_input_override,
     )
     if fixed_input is not None:
         command += ["--fixed-input", fixed_input["runtime_path"]]
@@ -483,6 +488,10 @@ def main():
     parser.add_argument("--bus-allocation", choices=("fixed", "paper-random25"), default="fixed",
                         help="fixed composition for method comparison (default); "
                              "paper-random25 only for original-artifact reproduction")
+    parser.add_argument(
+        "--fixed-input-override", type=Path,
+        help=("repository-relative fixed input JSONL for a controlled scenario; "
+              "requires one case and one seed"))
     parser.add_argument("--deceleration-active", action="store_true",
                         help="use the proposed deceleration-propagation rule")
     parser.add_argument(
@@ -538,6 +547,16 @@ def main():
         parser.error("--deceleration-time-half-life requires --deceleration-active")
     if args.eval3_downstream_slow_zone and set(args.cases) != {"eval3"}:
         parser.error("--eval3-downstream-slow-zone requires --cases eval3")
+    if args.fixed_input_override is not None:
+        if len(args.cases) != 1 or args.seeds is None or len(args.seeds) != 1:
+            parser.error("--fixed-input-override requires one --cases value and one --seeds value")
+        if args.bus_allocation != "fixed":
+            parser.error("--fixed-input-override requires --bus-allocation fixed")
+        override = args.fixed_input_override
+        if override.is_absolute() or ".." in override.parts:
+            parser.error("--fixed-input-override must be repository-relative")
+        if not (ROOT / override).is_file():
+            parser.error("--fixed-input-override does not exist")
     slow_zone_values = (
         args.eval3_slow_zone_start_offset,
         args.eval3_slow_zone_length,
