@@ -117,6 +117,7 @@ class FixedVehicleInputTests(unittest.TestCase):
     def test_platoon_search_inputs_are_valid_and_selectable_by_override(self):
         directories = (
             "eval3-platoon-search",
+            "eval3-platoon-sparse-search",
             "eval3-platoon-timing-search",
         )
         for directory in directories:

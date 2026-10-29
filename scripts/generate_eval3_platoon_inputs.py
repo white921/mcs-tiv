@@ -50,6 +50,34 @@ TIMING_CONDITIONS = {
     "singleton-late-1p5": 1.5,
 }
 
+SPARSE_CONDITIONS = {
+    "left8-three-episodes": {
+        "platoon_approach": "left", "platoon_size": 8,
+        "headway_s": 1.0, "bus_leader": False,
+        "episode_starts": (50.1, 150.1, 250.1),
+    },
+    "left8-five-episodes": {
+        "platoon_approach": "left", "platoon_size": 8,
+        "headway_s": 1.0, "bus_leader": False,
+        "episode_starts": (30.1, 90.1, 150.1, 210.1, 270.1),
+    },
+    "left10-three-episodes": {
+        "platoon_approach": "left", "platoon_size": 10,
+        "headway_s": 1.0, "bus_leader": False,
+        "episode_starts": (50.1, 150.1, 250.1),
+    },
+    "left10-bus-three-episodes": {
+        "platoon_approach": "left", "platoon_size": 10,
+        "headway_s": 1.0, "bus_leader": True,
+        "episode_starts": (50.1, 150.1, 250.1),
+    },
+    "bottom8-three-episodes": {
+        "platoon_approach": "bottom", "platoon_size": 8,
+        "headway_s": 1.0, "bus_leader": False,
+        "episode_starts": (50.1, 150.1, 250.1),
+    },
+}
+
 
 def route_for(approach):
     return {"left": "LR", "bottom": "BR", "right": "RB"}[approach]
@@ -59,7 +87,7 @@ def controlled_events(condition):
     platoon = condition["platoon_approach"]
     singleton = "bottom" if platoon == "left" else "left"
     events = []
-    for start in EPISODE_STARTS:
+    for start in condition.get("episode_starts", EPISODE_STARTS):
         events.append({
             "depart_time_s": round(
                 start + condition.get("singleton_offset_s", 0.0), 1),
@@ -166,6 +194,9 @@ def main():
             write_condition(
                 f"eval3-platoon-timing-validation/{name}",
                 f"seed-{seed}", condition, seed=seed)
+    for name, condition in SPARSE_CONDITIONS.items():
+        write_condition("eval3-platoon-sparse-search", name, condition)
+        print(name)
 
 
 if __name__ == "__main__":
