@@ -32,6 +32,31 @@ The restriction is disabled by default.  Add
 `--eval3-downstream-slow-zone` to enable it.  Omitting that option preserves
 the normal-road scenario.
 
+The default remains 15 m / 2 m / 8.33 m/s.  Exploratory sweeps can override
+the condition with `--eval3-slow-zone-start-offset`,
+`--eval3-slow-zone-length`, and `--eval3-slow-zone-speed-limit`.  The run
+manifest records the selected values and the runner passes the same values to
+candidate prediction and live path following.
+
+## Seed 1 severity sweep
+
+The first exploratory sweep keeps the start offset at 15 m and compares five
+increasingly restrictive settings under both methods:
+
+| Label | Length | Limit |
+|---|---:|---:|
+| s1 | 2 m | 8.33 m/s |
+| s2 | 5 m | 8.33 m/s |
+| s3 | 5 m | 6.94 m/s |
+| s4 | 10 m | 6.94 m/s |
+| s5 | 10 m | 5.56 m/s |
+
+This sweep does not require full recovery by 10 seconds.  Analyse additional
+deceleration, maximum speed reduction, and the residual speed difference at
+10 seconds separately.  `intended_profile_observed` retains its narrower
+meaning from the original experiment: the path entered and exited the zone,
+slowed additionally, and recovered within 0.05 m/s by 10 seconds.
+
 ## Condition-quality audit
 
 With diagnostic traces enabled, every negotiation `started` record and every

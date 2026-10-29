@@ -168,6 +168,8 @@ class DecelerationLossTests(unittest.TestCase):
         self.assertTrue(good["additional_deceleration_within_10s"])
         self.assertTrue(good["recovered_to_normal_speed_at_10s"])
         self.assertTrue(good["intended_temporary_slowdown"])
+        self.assertIs(type(good["recovered_to_normal_speed_at_10s"]), bool)
+        self.assertIs(type(good["intended_temporary_slowdown"]), bool)
         self.assertAlmostEqual(good["maximum_speed_reduction_mps"], 2.0)
         self.assertFalse(bad["recovered_to_normal_speed_at_10s"])
         self.assertFalse(bad["intended_temporary_slowdown"])

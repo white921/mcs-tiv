@@ -49,6 +49,27 @@ class Eval3SlowZoneTests(unittest.TestCase):
                 SLOW_ZONE.ENVIRONMENT_SWITCH: "yes",
             })
 
+    def test_zone_parameters_can_be_overridden_from_environment(self):
+        zone = SLOW_ZONE.zone_from_environment({
+            SLOW_ZONE.ENVIRONMENT_START_OFFSET: "12",
+            SLOW_ZONE.ENVIRONMENT_LENGTH: "10",
+            SLOW_ZONE.ENVIRONMENT_SPEED_LIMIT: "5.56",
+        })
+
+        self.assertEqual(zone["start_offset_m"], 12.0)
+        self.assertEqual(zone["length_m"], 10.0)
+        self.assertEqual(zone["speed_limit_mps"], 5.56)
+        self.assertEqual(zone["start_x_m"], 169.2)
+        self.assertEqual(zone["end_x_m"], 179.2)
+
+    def test_zone_parameters_reject_non_positive_length_and_limit(self):
+        for variable in (
+            SLOW_ZONE.ENVIRONMENT_LENGTH,
+            SLOW_ZONE.ENVIRONMENT_SPEED_LIMIT,
+        ):
+            with self.subTest(variable=variable), self.assertRaises(ValueError):
+                SLOW_ZONE.zone_from_environment({variable: "0"})
+
     def test_target_path_slows_and_recovers_within_ten_seconds(self):
         path = straight_path()
 

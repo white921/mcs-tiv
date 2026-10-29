@@ -50,6 +50,9 @@ CONTROLLED_MCS_ENV = {
     "MCS_DECELERATION_TIME_HALF_LIFE_S",
     "MCS_EVALUATION_AUDIT",
     "MCS_EVAL3_DOWNSTREAM_SLOW_ZONE",
+    "MCS_EVAL3_SLOW_ZONE_LENGTH_M",
+    "MCS_EVAL3_SLOW_ZONE_SPEED_LIMIT_MPS",
+    "MCS_EVAL3_SLOW_ZONE_START_OFFSET_M",
     "MCS_FCD_OUTPUT",
     "MCS_NEGOTIATION_AUDIT",
     "MCS_PHYSICAL_COLLISION_AUDIT",
@@ -195,7 +198,12 @@ def eval3_slow_zone_manifest(args):
     """Return the common scenario condition independently of decision method."""
     if not getattr(args, "eval3_downstream_slow_zone", False):
         return None
-    return dict(EVAL3_DOWNSTREAM_SLOW_ZONE_MANIFEST)
+    return {
+        **EVAL3_DOWNSTREAM_SLOW_ZONE_MANIFEST,
+        "start_offset_m": args.eval3_slow_zone_start_offset,
+        "length_m": args.eval3_slow_zone_length,
+        "speed_limit_mps": args.eval3_slow_zone_speed_limit,
+    }
 
 
 def fixed_input_details(
@@ -297,6 +305,11 @@ def run_task(task, args):
                MCS_TIV_IMPLEMENTATION="thesis",
                MCS_EVAL3_DOWNSTREAM_SLOW_ZONE=(
                    "1" if args.eval3_downstream_slow_zone else "0"),
+               MCS_EVAL3_SLOW_ZONE_START_OFFSET_M=str(
+                   args.eval3_slow_zone_start_offset),
+               MCS_EVAL3_SLOW_ZONE_LENGTH_M=str(args.eval3_slow_zone_length),
+               MCS_EVAL3_SLOW_ZONE_SPEED_LIMIT_MPS=str(
+                   args.eval3_slow_zone_speed_limit),
                MCS_DECELERATION_MODE=("active" if args.deceleration_active else "off"),
                MCS_DECELERATION_TIME_HALF_LIFE_S=str(
                    args.deceleration_time_half_life if args.deceleration_active else 0.0),
@@ -467,8 +480,17 @@ def main():
                         help="use the proposed deceleration-propagation rule")
     parser.add_argument(
         "--eval3-downstream-slow-zone", action="store_true",
-        help=("add the fixed 8.33 m/s speed hump 15 m downstream on Eval.3's "
+        help=("add a configurable speed hump downstream on Eval.3's "
               "right outgoing edge; applies equally to both decision methods"))
+    parser.add_argument(
+        "--eval3-slow-zone-start-offset", type=float, default=15.0,
+        help="speed-hump start offset on the right outgoing edge in metres")
+    parser.add_argument(
+        "--eval3-slow-zone-length", type=float, default=2.0,
+        help="speed-hump length in metres (default: 2.0)")
+    parser.add_argument(
+        "--eval3-slow-zone-speed-limit", type=float, default=8.33,
+        help="speed-hump limit in m/s (default: 8.33)")
     parser.add_argument(
         "--deceleration-time-half-life", type=float, default=0.0,
         help="exponential future-loss half-life in seconds; 0 keeps uniform 10 s weighting")
@@ -504,6 +526,16 @@ def main():
         parser.error("--deceleration-time-half-life requires --deceleration-active")
     if args.eval3_downstream_slow_zone and set(args.cases) != {"eval3"}:
         parser.error("--eval3-downstream-slow-zone requires --cases eval3")
+    slow_zone_values = (
+        args.eval3_slow_zone_start_offset,
+        args.eval3_slow_zone_length,
+        args.eval3_slow_zone_speed_limit,
+    )
+    if (not all(math.isfinite(value) for value in slow_zone_values) or
+            args.eval3_slow_zone_start_offset < 0 or
+            min(args.eval3_slow_zone_length,
+                args.eval3_slow_zone_speed_limit) <= 0):
+        parser.error("Eval.3 slow-zone offset must be non-negative and length/limit positive")
     if not (args.sumo_home / "bin" / "sumo").is_file() or not (args.sumo_home / "tools" / "traci").is_dir():
         parser.error("--sumo-home must contain bin/sumo and tools/traci")
     if args.paper is not None and not args.paper.is_file():

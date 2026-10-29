@@ -165,10 +165,11 @@ def _slow_zone_path_audit(path, now):
         if (float(xs[index]) > end_x and
             abs(float(ys[index]) - center_y) <= lateral_tolerance)
     ]
-    reference_at_horizon = _value_at(times, reference, end)
-    restricted_at_horizon = _value_at(times, speeds, end)
-    horizon_delta = reference_at_horizon - restricted_at_horizon
-    recovered = abs(horizon_delta) <= SLOW_ZONE_SPEED_TOLERANCE_MPS
+    reference_at_horizon = float(_value_at(times, reference, end))
+    restricted_at_horizon = float(_value_at(times, speeds, end))
+    horizon_delta = float(reference_at_horizon - restricted_at_horizon)
+    recovered = bool(
+        abs(horizon_delta) <= SLOW_ZONE_SPEED_TOLERANCE_MPS)
     additional_deceleration = bool(reductions)
     zone_entered = bool(zone_indices)
     zone_exited = bool(exited_indices)

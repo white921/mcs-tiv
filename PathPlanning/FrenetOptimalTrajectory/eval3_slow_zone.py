@@ -14,25 +14,52 @@ import os
 
 
 ENVIRONMENT_SWITCH = "MCS_EVAL3_DOWNSTREAM_SLOW_ZONE"
+ENVIRONMENT_START_OFFSET = "MCS_EVAL3_SLOW_ZONE_START_OFFSET_M"
+ENVIRONMENT_LENGTH = "MCS_EVAL3_SLOW_ZONE_LENGTH_M"
+ENVIRONMENT_SPEED_LIMIT = "MCS_EVAL3_SLOW_ZONE_SPEED_LIMIT_MPS"
+RIGHT_EDGE_START_X_M = 157.2
 
 # The outgoing ``right`` edge starts at x=157.2 m.  The speed-hump section is
 # deliberately short and begins 15 m downstream of the conflict area so the
 # intersection-arrival term is unchanged.  Its length and 30 km/h limit allow
 # even the lower-acceleration bus model on the LR through route to decelerate
 # and recover within the 10 s prediction horizon when planning upstream.
-ZONE = {
+DEFAULT_ZONE = {
     "case": "eval3",
     "edge_id": "right",
     "lane_id": "right_0",
     "start_offset_m": 15.0,
     "length_m": 2.0,
-    "start_x_m": 172.2,
-    "end_x_m": 174.2,
     "lane_center_y_m": -1.6,
     "lateral_tolerance_m": 1.0,
     "speed_limit_mps": 8.33,
     "reason": "fixed-predictable-downstream-speed-hump",
 }
+
+
+def zone_from_environment(environment=None):
+    """Build one validated zone from the runner-controlled environment."""
+    environment = os.environ if environment is None else environment
+    zone = dict(DEFAULT_ZONE)
+    parameters = (
+        (ENVIRONMENT_START_OFFSET, "start_offset_m", True),
+        (ENVIRONMENT_LENGTH, "length_m", False),
+        (ENVIRONMENT_SPEED_LIMIT, "speed_limit_mps", False),
+    )
+    for variable, field, allow_zero in parameters:
+        if variable not in environment:
+            continue
+        value = float(environment[variable])
+        if not math.isfinite(value) or value < 0 or (not allow_zero and value == 0):
+            qualifier = "non-negative" if allow_zero else "positive"
+            raise ValueError(f"{variable} must be a finite {qualifier} number")
+        zone[field] = value
+    zone["start_x_m"] = RIGHT_EDGE_START_X_M + zone["start_offset_m"]
+    zone["end_x_m"] = zone["start_x_m"] + zone["length_m"]
+    return zone
+
+
+ZONE = zone_from_environment()
 
 
 def enabled_from_environment(environment=None):

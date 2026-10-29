@@ -21,6 +21,9 @@ class ResultLayoutTests(unittest.TestCase):
             "deceleration_time_half_life": 0.0,
             "deceleration_loss_lambda": 1.0,
             "eval3_downstream_slow_zone": False,
+            "eval3_slow_zone_start_offset": 15.0,
+            "eval3_slow_zone_length": 2.0,
+            "eval3_slow_zone_speed_limit": 8.33,
             "cases": ["eval3"],
             "seeds": [1, 2, 3, 4, 5],
             "seeds_per_case": None,
@@ -116,6 +119,18 @@ class ResultLayoutTests(unittest.TestCase):
         self.assertEqual(scenario["edge_id"], "right")
         self.assertEqual(scenario["speed_limit_mps"], 8.33)
         self.assertIn("candidate_trajectories", scenario["affects"])
+
+    def test_slow_zone_manifest_records_parameter_sweep_values(self):
+        scenario = RUNNER.eval3_slow_zone_manifest(self.args(
+            eval3_downstream_slow_zone=True,
+            eval3_slow_zone_start_offset=12.0,
+            eval3_slow_zone_length=10.0,
+            eval3_slow_zone_speed_limit=5.56,
+        ))
+
+        self.assertEqual(scenario["start_offset_m"], 12.0)
+        self.assertEqual(scenario["length_m"], 10.0)
+        self.assertEqual(scenario["speed_limit_mps"], 5.56)
 
 if __name__ == "__main__":
     unittest.main()
