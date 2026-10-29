@@ -50,6 +50,14 @@ TIMING_CONDITIONS = {
     "singleton-late-1p5": 1.5,
 }
 
+ADVANCE_CONDITIONS = {
+    "singleton-early-2p0": -2.0,
+    "singleton-early-2p5": -2.5,
+    "singleton-early-3p0": -3.0,
+    "singleton-early-3p5": -3.5,
+    "singleton-early-4p0": -4.0,
+}
+
 SPARSE_CONDITIONS = {
     "left8-three-episodes": {
         "platoon_approach": "left", "platoon_size": 8,
@@ -193,6 +201,20 @@ def main():
         for seed in range(1, 6):
             write_condition(
                 f"eval3-platoon-timing-validation/{name}",
+                f"seed-{seed}", condition, seed=seed)
+    for name, offset in ADVANCE_CONDITIONS.items():
+        condition = {
+            "platoon_approach": "left",
+            "platoon_size": 6,
+            "headway_s": 1.2,
+            "bus_leader": False,
+            "singleton_offset_s": offset,
+        }
+        write_condition("eval3-platoon-advance-search", name, condition)
+        print(name)
+        for seed in range(1, 6):
+            write_condition(
+                f"eval3-platoon-advance-validation/{name}",
                 f"seed-{seed}", condition, seed=seed)
     for name, condition in SPARSE_CONDITIONS.items():
         write_condition("eval3-platoon-sparse-search", name, condition)
