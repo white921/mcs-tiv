@@ -84,7 +84,20 @@ class Eval3SlowZoneTests(unittest.TestCase):
         self.assertLess(min(path.s_d), 8.7)
         self.assertGreater(path.s_d[-1], 10.9)
 
-    def test_real_turn_planner_exposes_dip_and_recovery_for_car_and_bus(self):
+    def test_non_binding_zone_preserves_a_slower_plan_exactly(self):
+        path = straight_path(speed=5.0)
+        original = {
+            name: list(getattr(path, name))
+            for name in ("x", "y", "s", "s_d", "s_dd", "s_ddd", "yaw", "ds", "c")
+        }
+
+        SLOW_ZONE.apply_to_path(
+            path, max_speed=13.89, max_accel=3.0, max_decel=-5.0)
+
+        for name, values in original.items():
+            self.assertEqual(getattr(path, name), values)
+
+    def test_real_straight_planner_exposes_dip_and_recovery_for_car_and_bus(self):
         import numpy as np
 
         planner_directory = ROOT / "PathPlanning" / "FrenetOptimalTrajectory"
@@ -93,43 +106,67 @@ class Eval3SlowZoneTests(unittest.TestCase):
             import frenet_three_junction as planner
 
             previous = os.environ.get(SLOW_ZONE.ENVIRONMENT_SWITCH)
-            os.environ[SLOW_ZONE.ENVIRONMENT_SWITCH] = "1"
             try:
                 for vehicle_type, max_speed, max_accel, max_decel in (
                     ("car", 13.89, 3.0, -5.0),
                     ("bus", 11.11, 1.0, -3.0),
                 ):
-                    with redirect_stdout(io.StringIO()):
-                        paths = planner.generate_frenet_frame(
-                            objects=np.empty((0, 2)),
-                            c_s=100.0,
-                            c_s_d=10.0,
-                            c_s_dd=0.0,
-                            c_d=0.0,
-                            mode="turn",
-                            route="BR",
-                            target_pos=141.8,
-                            simTime=0.0,
-                            vehInstance=SimpleNamespace(id=vehicle_type),
-                            vehicle_max_speed=max_speed,
-                            vehicle_max_accel=max_accel,
-                            vehicle_max_decel=max_decel,
-                        )
-                    self.assertEqual(len(paths), 1)
-                    path = paths[0]
-                    zone_speeds = [
-                        speed for x, y, speed in zip(path.x, path.y, path.s_d)
+                    selected = {}
+                    for enabled in (False, True):
+                        os.environ[SLOW_ZONE.ENVIRONMENT_SWITCH] = (
+                            "1" if enabled else "0")
+                        with redirect_stdout(io.StringIO()):
+                            paths = planner.generate_frenet_frame(
+                                objects=np.empty((0, 2)),
+                                c_s=100.0,
+                                c_s_d=max_speed,
+                                c_s_dd=0.0,
+                                c_d=0.0,
+                                mode="free",
+                                route="LR",
+                                target_pos=141.8,
+                                simTime=0.0,
+                                vehInstance=SimpleNamespace(id=vehicle_type),
+                                vehicle_max_speed=max_speed,
+                                vehicle_max_accel=max_accel,
+                                vehicle_max_decel=max_decel,
+                            )
+                        selected[enabled] = min(paths, key=lambda path: path.cf)
+
+                    normal = selected[False]
+                    restricted = selected[True]
+                    normal_zone_speeds = [
+                        speed for x, y, speed in
+                        zip(normal.x, normal.y, normal.s_d)
                         if (SLOW_ZONE.ZONE["start_x_m"] <= x <=
                             SLOW_ZONE.ZONE["end_x_m"] and
                             abs(y - SLOW_ZONE.ZONE["lane_center_y_m"]) <= 1.0)
                     ]
-                    speed_at_ten = next(
-                        speed for time, speed in zip(path.t, path.s_d)
+                    restricted_zone_speeds = [
+                        speed for x, y, speed in
+                        zip(restricted.x, restricted.y, restricted.s_d)
+                        if (SLOW_ZONE.ZONE["start_x_m"] <= x <=
+                            SLOW_ZONE.ZONE["end_x_m"] and
+                            abs(y - SLOW_ZONE.ZONE["lane_center_y_m"]) <= 1.0)
+                    ]
+                    normal_speed_at_ten = next(
+                        speed for time, speed in zip(normal.t, normal.s_d)
                         if abs(time - 10.0) < 1e-9)
-                    self.assertTrue(zone_speeds)
+                    restricted_speed_at_ten = next(
+                        speed for time, speed in
+                        zip(restricted.t, restricted.s_d)
+                        if abs(time - 10.0) < 1e-9)
+                    self.assertTrue(normal_zone_speeds)
+                    self.assertGreater(
+                        min(normal_zone_speeds),
+                        SLOW_ZONE.ZONE["speed_limit_mps"] + 0.5)
+                    self.assertTrue(restricted_zone_speeds)
                     self.assertLessEqual(
-                        max(zone_speeds), SLOW_ZONE.ZONE["speed_limit_mps"] + 0.01)
-                    self.assertAlmostEqual(speed_at_ten, max_speed, places=2)
+                        max(restricted_zone_speeds),
+                        SLOW_ZONE.ZONE["speed_limit_mps"] + 0.01)
+                    self.assertAlmostEqual(
+                        restricted_speed_at_ten, normal_speed_at_ten, places=2)
+                    self.assertLess(restricted.x[-1], normal.x[-1])
             finally:
                 if previous is None:
                     os.environ.pop(SLOW_ZONE.ENVIRONMENT_SWITCH, None)

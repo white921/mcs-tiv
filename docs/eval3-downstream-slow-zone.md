@@ -19,9 +19,14 @@ followers over the 10-second trajectory.
 - Length: 2 m
 - Limit: 8.33 m/s (30 km/h)
 - Applies to: candidate trajectories and live path following
-- Vehicle models: both cars and buses decelerate through the section and
-  recover to their normal maximum speed by 10 seconds in the checked turn
-  trajectory
+- Vehicle models: both cars and buses on the LR through route decelerate
+  through the section and recover to the same terminal speed as the normal
+  road by 10 seconds in the checked upstream planning state
+
+The BR turn is already below 30 km/h at this location in the checked planning
+state, so the added limit is non-binding for that trajectory.  The experiment's
+deliberate temporary speed loss is created on the LR through traffic that
+shares the downstream `right` corridor.
 
 The restriction is disabled by default.  Add
 `--eval3-downstream-slow-zone` to enable it.  Omitting that option preserves

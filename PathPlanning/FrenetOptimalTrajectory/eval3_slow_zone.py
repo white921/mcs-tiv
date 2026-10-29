@@ -18,8 +18,8 @@ ENVIRONMENT_SWITCH = "MCS_EVAL3_DOWNSTREAM_SLOW_ZONE"
 # The outgoing ``right`` edge starts at x=157.2 m.  The speed-hump section is
 # deliberately short and begins 15 m downstream of the conflict area so the
 # intersection-arrival term is unchanged.  Its length and 30 km/h limit allow
-# even the lower-acceleration bus model to decelerate and recover within the
-# 10 s prediction horizon when negotiating about 50 m upstream.
+# even the lower-acceleration bus model on the LR through route to decelerate
+# and recover within the 10 s prediction horizon when planning upstream.
 ZONE = {
     "case": "eval3",
     "edge_id": "right",
@@ -151,9 +151,13 @@ def apply_to_path(path, *, max_speed, max_accel, max_decel, time_step=0.1):
     if max_speed <= 0 or max_accel <= 0 or deceleration <= 0:
         raise ValueError("vehicle motion limits must be positive")
 
+    original_speeds = [
+        max(0.0, min(float(speed), float(max_speed)))
+        for speed in path.s_d
+    ]
     progress = [0.0]
-    speeds = [max(0.0, min(float(path.s_d[0]), float(max_speed)))]
-    for _ in range(1, sample_count):
+    speeds = [original_speeds[0]]
+    for index in range(1, sample_count):
         current_position = progress[-1]
         current_speed = speeds[-1]
         if current_position < zone_start:
@@ -163,15 +167,20 @@ def apply_to_path(path, *, max_speed, max_accel, max_decel, time_step=0.1):
             # enter the restricted section one sample above its limit.
             braking_distance = max(
                 distance_to_zone - current_speed * time_step, 0.0)
-            target_speed = min(
+            zone_envelope = min(
                 float(max_speed),
                 math.sqrt(ZONE["speed_limit_mps"] ** 2 +
                           2 * deceleration * braking_distance),
             )
         elif current_position <= zone_end:
-            target_speed = ZONE["speed_limit_mps"]
+            zone_envelope = ZONE["speed_limit_mps"]
         else:
-            target_speed = float(max_speed)
+            zone_envelope = float(max_speed)
+
+        # The speed hump is an additional road constraint, not a replacement
+        # for the trajectory mode.  Preserve a free/follow/yield/stop plan
+        # whenever it is already slower than the restriction's envelope.
+        target_speed = min(original_speeds[index], zone_envelope)
 
         next_speed = min(current_speed + float(max_accel) * time_step, target_speed)
         next_speed = max(next_speed, current_speed - deceleration * time_step, 0.0)
@@ -181,6 +190,13 @@ def apply_to_path(path, *, max_speed, max_accel, max_decel, time_step=0.1):
         )
         progress.append(next_position)
         speeds.append(next_speed)
+
+    # Avoid numerical re-parameterization when the original trajectory already
+    # obeys the new restriction.  This makes the disabled and non-binding cases
+    # exactly identical to the established simulation behavior.
+    if all(abs(actual - original) <= 1e-12
+           for actual, original in zip(speeds, original_speeds)):
+        return path
 
     for name in ("x", "y", "s", "d", "d_d", "d_dd", "d_ddd"):
         values = getattr(path, name, None)
