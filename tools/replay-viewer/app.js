@@ -164,6 +164,82 @@ function drawNetwork(view) {
   }
 }
 
+function drawAnnotationLabel(text, x, y, color) {
+  ctx.save();
+  ctx.font = '700 11px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  const width = ctx.measureText(text).width + 12;
+  ctx.fillStyle = 'rgba(8, 16, 25, .9)';
+  ctx.fillRect(x - width / 2, y - 18, width, 17);
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y - 4);
+  ctx.restore();
+}
+
+function drawMergeZone(annotation, view) {
+  const [startX, laneY] = view.point(annotation.start_x, annotation.y);
+  const [endX] = view.point(annotation.end_x, annotation.y);
+  const laneWidth = Math.max(8, Number(annotation.width_m || 3.2) * view.scale);
+  const left = Math.min(startX, endX);
+  const width = Math.abs(endX - startX);
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(73, 210, 255, .13)';
+  ctx.fillRect(left, laneY - laneWidth / 2, width, laneWidth);
+  ctx.strokeStyle = 'rgba(89, 219, 255, .9)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 5]);
+  for (const x of [startX, endX]) {
+    ctx.beginPath();
+    ctx.moveTo(x, laneY - laneWidth * .8);
+    ctx.lineTo(x, laneY + laneWidth * .8);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  drawAnnotationLabel(annotation.start_label, startX, laneY - laneWidth, '#69dcff');
+  drawAnnotationLabel(annotation.end_label, endX, laneY + laneWidth + 25, '#69dcff');
+}
+
+function drawObstacle(annotation, view) {
+  const [x, y] = view.point(annotation.x, annotation.y);
+  const length = Math.max(12, Number(annotation.length_m || 5) * view.scale);
+  const width = Math.max(8, Number(annotation.width_m || 1.8) * view.scale);
+  const angle = Number(annotation.angle_deg || 0) * Math.PI / 180;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.fillStyle = '#e7edf3';
+  ctx.strokeStyle = '#ff5c68';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(-width / 2, -length / 2, width, length, 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = '#ff5c68';
+  ctx.lineWidth = 2;
+  for (let offset = -length / 2 + 3; offset < length / 2; offset += 7) {
+    ctx.beginPath();
+    ctx.moveTo(-width / 2, offset);
+    ctx.lineTo(width / 2, Math.min(length / 2, offset + width));
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  const position = Number.isFinite(Number(annotation.lane_position_m))
+    ? ` · 車線位置 ${Number(annotation.lane_position_m).toFixed(0)} m` : '';
+  drawAnnotationLabel(`${annotation.label}${position}`, x, y - Math.max(width, length) / 2 - 4, '#ff7b84');
+}
+
+function drawScenarioAnnotations(view) {
+  for (const annotation of state.network.annotations || []) {
+    if (annotation.kind === 'merge_zone') drawMergeZone(annotation, view);
+    if (annotation.kind === 'obstacle') drawObstacle(annotation, view);
+  }
+}
+
 function signalState(vehicle) {
   if (vehicle.signal_state) return vehicle.signal_state;
   const bits = Number(vehicle.signals || 0);
@@ -273,6 +349,7 @@ function draw() {
   if (!state.network || !state.frame) return;
   const view = transform();
   drawNetwork(view);
+  drawScenarioAnnotations(view);
   const currentEvents = eventsAt(Number(state.frame.sim_time));
   drawLeaderLines(view, currentEvents);
   for (const vehicle of state.frame.vehicles) drawVehicle(vehicle, view, currentEvents);
@@ -401,6 +478,10 @@ async function loadSelection(selectionId) {
   const note = document.querySelector('#scenario-note');
   note.textContent = state.meta.scenario_note || '';
   note.hidden = !state.meta.scenario_note;
+  const annotationKinds = new Set(
+    (state.network.annotations || []).map(annotation => annotation.kind));
+  document.querySelector('#merge-zone-legend').hidden = !annotationKinds.has('merge_zone');
+  document.querySelector('#obstacle-legend').hidden = !annotationKinds.has('obstacle');
   await setFrame(0);
   resizeCanvas();
 }

@@ -41,6 +41,11 @@ Passing either a different results root or one seed directory remains supported.
 - the event panel joins negotiation records to the closest 0.1-second frame.
 - Eval.3 displays an explicit note that the inherited implementation uses the
   four-arm network with no traffic on the upper approach.
+- Eval.6 and Eval.7 shade the 100 m merge range from x=200 m to x=300 m,
+  label its start and expected completion boundary, and draw the static
+  `stone` obstacle from its exact pose in the saved FCD.  The obstacle remains
+  separate from traffic counts because diagnostic vehicle traces intentionally
+  omit it.
 
 The server indexes uncompressed JSONL by byte offset instead of loading all
 vehicle frames into browser memory.  This keeps a 600-second diagnostic usable.

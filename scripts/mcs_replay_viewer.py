@@ -142,6 +142,67 @@ def parse_network(path: Path) -> dict:
     return {"file": path.name, "bounds": bounds, "lanes": lanes}
 
 
+def find_static_obstacles(run_dir: Path, case: str | None) -> list[dict]:
+    """Read scenario obstacles that are intentionally absent from vehicle traces.
+
+    The merge runner models the end of the requesting lane with a stopped SUMO
+    vehicle named ``stone``.  Diagnostic vehicle traces only contain controlled
+    vehicles, while FCD retains the exact pose of this static object.
+    """
+    if str(case).lower() not in {"eval6", "eval7"}:
+        return []
+    candidates = [run_dir / "fcd.xml.gz", run_dir / "fcd.xml"]
+    fcd_path = next((path for path in candidates if path.is_file()), None)
+    if fcd_path is None:
+        return []
+    opener = gzip.open if fcd_path.suffix == ".gz" else open
+    with opener(fcd_path, "rt", encoding="utf-8") as stream:
+        for _, element in ET.iterparse(stream, events=("end",)):
+            if element.tag.rsplit("}", 1)[-1] != "vehicle":
+                continue
+            if element.get("id") != "stone":
+                element.clear()
+                continue
+            return [{
+                "kind": "obstacle",
+                "id": "stone",
+                "label": "障害物 stone",
+                "x": float(element.get("x", "0")),
+                "y": float(element.get("y", "0")),
+                "angle_deg": float(element.get("angle", "0")),
+                "lane_id": element.get("lane"),
+                "lane_position_m": float(element.get("pos", "0")),
+                "length_m": 5.0,
+                "width_m": 1.8,
+                "source": "fcd",
+            }]
+    return []
+
+
+def scenario_annotations(run_dir: Path, case: str | None,
+                         network: dict) -> list[dict]:
+    """Return fixed scenario landmarks drawn independently from traffic state."""
+    if str(case).lower() not in {"eval6", "eval7"}:
+        return []
+    requesting_lane = next(
+        (lane for lane in network["lanes"] if lane["id"] == "main_0"), None)
+    lane_y = requesting_lane["shape"][0][1] if requesting_lane else -8.0
+    lane_width = requesting_lane["width"] if requesting_lane else 3.2
+    annotations = [{
+        "kind": "merge_zone",
+        "label": "合流区間 100 m",
+        "start_label": "合流開始 200 m",
+        "end_label": "合流完了目安 300 m",
+        "start_x": 200.0,
+        "end_x": 300.0,
+        "y": lane_y,
+        "width_m": lane_width,
+        "lane_id": "main_0",
+    }]
+    annotations.extend(find_static_obstacles(run_dir, case))
+    return annotations
+
+
 class ReplayApplication:
     def __init__(self, run_dir: Path):
         self.run_dir = run_dir.resolve()
@@ -156,6 +217,8 @@ class ReplayApplication:
         self.events.sort(key=lambda event: float(event.get("sim_time", 0)))
         self.network = parse_network(find_network(
             self.run_dir, self.manifest.get("case")))
+        self.network["annotations"] = scenario_annotations(
+            self.run_dir, self.manifest.get("case"), self.network)
 
     def metadata(self):
         return {

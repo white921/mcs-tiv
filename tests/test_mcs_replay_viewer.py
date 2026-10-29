@@ -1,4 +1,5 @@
 import json
+import gzip
 import shutil
 import sys
 import tempfile
@@ -14,9 +15,11 @@ from mcs_replay_viewer import (
     display_method,
     find_trace,
     find_network,
+    find_static_obstacles,
     logical_experiment_id,
     parse_network,
     physical_experiment_id,
+    scenario_annotations,
 )
 
 
@@ -65,6 +68,31 @@ class ReplayViewerTests(unittest.TestCase):
                              "junction_four.net.xml")
             self.assertEqual(find_network(run, "eval7").name,
                              "threeLane.net.xml")
+
+    def test_merge_annotations_include_range_and_fcd_stone(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            with gzip.open(run / "fcd.xml.gz", "wt", encoding="utf-8") as stream:
+                stream.write("""<?xml version=\"1.0\"?>
+<fcd-export><timestep time=\"0.10\">
+<vehicle id=\"stone\" x=\"299.90\" y=\"-8.00\" angle=\"90.00\"
+ type=\"CAV_0\" speed=\"0.00\" pos=\"305.00\" lane=\"main_0\"/>
+</timestep></fcd-export>""")
+            network = parse_network(ROOT / "merge" / "threeLane.net.xml")
+            annotations = scenario_annotations(run, "eval7", network)
+            merge_zone = next(item for item in annotations
+                              if item["kind"] == "merge_zone")
+            obstacle = next(item for item in annotations
+                            if item["kind"] == "obstacle")
+            self.assertEqual((merge_zone["start_x"], merge_zone["end_x"]),
+                             (200.0, 300.0))
+            self.assertEqual(obstacle["id"], "stone")
+            self.assertEqual(obstacle["x"], 299.9)
+            self.assertEqual(obstacle["lane_position_m"], 305.0)
+
+    def test_non_merge_case_has_no_static_obstacles(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(find_static_obstacles(Path(directory), "eval3"), [])
 
     def test_catalog_groups_experiment_eval_and_seed(self):
         with tempfile.TemporaryDirectory() as directory:
