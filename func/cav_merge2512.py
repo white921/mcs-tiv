@@ -222,8 +222,10 @@ class CAV:
 
         # 他の車両が全て交渉を受け入れる場合に代替経路を予定経路に設定
         if self.WithAgreementPhase and self.isWaitAgree:
-            self.waitAgreeID.sort()
-            self.receiveAgreeID.sort()
+            thesis_tiv.abort_waiting_agreement(self)
+        if self.WithAgreementPhase and self.isWaitAgree:
+            self.waitAgreeID = sorted(set(self.waitAgreeID), key=str)
+            self.receiveAgreeID = sorted(set(self.receiveAgreeID), key=str)
             print("\tagree wait id", self.waitAgreeID, "receive id", self.receiveAgreeID)
             if self.waitAgreeID == self.receiveAgreeID:
                 print("\talter to", self.waitPath.pathID)
@@ -777,7 +779,8 @@ class CAV:
         if self.WithAgreementPhase and self.isWaitAgree:
             for path in self.receivedPaths:
                 if path.type == "alter" and path.yieldTo == self.alter_straight_path.yieldTo:
-                    self.receiveAgreeID.append(path.vehID)
+                    if path.vehID not in self.receiveAgreeID:
+                        self.receiveAgreeID.append(path.vehID)
 
 
     # 経路を10秒後まで延長

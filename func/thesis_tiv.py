@@ -12,6 +12,8 @@ from trajectory_arrival import arrival_delay as shared_arrival_delay
 
 COUNTS = Counter()
 EXAMPLES = []
+AGREEMENT_REJECTIONS = {}
+AGREEMENT_REJECTION_TTL = 2.0
 IMPLEMENTATION = os.environ.get("MCS_TIV_IMPLEMENTATION", "thesis")
 if IMPLEMENTATION not in ("thesis", "legacy-local"):
     raise ValueError("invalid MCS_TIV_IMPLEMENTATION")
@@ -26,6 +28,83 @@ def planned_update_interval(vehicle, legacy_interval):
     # *candidate trajectory regeneration* expiry, for which the archived
     # implementation uses one second.  Agreement-path validity is separate.
     return 1.0 if enabled(vehicle) else legacy_interval
+
+
+def merge_required_receiver_ids(vehicle, collisions, traci):
+    """Return the unique cross-lane vehicles that can vote on a merge.
+
+    A vehicle already travelling in the requester's lane cannot provide the
+    alternative straight-line yielding trajectory used by the merge protocol,
+    so including it makes unanimous agreement impossible.
+    """
+    result = []
+    sender_lane = vehicle.lane
+    for collision in collisions:
+        receiver_id = collision["collideID"]
+        receiver_path = collision.get("path")
+        receiver_lane = getattr(receiver_path, "lane_index", None)
+        if receiver_lane is None:
+            receiver_lane = traci.vehicle.getLaneIndex(receiver_id)
+        if receiver_lane == sender_lane or receiver_id in result:
+            continue
+        result.append(receiver_id)
+    return sorted(result, key=str)
+
+
+def _agreement_key(desired):
+    return str(desired.vehID), str(desired.pathID)
+
+
+def _prune_agreement_rejections(now):
+    for key, votes in list(AGREEMENT_REJECTIONS.items()):
+        current = {
+            receiver: vote for receiver, vote in votes.items()
+            if now - vote["sim_time"] <= AGREEMENT_REJECTION_TTL
+        }
+        if current:
+            AGREEMENT_REJECTIONS[key] = current
+        else:
+            AGREEMENT_REJECTIONS.pop(key, None)
+
+
+def record_agreement_rejection(desired, receiver_id, sim_time, reason):
+    """Publish a negative vote so already-accepting peers can abort promptly."""
+    _prune_agreement_rejections(sim_time)
+    AGREEMENT_REJECTIONS.setdefault(_agreement_key(desired), {})[
+        str(receiver_id)
+    ] = {"sim_time": float(sim_time), "reason": reason}
+
+
+def agreement_rejections(desired, receiver_id, sim_time):
+    _prune_agreement_rejections(sim_time)
+    expected = {str(value) for value in (desired.negotiationID or [])}
+    expected.discard(str(receiver_id))
+    votes = AGREEMENT_REJECTIONS.get(_agreement_key(desired), {})
+    return {key: value for key, value in votes.items() if key in expected}
+
+
+def abort_waiting_agreement(vehicle):
+    """Cancel a local Accept when another required receiver voted Reject."""
+    if not vehicle.isWaitAgree or vehicle.waitPath is None:
+        return False
+    rejections = agreement_rejections(
+        vehicle.waitPath, vehicle.id, vehicle.simTime)
+    if not rejections:
+        return False
+    diagnostic_trace.record_negotiation(
+        vehicle, vehicle.waitPath, "cancelled", accept=False,
+        reason="peer_rejected", details={"rejections": rejections})
+    if vehicle.waitPath.pathID not in vehicle.yetJudgedList:
+        vehicle.yetJudgedList.append(vehicle.waitPath.pathID)
+    vehicle.alter_straight_path = None
+    if hasattr(vehicle, "alter_change_path"):
+        vehicle.alter_change_path = None
+    vehicle.isWaitAgree = False
+    vehicle.waitAgreeID = []
+    vehicle.receiveAgreeID = []
+    vehicle.waitPath = None
+    COUNTS["agreement_cancelled_by_peer_rejection"] += 1
+    return True
 
 
 def trajectories_are_too_close(
@@ -221,6 +300,18 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
                 continue
             if vehicle.pos_x > 300:
                 return
+            if vehicle.WithAgreementPhase:
+                rejections = agreement_rejections(
+                    desired, vehicle.id, vehicle.simTime)
+                if rejections:
+                    diagnostic_trace.record_negotiation(
+                        vehicle, desired, "cancelled", accept=False,
+                        reason="peer_rejected", collision=collision,
+                        details={"rejections": rejections})
+                    if desired.pathID not in vehicle.yetJudgedList:
+                        vehicle.yetJudgedList.append(desired.pathID)
+                    COUNTS["agreement_skipped_after_peer_rejection"] += 1
+                    continue
         elif traci.vehicle.getRoadID(desired.vehID) == vehicle.road:
             continue
         if desired.pathID in vehicle.yetJudgedList:
@@ -244,6 +335,10 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             vehicle.yetJudgedList.append(desired.pathID)
             vehicle.count_refuse_physics += 1
             COUNTS["no_feasible_alternative"] += 1
+            if merge and vehicle.WithAgreementPhase:
+                record_agreement_rejection(
+                    desired, vehicle.id, vehicle.simTime,
+                    "no_feasible_alternative")
             continue
         selected = vehicle.selectBestPath(alternatives)
         if merge:
@@ -349,6 +444,9 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             vehicle.alter_straight_path = None
             vehicle.yetJudgedList.append(desired.pathID)
             vehicle.count_refuse_utility += 1
+            if merge and vehicle.WithAgreementPhase:
+                record_agreement_rejection(
+                    desired, vehicle.id, vehicle.simTime, prediction_method)
             continue
         vehicle.count_accept_utility += 1
         vehicle.pathID += 1

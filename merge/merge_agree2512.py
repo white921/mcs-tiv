@@ -410,8 +410,8 @@ def run(alpha='0.0', inflow_0=750, inflow_1=750, quiet=False, save_statistics=Tr
             if ins.desiredPaths:
                 collision_list_desired, _ = ins.checkPathCollision(ins.desiredPaths[0], ins.receivedPaths, s_type="planned")
                 if collision_list_desired:
-                    ins.desiredPaths[0].negotiationID = [i["collideID"] for i in collision_list_desired]
-                    ins.desiredPaths[0].negotiationID.sort()
+                    ins.desiredPaths[0].negotiationID = thesis_tiv.merge_required_receiver_ids(
+                        ins, collision_list_desired, traci)
                     if ins.status == "lanechange":
                         ins.status = None
                         

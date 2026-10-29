@@ -48,6 +48,9 @@ def traci():
 
 
 class ThesisTIVTests(unittest.TestCase):
+    def setUp(self):
+        tiv.AGREEMENT_REJECTIONS.clear()
+
     def test_vertical_opposing_lanes_are_not_treated_as_same_corridor(self):
         self.assertFalse(tiv.trajectories_are_too_close(
             148.4, 32, 151.6, 32,
@@ -243,6 +246,55 @@ class ThesisTIVTests(unittest.TestCase):
         self.assertIs(v.waitPath, desired)
         v.waitAgreeID.append("new")
         self.assertEqual(desired.negotiationID, ["2"])
+
+    def test_merge_agreement_excludes_same_lane_and_duplicate_receivers(self):
+        sender = vehicle("1")
+        sender.lane = 0
+        same_lane = path("2")
+        same_lane.lane_index = 0
+        other_lane = path("3")
+        other_lane.lane_index = 1
+        collisions = [
+            {"collideID": "2", "path": same_lane},
+            {"collideID": "3", "path": other_lane},
+            {"collideID": "3", "path": other_lane},
+        ]
+        self.assertEqual(
+            tiv.merge_required_receiver_ids(sender, collisions, traci()),
+            ["3"])
+
+    def test_peer_rejection_aborts_waiting_accept(self):
+        receiver, desired, _ = self.decision()
+        desired.negotiationID = ["2", "3"]
+        receiver.WithAgreementPhase = True
+        receiver.isWaitAgree = True
+        receiver.waitPath = desired
+        receiver.waitAgreeID = ["2", "3"]
+        receiver.receiveAgreeID = ["2"]
+        receiver.alter_straight_path = path("2", "alter")
+        receiver.alter_change_path = path("2", "alter")
+
+        tiv.record_agreement_rejection(
+            desired, "3", receiver.simTime, "no_feasible_alternative")
+
+        self.assertTrue(tiv.abort_waiting_agreement(receiver))
+        self.assertFalse(receiver.isWaitAgree)
+        self.assertIsNone(receiver.alter_straight_path)
+        self.assertIsNone(receiver.alter_change_path)
+        self.assertIn(desired.pathID, receiver.yetJudgedList)
+
+    def test_merge_physical_rejection_is_published_to_peers(self):
+        receiver, desired, collisions = self.decision()
+        receiver.lane = 0
+        receiver.WithAgreementPhase = True
+        desired.negotiationID = ["2", "3"]
+        receiver.generateAlterPath.return_value = []
+
+        tiv.judge_yield(receiver, collisions, [], traci(), merge=True)
+
+        self.assertEqual(
+            tiv.agreement_rejections(desired, "3", receiver.simTime)["2"]["reason"],
+            "no_feasible_alternative")
 
     def test_two_unreachable_paths_not_accepted(self):
         v, _, collisions = self.decision(math.inf)
