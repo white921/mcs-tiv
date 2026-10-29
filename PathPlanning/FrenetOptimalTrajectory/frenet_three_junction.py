@@ -12,6 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import copy
 from trajectory_precision import position
+import eval3_slow_zone
 import math
 import sys
 import os
@@ -921,6 +922,13 @@ def generate_frenet_frame(objects, c_s, c_s_d, c_s_dd, c_d, mode, route, target_
     elif mode == "turn":
         fplist = calc_frenet_paths_desired(c_s, c_s_d, c_s_dd, c_d, c_d_d, c_d_dd, route, duration=maxT,
                                             max_speed=vehicle_max_speed, max_accel=vehicle_max_accel, max_decel=vehicle_max_decel)
+
+    fplist = eval3_slow_zone.apply_to_paths(
+        fplist,
+        max_speed=vehicle_max_speed,
+        max_accel=vehicle_max_accel,
+        max_decel=vehicle_max_decel,
+    )
 
     # plot_path(fplist)
 

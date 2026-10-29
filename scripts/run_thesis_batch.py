@@ -49,6 +49,7 @@ CONTROLLED_MCS_ENV = {
     "MCS_DECELERATION_LOSS_LAMBDA",
     "MCS_DECELERATION_TIME_HALF_LIFE_S",
     "MCS_EVALUATION_AUDIT",
+    "MCS_EVAL3_DOWNSTREAM_SLOW_ZONE",
     "MCS_FCD_OUTPUT",
     "MCS_NEGOTIATION_AUDIT",
     "MCS_PHYSICAL_COLLISION_AUDIT",
@@ -68,6 +69,17 @@ CONTROLLED_MCS_ENV = {
 # agreement-hold extension.  Record that choice explicitly so a completed
 # result can be audited without inferring it from absent CLI flags.
 PRIORITY_HOLD_MANIFEST = {"mode": "off", "enabled": False}
+
+EVAL3_DOWNSTREAM_SLOW_ZONE_MANIFEST = {
+    "case": "eval3",
+    "edge_id": "right",
+    "lane_id": "right_0",
+    "start_offset_m": 15.0,
+    "length_m": 2.0,
+    "speed_limit_mps": 8.33,
+    "reason": "fixed-predictable-downstream-speed-hump",
+    "affects": ["candidate_trajectories", "live_path_following"],
+}
 
 # These are the five published result families for which the audited source
 # contains an exact scenario runner.  Eval.1/2 need their comparison matrices
@@ -132,6 +144,8 @@ def default_run_directory(args, now=None):
         half_life = getattr(args, "deceleration_time_half_life", 0)
         if args.deceleration_active and half_life > 0:
             method += f"-weighted-{duration_label(half_life)}s"
+        if getattr(args, "eval3_downstream_slow_zone", False):
+            method += "-downstream-slow-zone"
         cases = "-".join(args.cases)
         if args.seeds is not None:
             seeds = "seeds-" + "-".join(str(seed) for seed in args.seeds)
@@ -175,6 +189,13 @@ def deceleration_prediction_manifest(args):
         "excluded_loss_roles": ["request_vehicle", "receiver_vehicle"],
         "distance_to_time_speed": "per-vehicle allowed speed at negotiation",
     }
+
+
+def eval3_slow_zone_manifest(args):
+    """Return the common scenario condition independently of decision method."""
+    if not getattr(args, "eval3_downstream_slow_zone", False):
+        return None
+    return dict(EVAL3_DOWNSTREAM_SLOW_ZONE_MANIFEST)
 
 
 def fixed_input_details(
@@ -274,6 +295,8 @@ def run_task(task, args):
                PYTHONPATH=str(sumo_home / "tools"),
                MPLBACKEND="Agg", OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1",
                MCS_TIV_IMPLEMENTATION="thesis",
+               MCS_EVAL3_DOWNSTREAM_SLOW_ZONE=(
+                   "1" if args.eval3_downstream_slow_zone else "0"),
                MCS_DECELERATION_MODE=("active" if args.deceleration_active else "off"),
                MCS_DECELERATION_TIME_HALF_LIFE_S=str(
                    args.deceleration_time_half_life if args.deceleration_active else 0.0),
@@ -345,6 +368,7 @@ def run_task(task, args):
         } if fixed_input is not None else None),
         "decision_method": "deceleration-propagation" if args.deceleration_active else "thesis-tiv",
         "priority_hold": dict(PRIORITY_HOLD_MANIFEST),
+        "eval3_downstream_slow_zone": eval3_slow_zone_manifest(args),
         "deceleration_prediction": deceleration_prediction_manifest(args),
         "diagnostic_traces_requested": args.diagnostic_traces,
         "diagnostic_traces_enabled": bool(args.diagnostic_traces),
@@ -442,6 +466,10 @@ def main():
     parser.add_argument("--deceleration-active", action="store_true",
                         help="use the proposed deceleration-propagation rule")
     parser.add_argument(
+        "--eval3-downstream-slow-zone", action="store_true",
+        help=("add the fixed 8.33 m/s speed hump 15 m downstream on Eval.3's "
+              "right outgoing edge; applies equally to both decision methods"))
+    parser.add_argument(
         "--deceleration-time-half-life", type=float, default=0.0,
         help="exponential future-loss half-life in seconds; 0 keeps uniform 10 s weighting")
     parser.add_argument(
@@ -474,6 +502,8 @@ def main():
         parser.error("prediction and checkpoint limits must be non-negative")
     if args.deceleration_time_half_life > 0 and not args.deceleration_active:
         parser.error("--deceleration-time-half-life requires --deceleration-active")
+    if args.eval3_downstream_slow_zone and set(args.cases) != {"eval3"}:
+        parser.error("--eval3-downstream-slow-zone requires --cases eval3")
     if not (args.sumo_home / "bin" / "sumo").is_file() or not (args.sumo_home / "tools" / "traci").is_dir():
         parser.error("--sumo-home must contain bin/sumo and tools/traci")
     if args.paper is not None and not args.paper.is_file():
@@ -517,6 +547,7 @@ def main():
         "started_epoch": started_at.timestamp(),
         "directory": str(args.output),
         "method": "deceleration-propagation" if args.deceleration_active else "yamashita-tiv",
+        "eval3_downstream_slow_zone": eval3_slow_zone_manifest(args),
         "deceleration_time_half_life_s": (
             args.deceleration_time_half_life
             if args.deceleration_active and args.deceleration_time_half_life > 0

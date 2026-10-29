@@ -20,6 +20,7 @@ class ResultLayoutTests(unittest.TestCase):
             "deceleration_active": True,
             "deceleration_time_half_life": 0.0,
             "deceleration_loss_lambda": 1.0,
+            "eval3_downstream_slow_zone": False,
             "cases": ["eval3"],
             "seeds": [1, 2, 3, 4, 5],
             "seeds_per_case": None,
@@ -74,6 +75,7 @@ class ResultLayoutTests(unittest.TestCase):
             "MCS_DECELERATION_LOSS_LAMBDA": "99",
             "MCS_FCD_OUTPUT": "/tmp/old-fcd.xml",
             "MCS_CHECKPOINT_DIR": "/tmp/old-checkpoint",
+            "MCS_EVAL3_DOWNSTREAM_SLOW_ZONE": "1",
         }
 
         cleaned = RUNNER.clean_experiment_environment(stale)
@@ -98,6 +100,22 @@ class ResultLayoutTests(unittest.TestCase):
             manifest["excluded_loss_roles"],
             ["request_vehicle", "receiver_vehicle"])
 
+    def test_slow_zone_is_named_and_recorded_independently_of_method(self):
+        now = datetime.datetime(
+            2026, 10, 26, 15, 30, 0,
+            tzinfo=datetime.timezone(datetime.timedelta(hours=9)))
+        args = self.args(
+            deceleration_active=False,
+            eval3_downstream_slow_zone=True,
+        )
+
+        path = RUNNER.default_run_directory(args, now=now)
+        scenario = RUNNER.eval3_slow_zone_manifest(args)
+
+        self.assertIn("yamashita-downstream-slow-zone", path.name)
+        self.assertEqual(scenario["edge_id"], "right")
+        self.assertEqual(scenario["speed_limit_mps"], 8.33)
+        self.assertIn("candidate_trajectories", scenario["affects"])
 
 if __name__ == "__main__":
     unittest.main()
