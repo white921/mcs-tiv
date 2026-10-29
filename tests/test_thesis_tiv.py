@@ -187,6 +187,24 @@ class ThesisTIVTests(unittest.TestCase):
         self.assertEqual(packet.x[0], 0)
         api.vehicle.getAllowedSpeed.assert_called_once_with("1")
 
+    def test_desired_packet_tracks_continuous_request_wait(self):
+        sender = vehicle()
+        sender.desiredPaths = [path(kind="desired")]
+        sender.checkPathCollision = Mock(return_value=([], []))
+        api = traci()
+
+        first = []
+        tiv.send_mcm(sender, first, api)
+        sender.simTime = 5.0
+        second = []
+        tiv.send_mcm(sender, second, api)
+        sender.desiredPaths = []
+        tiv.send_mcm(sender, [], api)
+
+        self.assertEqual(first[1].request_wait_s, 0.0)
+        self.assertEqual(second[1].request_wait_s, 5.0)
+        self.assertIsNone(sender.merge_request_started_at)
+
     def decision(self, desired_value=1.3):
         v = vehicle("2")
         desired = path("1", "desired")

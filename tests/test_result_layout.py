@@ -21,6 +21,7 @@ class ResultLayoutTests(unittest.TestCase):
             "deceleration_time_half_life": 0.0,
             "deceleration_loss_lambda": 1.0,
             "deceleration_loss_normalization": "sum",
+            "deceleration_wait_urgency_rate": 0.0,
             "cases": ["eval3"],
             "seeds": [1, 2, 3, 4, 5],
             "seeds_per_case": None,
@@ -107,6 +108,13 @@ class ResultLayoutTests(unittest.TestCase):
 
         self.assertEqual(manifest["loss_normalization"], "sqrt-followers")
         self.assertIn("sqrt(follower_count)", manifest["loss_aggregation"])
+
+    def test_manifest_records_wait_urgency_rate_and_formula(self):
+        manifest = RUNNER.deceleration_prediction_manifest(
+            self.args(deceleration_wait_urgency_rate=.1))
+
+        self.assertEqual(manifest["wait_urgency_rate"], .1)
+        self.assertIn("request_wait_s", manifest["decision_formula"])
 
 
 if __name__ == "__main__":

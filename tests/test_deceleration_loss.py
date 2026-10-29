@@ -151,6 +151,26 @@ class DecelerationLossTests(unittest.TestCase):
                 request_arrival_s=1, receiver_arrival_s=2,
                 loss_normalization="unknown")
 
+    def test_wait_urgency_conservatively_favors_a_waiting_request(self):
+        reference = {"v": self.profile((10, 10, 10))}
+        result = loss.time_equivalent_decision(
+            reference, reference, reference, {"v": 10},
+            request_arrival_s=3, receiver_arrival_s=2,
+            request_wait_s=10, wait_urgency_rate=.1)
+
+        self.assertAlmostEqual(result["wait_urgency_bonus_s"], 1.0)
+        self.assertAlmostEqual(result["final_margin_s"], 0.0)
+        self.assertEqual(result["decision"], "accept")
+
+    def test_wait_urgency_parameters_must_be_non_negative_and_finite(self):
+        reference = {"v": self.profile((10, 10, 10))}
+        for wait, rate in [(-1, .1), (1, -1), (math.inf, .1), (1, math.nan)]:
+            with self.assertRaises(ValueError):
+                loss.time_equivalent_decision(
+                    reference, reference, reference, {"v": 10},
+                    request_arrival_s=1, receiver_arrival_s=2,
+                    request_wait_s=wait, wait_urgency_rate=rate)
+
     def test_shadow_does_not_mutate_live_paths_or_decision_state(self):
         def path(veh, kind, speeds):
             return NS(vehID=veh, type=kind, pathID=veh + "_path",

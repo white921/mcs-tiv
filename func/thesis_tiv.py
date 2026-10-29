@@ -256,10 +256,20 @@ def send_mcm(vehicle, server, traci):
         server.append(transmitted_path(
             vehicle.plannedPath, vehicle.simTime, lane_context))
         vehicle.count_send_PT += 1
-    for desired in vehicle.desiredPaths or []:
+    desired_paths = vehicle.desiredPaths or []
+    if desired_paths:
+        if getattr(vehicle, "merge_request_started_at", None) is None:
+            vehicle.merge_request_started_at = vehicle.simTime
+        request_wait_s = max(
+            0.0, vehicle.simTime - vehicle.merge_request_started_at)
+    else:
+        vehicle.merge_request_started_at = None
+        request_wait_s = 0.0
+    for desired in desired_paths:
         conflicts, _ = vehicle.checkPathCollision(
             desired, vehicle.receivedPaths, s_type="planned")
         packet = transmitted_path(desired, vehicle.simTime, lane_context)
+        packet.request_wait_s = request_wait_s
         packet.tiv_by_receiver = {}
         for conflict in conflicts:
             point = (conflict["collide_x"], conflict["collide_y"])

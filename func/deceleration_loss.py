@@ -103,10 +103,13 @@ def time_equivalent_decision(
     loss_lambda: float = 1.0,
     loss_normalization: str = "sum",
     time_half_life_s: float | None = None,
+    request_wait_s: float = 0.0,
+    wait_urgency_rate: float = 0.0,
 ) -> dict:
     """Compare Accept and Reject on one time-equivalent scale.
 
-    ``M = (t_request - t_receiver) + lambda * normalized_loss_margin``.
+    ``M = (t_request - t_receiver) + lambda * normalized_loss_margin
+    - wait_urgency_rate * request_wait_s``.
     ``M <= 0`` accepts.  ``sum`` preserves the original aggregate, while
     ``sqrt-followers`` divides the aggregate loss margin by the square root of
     the number of selected follower vehicles.  The latter keeps a long queue
@@ -116,6 +119,10 @@ def time_equivalent_decision(
     """
     if not math.isfinite(loss_lambda) or loss_lambda < 0:
         raise ValueError("loss lambda must be finite and non-negative")
+    if not math.isfinite(request_wait_s) or request_wait_s < 0:
+        raise ValueError("request wait must be finite and non-negative")
+    if not math.isfinite(wait_urgency_rate) or wait_urgency_rate < 0:
+        raise ValueError("wait urgency rate must be finite and non-negative")
     if loss_normalization not in ("sum", "sqrt-followers"):
         raise ValueError(
             "loss normalization must be sum or sqrt-followers")
@@ -159,6 +166,7 @@ def time_equivalent_decision(
         if loss_normalization == "sqrt-followers" and vehicle_ids else 1.0)
     normalized_loss_margin_s = loss_margin_s / loss_normalization_divisor
     weighted_loss_margin_s = loss_lambda * normalized_loss_margin_s
+    wait_urgency_bonus_s = wait_urgency_rate * request_wait_s
     request_reached = math.isfinite(request_arrival_s)
     receiver_reached = math.isfinite(receiver_arrival_s)
     if (not request_reached and request_arrival_s > 0 and
@@ -187,7 +195,8 @@ def time_equivalent_decision(
         arrival_status = "both_reached"
         decision_basis = "combined_margin"
         arrival_margin_s = request_arrival_s - receiver_arrival_s
-        final_margin_s = arrival_margin_s + weighted_loss_margin_s
+        final_margin_s = (
+            arrival_margin_s + weighted_loss_margin_s - wait_urgency_bonus_s)
         decision = "accept" if final_margin_s <= 0 else "reject"
     return {
         **distance,
@@ -207,6 +216,9 @@ def time_equivalent_decision(
         "loss_normalization_divisor": loss_normalization_divisor,
         "normalized_loss_margin_s": normalized_loss_margin_s,
         "weighted_loss_margin_s": weighted_loss_margin_s,
+        "request_wait_s": request_wait_s,
+        "wait_urgency_rate": wait_urgency_rate,
+        "wait_urgency_bonus_s": wait_urgency_bonus_s,
         "final_margin_s": final_margin_s,
         "vehicle_loss_details": details,
         "decision": decision,

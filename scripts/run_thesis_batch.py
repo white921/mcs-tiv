@@ -49,6 +49,7 @@ CONTROLLED_MCS_ENV = {
     "MCS_DECELERATION_LOSS_LAMBDA",
     "MCS_DECELERATION_LOSS_NORMALIZATION",
     "MCS_DECELERATION_TIME_HALF_LIFE_S",
+    "MCS_DECELERATION_WAIT_URGENCY_RATE",
     "MCS_EVALUATION_AUDIT",
     "MCS_FCD_OUTPUT",
     "MCS_NEGOTIATION_AUDIT",
@@ -136,6 +137,9 @@ def default_run_directory(args, now=None):
         normalization = getattr(args, "deceleration_loss_normalization", "sum")
         if args.deceleration_active and normalization != "sum":
             method += f"-{normalization}"
+        urgency_rate = getattr(args, "deceleration_wait_urgency_rate", 0)
+        if args.deceleration_active and urgency_rate > 0:
+            method += f"-wait-urgency-{duration_label(urgency_rate)}"
         cases = "-".join(args.cases)
         if args.seeds is not None:
             seeds = "seeds-" + "-".join(str(seed) for seed in args.seeds)
@@ -172,7 +176,8 @@ def deceleration_prediction_manifest(args):
             else "exponential-half-life"),
         "time_half_life_s": (args.deceleration_time_half_life or None),
         "decision_formula": (
-            "M=(t_request-t_receiver)+lambda*normalized_loss_margin; "
+            "M=(t_request-t_receiver)+lambda*normalized_loss_margin"
+            "-wait_urgency_rate*request_wait_s; "
             "accept iff M<=0"),
         "loss_lambda": args.deceleration_loss_lambda,
         "loss_normalization": args.deceleration_loss_normalization,
@@ -183,6 +188,9 @@ def deceleration_prediction_manifest(args):
         "loss_scope": "detected followers excluding request and receiver vehicles",
         "excluded_loss_roles": ["request_vehicle", "receiver_vehicle"],
         "distance_to_time_speed": "per-vehicle allowed speed at negotiation",
+        "request_wait_definition": (
+            "continuous seconds with a merge desired path; reset when absent"),
+        "wait_urgency_rate": args.deceleration_wait_urgency_rate,
     }
 
 
@@ -291,6 +299,9 @@ def run_task(task, args):
                MCS_DECELERATION_LOSS_NORMALIZATION=(
                    args.deceleration_loss_normalization
                    if args.deceleration_active else "sum"),
+               MCS_DECELERATION_WAIT_URGENCY_RATE=str(
+                   args.deceleration_wait_urgency_rate
+                   if args.deceleration_active else 0.0),
                MCS_TIV_AUDIT=str(destination / "tiv-audit.json"),
                MCS_EVALUATION_AUDIT=str(destination / "evaluation-metrics.json"),
                MCS_PHYSICAL_COLLISION_AUDIT=str(
@@ -464,6 +475,10 @@ def main():
         choices=("sum", "sqrt-followers"), default="sum",
         help=("aggregate follower loss as a raw sum (default) or divide it "
               "by sqrt(follower count)"))
+    parser.add_argument(
+        "--deceleration-wait-urgency-rate", type=float, default=0.0,
+        help=("subtract this many decision-margin seconds per continuous "
+              "second of merge request waiting; Eval.7 proposal only"))
     parser.add_argument("--diagnostic-traces", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="write replay/FCD/negotiation diagnostics (default: enabled)")
@@ -487,6 +502,10 @@ def main():
     if (not math.isfinite(args.deceleration_loss_lambda) or
             args.deceleration_loss_lambda < 0):
         parser.error("--deceleration-loss-lambda must be finite and non-negative")
+    if (not math.isfinite(args.deceleration_wait_urgency_rate) or
+            args.deceleration_wait_urgency_rate < 0):
+        parser.error(
+            "--deceleration-wait-urgency-rate must be finite and non-negative")
     if min(args.deceleration_time_half_life, args.checkpoint_interval) < 0:
         parser.error("prediction and checkpoint limits must be non-negative")
     if args.deceleration_time_half_life > 0 and not args.deceleration_active:
@@ -495,6 +514,10 @@ def main():
             not args.deceleration_active):
         parser.error(
             "--deceleration-loss-normalization requires --deceleration-active")
+    if (args.deceleration_wait_urgency_rate > 0 and
+            (not args.deceleration_active or set(args.cases) != {"eval7"})):
+        parser.error(
+            "--deceleration-wait-urgency-rate requires active Eval.7 only")
     if not (args.sumo_home / "bin" / "sumo").is_file() or not (args.sumo_home / "tools" / "traci").is_dir():
         parser.error("--sumo-home must contain bin/sumo and tools/traci")
     if args.paper is not None and not args.paper.is_file():
@@ -546,6 +569,9 @@ def main():
             args.deceleration_loss_lambda if args.deceleration_active else None),
         "deceleration_loss_normalization": (
             args.deceleration_loss_normalization
+            if args.deceleration_active else None),
+        "deceleration_wait_urgency_rate": (
+            args.deceleration_wait_urgency_rate
             if args.deceleration_active else None),
         "cases": list(args.cases),
         "tasks": [{"case": case, "seed": seed} for case, seed in tasks],

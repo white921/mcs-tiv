@@ -61,6 +61,17 @@ def _loss_normalization_from_environment():
 
 LOSS_NORMALIZATION = _loss_normalization_from_environment()
 
+
+def _wait_urgency_rate_from_environment():
+    value = float(os.environ.get("MCS_DECELERATION_WAIT_URGENCY_RATE", "0"))
+    if not math.isfinite(value) or value < 0:
+        raise ValueError(
+            "MCS_DECELERATION_WAIT_URGENCY_RATE must be finite and non-negative")
+    return value
+
+
+WAIT_URGENCY_RATE = _wait_urgency_rate_from_environment()
+
 COUNTS = Counter()
 RECORDS = []
 # A desired MCM is normally regenerated every second.  Keep an active
@@ -392,7 +403,9 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_point):
             receiver_planned, conflict_point, now),
         loss_lambda=LOSS_LAMBDA,
         loss_normalization=LOSS_NORMALIZATION,
-        time_half_life_s=TIME_HALF_LIFE_S)
+        time_half_life_s=TIME_HALF_LIFE_S,
+        request_wait_s=float(getattr(desired, "request_wait_s", 0.0)),
+        wait_urgency_rate=WAIT_URGENCY_RATE)
     union_follower_ids = accept_follower_ids | reject_follower_ids
     result = {**result, "vehicle_ids": sorted(union_ids),
               "loss_vehicle_ids": sorted(loss_vehicle_ids),
@@ -486,6 +499,9 @@ def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode
                     "accept_time_equivalent_loss_s": result["accept_time_equivalent_loss_s"],
                     "reject_time_equivalent_loss_s": result["reject_time_equivalent_loss_s"],
                     "weighted_loss_margin_s": result["weighted_loss_margin_s"],
+                    "request_wait_s": result["request_wait_s"],
+                    "wait_urgency_rate": result["wait_urgency_rate"],
+                    "wait_urgency_bonus_s": result["wait_urgency_bonus_s"],
                     "final_margin_s": result["final_margin_s"],
                     "loss_lambda": result["loss_lambda"],
                     "loss_normalization": result["loss_normalization"],
@@ -542,6 +558,7 @@ def _write_audit():
             json.dump(evaluation_metrics.json_safe({
                 "mode": MODE,
                 "loss_normalization": LOSS_NORMALIZATION,
+                "wait_urgency_rate": WAIT_URGENCY_RATE,
                 "counts": dict(COUNTS), "records": RECORDS,
             }), stream, indent=2,
                       allow_nan=False)
