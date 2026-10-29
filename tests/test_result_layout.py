@@ -20,6 +20,7 @@ class ResultLayoutTests(unittest.TestCase):
             "deceleration_active": True,
             "deceleration_time_half_life": 0.0,
             "deceleration_loss_lambda": 1.0,
+            "deceleration_loss_mode": "integrated",
             "eval3_downstream_slow_zone": False,
             "eval3_slow_zone_location": "downstream",
             "eval3_slow_zone_start_offset": 15.0,
@@ -62,6 +63,11 @@ class ResultLayoutTests(unittest.TestCase):
 
         self.assertIn("proposal-weighted-3s", path.name)
 
+    def test_terminal_loss_ablation_is_named(self):
+        path = RUNNER.default_run_directory(
+            self.args(deceleration_loss_mode="terminal-held"))
+        self.assertIn("proposal-terminal-held", path.name)
+
     def test_write_json_has_stable_trailing_newline(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "manifest.json"
@@ -77,6 +83,7 @@ class ResultLayoutTests(unittest.TestCase):
             "MCS_DECELERATION_MODE": "active",
             "MCS_DECELERATION_TIME_HALF_LIFE_S": "99",
             "MCS_DECELERATION_LOSS_LAMBDA": "99",
+            "MCS_DECELERATION_LOSS_MODE": "terminal-held",
             "MCS_FCD_OUTPUT": "/tmp/old-fcd.xml",
             "MCS_CHECKPOINT_DIR": "/tmp/old-checkpoint",
             "MCS_EVAL3_DOWNSTREAM_SLOW_ZONE": "1",
@@ -96,6 +103,7 @@ class ResultLayoutTests(unittest.TestCase):
             self.args(deceleration_loss_lambda=1.25))
 
         self.assertEqual(manifest["loss_lambda"], 1.25)
+        self.assertEqual(manifest["loss_mode"], "integrated")
         self.assertIn("accept iff M<=0", manifest["decision_formula"])
         self.assertEqual(
             manifest["loss_scope"],

@@ -27,19 +27,27 @@ class SpeedProfile:
 
 
 def distance_loss(reference: SpeedProfile, case: SpeedProfile, *,
-                  time_half_life_s: float | None = None) -> float:
-    """Integrate ``reference speed - case speed`` over matching intervals.
+                  time_half_life_s: float | None = None,
+                  loss_mode: str = "integrated") -> float:
+    """Measure ``reference speed - case speed`` on one common horizon.
 
-    The result is a signed distance in metres.  Negative values are retained:
-    they expose a faster case or an incorrectly constructed reference rather
-    than being silently hidden by clipping.
+    ``integrated`` uses every interval. ``terminal-held`` is an ablation that
+    samples only the endpoint deficit and holds it across the horizon so the
+    result remains a signed distance in metres. Negative values are retained.
     """
     if reference.vehicle_id != case.vehicle_id:
         raise ValueError("cannot compare profiles for different vehicles")
     if reference.times != case.times:
         raise ValueError("comparison profiles must use the same time grid")
+    if loss_mode not in ("integrated", "terminal-held"):
+        raise ValueError("loss mode must be integrated or terminal-held")
     if time_half_life_s is not None and time_half_life_s <= 0:
         raise ValueError("time half-life must be positive")
+    if loss_mode == "terminal-held":
+        if time_half_life_s is not None:
+            raise ValueError("terminal-held loss does not support time weighting")
+        return ((reference.speeds[-1] - case.speeds[-1]) *
+                (reference.times[-1] - reference.times[0]))
     start = reference.times[0]
     total = 0.0
     for index in range(len(reference.times) - 1):
@@ -56,39 +64,44 @@ def distance_loss(reference: SpeedProfile, case: SpeedProfile, *,
 
 def total_loss(reference: Mapping[str, SpeedProfile],
                case: Mapping[str, SpeedProfile], *,
-               time_half_life_s: float | None = None) -> float:
+               time_half_life_s: float | None = None,
+               loss_mode: str = "integrated") -> float:
     """Sum signed distance losses over the same explicitly selected vehicles."""
     if set(reference) != set(case):
         raise ValueError("reference and case must cover identical vehicle IDs")
     return sum(distance_loss(
         reference[vehicle_id], case[vehicle_id],
-        time_half_life_s=time_half_life_s)
+        time_half_life_s=time_half_life_s, loss_mode=loss_mode)
                for vehicle_id in sorted(reference))
 
 
 def decision_margin(reference: Mapping[str, SpeedProfile],
                     accept: Mapping[str, SpeedProfile],
                     reject: Mapping[str, SpeedProfile], *,
-                    time_half_life_s: float | None = None) -> dict:
+                    time_half_life_s: float | None = None,
+                    loss_mode: str = "integrated") -> dict:
     """Return losses and the documented ``L_reject - L_accept`` margin."""
     accept_loss = total_loss(
-        reference, accept, time_half_life_s=time_half_life_s)
+        reference, accept, time_half_life_s=time_half_life_s,
+        loss_mode=loss_mode)
     reject_loss = total_loss(
-        reference, reject, time_half_life_s=time_half_life_s)
+        reference, reject, time_half_life_s=time_half_life_s,
+        loss_mode=loss_mode)
     return {"accept_loss_m": accept_loss, "reject_loss_m": reject_loss,
             "reject_minus_accept_m": reject_loss - accept_loss}
 
 
 def distance_losses(reference: Mapping[str, SpeedProfile],
                     case: Mapping[str, SpeedProfile], *,
-                    time_half_life_s: float | None = None) -> dict[str, float]:
+                    time_half_life_s: float | None = None,
+                    loss_mode: str = "integrated") -> dict[str, float]:
     """Return each vehicle's signed distance loss in metres."""
     if set(reference) != set(case):
         raise ValueError("reference and case must cover identical vehicle IDs")
     return {
         vehicle_id: distance_loss(
             reference[vehicle_id], case[vehicle_id],
-            time_half_life_s=time_half_life_s)
+            time_half_life_s=time_half_life_s, loss_mode=loss_mode)
         for vehicle_id in sorted(reference)
     }
 
@@ -102,6 +115,7 @@ def time_equivalent_decision(
     receiver_arrival_s: float,
     loss_lambda: float = 1.0,
     time_half_life_s: float | None = None,
+    loss_mode: str = "integrated",
 ) -> dict:
     """Compare Accept and Reject on one time-equivalent scale.
 
@@ -119,9 +133,11 @@ def time_equivalent_decision(
         raise ValueError("allowed speeds must cover identical vehicle IDs")
 
     accept_by_vehicle = distance_losses(
-        reference, accept, time_half_life_s=time_half_life_s)
+        reference, accept, time_half_life_s=time_half_life_s,
+        loss_mode=loss_mode)
     reject_by_vehicle = distance_losses(
-        reference, reject, time_half_life_s=time_half_life_s)
+        reference, reject, time_half_life_s=time_half_life_s,
+        loss_mode=loss_mode)
     details = {}
     accept_loss_s = 0.0
     reject_loss_s = 0.0
@@ -143,7 +159,8 @@ def time_equivalent_decision(
         }
 
     distance = decision_margin(
-        reference, accept, reject, time_half_life_s=time_half_life_s)
+        reference, accept, reject, time_half_life_s=time_half_life_s,
+        loss_mode=loss_mode)
     request_arrival_s = float(request_arrival_s)
     receiver_arrival_s = float(receiver_arrival_s)
     loss_margin_s = accept_loss_s - reject_loss_s
@@ -191,6 +208,7 @@ def time_equivalent_decision(
         "reject_time_equivalent_loss_s": reject_loss_s,
         "loss_margin_s": loss_margin_s,
         "loss_lambda": loss_lambda,
+        "loss_mode": loss_mode,
         "weighted_loss_margin_s": weighted_loss_margin_s,
         "final_margin_s": final_margin_s,
         "vehicle_loss_details": details,

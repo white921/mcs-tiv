@@ -47,6 +47,7 @@ CONTROLLED_MCS_ENV = {
     "MCS_DECELERATION_AUDIT",
     "MCS_DECELERATION_MODE",
     "MCS_DECELERATION_LOSS_LAMBDA",
+    "MCS_DECELERATION_LOSS_MODE",
     "MCS_DECELERATION_TIME_HALF_LIFE_S",
     "MCS_EVALUATION_AUDIT",
     "MCS_EVAL3_DOWNSTREAM_SLOW_ZONE",
@@ -148,6 +149,9 @@ def default_run_directory(args, now=None):
         half_life = getattr(args, "deceleration_time_half_life", 0)
         if args.deceleration_active and half_life > 0:
             method += f"-weighted-{duration_label(half_life)}s"
+        loss_mode = getattr(args, "deceleration_loss_mode", "integrated")
+        if args.deceleration_active and loss_mode != "integrated":
+            method += f"-{loss_mode}"
         if getattr(args, "eval3_downstream_slow_zone", False):
             method += "-downstream-slow-zone"
         cases = "-".join(args.cases)
@@ -189,6 +193,7 @@ def deceleration_prediction_manifest(args):
             "M=(t_request-t_receiver)+lambda*"
             "(accept_time_loss-reject_time_loss); accept iff M<=0"),
         "loss_lambda": args.deceleration_loss_lambda,
+        "loss_mode": args.deceleration_loss_mode,
         "loss_scope": "detected followers excluding request and receiver vehicles",
         "excluded_loss_roles": ["request_vehicle", "receiver_vehicle"],
         "distance_to_time_speed": "per-vehicle allowed speed at negotiation",
@@ -326,6 +331,9 @@ def run_task(task, args):
                    args.deceleration_time_half_life if args.deceleration_active else 0.0),
                MCS_DECELERATION_LOSS_LAMBDA=str(
                    args.deceleration_loss_lambda if args.deceleration_active else 1.0),
+               MCS_DECELERATION_LOSS_MODE=(
+                   args.deceleration_loss_mode if args.deceleration_active
+                   else "integrated"),
                MCS_TIV_AUDIT=str(destination / "tiv-audit.json"),
                MCS_EVALUATION_AUDIT=str(destination / "evaluation-metrics.json"),
                MCS_PHYSICAL_COLLISION_AUDIT=str(
@@ -518,6 +526,11 @@ def main():
     parser.add_argument(
         "--deceleration-loss-lambda", type=float, default=1.0,
         help="weight on Accept-minus-Reject time-equivalent loss (default: 1.0)")
+    parser.add_argument(
+        "--deceleration-loss-mode", choices=("integrated", "terminal-held"),
+        default="integrated",
+        help=("integrate the full 10 s speed deficit, or use only the 10 s "
+              "terminal deficit held across the horizon for an ablation"))
     parser.add_argument("--diagnostic-traces", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="write replay/FCD/negotiation diagnostics (default: enabled)")
@@ -545,6 +558,12 @@ def main():
         parser.error("prediction and checkpoint limits must be non-negative")
     if args.deceleration_time_half_life > 0 and not args.deceleration_active:
         parser.error("--deceleration-time-half-life requires --deceleration-active")
+    if (args.deceleration_loss_mode != "integrated" and
+            not args.deceleration_active):
+        parser.error("--deceleration-loss-mode requires --deceleration-active")
+    if (args.deceleration_loss_mode == "terminal-held" and
+            args.deceleration_time_half_life > 0):
+        parser.error("terminal-held loss cannot use --deceleration-time-half-life")
     if args.eval3_downstream_slow_zone and set(args.cases) != {"eval3"}:
         parser.error("--eval3-downstream-slow-zone requires --cases eval3")
     if args.fixed_input_override is not None:
@@ -617,6 +636,8 @@ def main():
             else None),
         "deceleration_loss_lambda": (
             args.deceleration_loss_lambda if args.deceleration_active else None),
+        "deceleration_loss_mode": (
+            args.deceleration_loss_mode if args.deceleration_active else None),
         "cases": list(args.cases),
         "tasks": [{"case": case, "seed": seed} for case, seed in tasks],
         "duration_s": args.duration,

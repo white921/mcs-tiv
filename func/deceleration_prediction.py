@@ -51,6 +51,19 @@ def _loss_lambda_from_environment():
 
 LOSS_LAMBDA = _loss_lambda_from_environment()
 
+
+def _loss_mode_from_environment():
+    value = os.environ.get("MCS_DECELERATION_LOSS_MODE", "integrated")
+    if value not in ("integrated", "terminal-held"):
+        raise ValueError(
+            "MCS_DECELERATION_LOSS_MODE must be integrated or terminal-held")
+    if value == "terminal-held" and TIME_HALF_LIFE_S is not None:
+        raise ValueError("terminal-held loss does not support time weighting")
+    return value
+
+
+LOSS_MODE = _loss_mode_from_environment()
+
 COUNTS = Counter()
 RECORDS = []
 # A desired MCM is normally regenerated every second.  Keep an active
@@ -526,7 +539,24 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_point):
         receiver_arrival_s=arrival_delay(
             receiver_planned, conflict_point, now),
         loss_lambda=LOSS_LAMBDA,
-        time_half_life_s=TIME_HALF_LIFE_S)
+        time_half_life_s=TIME_HALF_LIFE_S,
+        loss_mode=LOSS_MODE)
+    terminal_speed_details = {
+        vehicle_id: {
+            "reference_terminal_mps": reference[vehicle_id].speeds[-1],
+            "accept_terminal_mps": accept[vehicle_id].speeds[-1],
+            "reject_terminal_mps": reject[vehicle_id].speeds[-1],
+            "accept_minus_reject_mps": (
+                accept[vehicle_id].speeds[-1] -
+                reject[vehicle_id].speeds[-1]),
+        }
+        for vehicle_id in sorted(loss_vehicle_ids)
+    }
+    maximum_terminal_difference = max(
+        (abs(item["accept_minus_reject_mps"])
+         for item in terminal_speed_details.values()),
+        default=0.0,
+    )
     union_follower_ids = accept_follower_ids | reject_follower_ids
     result = {**result, "vehicle_ids": sorted(union_ids),
               "loss_vehicle_ids": sorted(loss_vehicle_ids),
@@ -535,10 +565,14 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_point):
               "reject_follower_ids": sorted(reject_follower_ids),
               "union_follower_ids": sorted(union_follower_ids),
               "follower_count": len(union_follower_ids),
+              "terminal_speed_details": terminal_speed_details,
+              "maximum_accept_reject_terminal_speed_difference_mps": (
+                  maximum_terminal_difference),
               "replan_interval_s": REPLAN_INTERVAL,
               "time_weighting": ("uniform" if TIME_HALF_LIFE_S is None
                                  else "exponential-half-life"),
               "time_half_life_s": TIME_HALF_LIFE_S,
+              "loss_mode": LOSS_MODE,
               "follower_replans": len(union_follower_ids) * int(HORIZON / REPLAN_INTERVAL),
               "slow_zone_audit": slow_zone_negotiation_audit(
                   receiver, desired, alternative, now)}
@@ -609,6 +643,7 @@ def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode
                     "prediction_scope": "sender_receiver_and_detected_followers",
                     "time_weighting": result["time_weighting"],
                     "time_half_life_s": result["time_half_life_s"],
+                    "loss_mode": result["loss_mode"],
                     "accept_loss_m": result["accept_loss_m"],
                     "reject_loss_m": result["reject_loss_m"],
                     "decision_margin_m": result["reject_minus_accept_m"],
