@@ -76,7 +76,8 @@ def transmitted_path(path, now, lane_context=None):
         raise ValueError("trajectory does not cover publication time")
     start, end = indices[0], indices[-1] + 1
     for name in ("t", "d", "d_d", "d_dd", "d_ddd", "s", "s_d", "s_dd",
-                 "s_ddd", "x", "y", "yaw", "ds", "c"):
+                 "s_ddd", "x", "y", "yaw", "ds", "c",
+                 "slow_zone_reference_s_d"):
         values = getattr(path, name, None)
         if hasattr(values, "__len__") and (
             name in ("t", "x", "y", "s_d") or len(values) == len(path.t)
@@ -235,12 +236,18 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
                 collision=collision)
             continue
         diagnostic_trace.record_negotiation(
-            vehicle, desired, "started", collision=collision)
+            vehicle, desired, "started", collision=collision,
+            details={"slow_zone_audit":
+                     deceleration_prediction.slow_zone_negotiation_audit(
+                         vehicle, desired, None, vehicle.simTime)})
         alternatives = vehicle.generateAlterPath(collision, obstacles)
         if not alternatives:
             diagnostic_trace.record_negotiation(
                 vehicle, desired, "decision", accept=False,
-                reason="no_feasible_alternative", collision=collision)
+                reason="no_feasible_alternative", collision=collision,
+                details={"slow_zone_audit":
+                         deceleration_prediction.slow_zone_negotiation_audit(
+                             vehicle, desired, None, vehicle.simTime)})
             vehicle.yetJudgedList.append(desired.pathID)
             vehicle.count_refuse_physics += 1
             COUNTS["no_feasible_alternative"] += 1
@@ -253,7 +260,10 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
         if not vehicle.alter_straight_path:
             diagnostic_trace.record_negotiation(
                 vehicle, desired, "deferred", reason="no_selected_alternative",
-                collision=collision)
+                collision=collision,
+                details={"slow_zone_audit":
+                         deceleration_prediction.slow_zone_negotiation_audit(
+                             vehicle, desired, None, vehicle.simTime)})
             continue
         # Shadow mode is intentionally read-only: it observes the same
         # physically feasible alternative considered by the baseline TIV
@@ -265,6 +275,8 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             point = (collision["collide_x"], collision["collide_y"])
         else:
             point = (received_packet or {}).get("point")
+        slow_zone_audit = deceleration_prediction.slow_zone_negotiation_audit(
+            vehicle, desired, vehicle.alter_straight_path, vehicle.simTime)
         deceleration_prediction.record_shadow(
             vehicle, desired, vehicle.alter_straight_path, vehicle.simTime,
             point)
@@ -277,7 +289,8 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
                 # No receiver-side fallback; retry on the next MCM.
                 diagnostic_trace.record_negotiation(
                     vehicle, desired, "deferred", reason="missing_sender_tiv",
-                    collision=collision)
+                    collision=collision,
+                    details={"slow_zone_audit": slow_zone_audit})
                 vehicle.alter_straight_path = None
                 COUNTS["missing_sender_tiv"] += 1
                 continue
@@ -340,7 +353,8 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             vehicle, desired, "decision", accept=accept,
             reason=prediction_method, collision=collision,
             details={"sender_tiv": received.get("value"),
-                     "receiver_tiv": planned.get("value")})
+                     "receiver_tiv": planned.get("value"),
+                     "slow_zone_audit": slow_zone_audit})
         if len(EXAMPLES) < 100:
             EXAMPLES.append({"receiver": vehicle.id, "sender": desired.vehID,
                              "time": vehicle.simTime, "received": received,

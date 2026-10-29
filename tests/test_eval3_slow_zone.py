@@ -67,6 +67,8 @@ class Eval3SlowZoneTests(unittest.TestCase):
         self.assertTrue(all(right >= left for left, right in zip(path.x, path.x[1:])))
         self.assertEqual(len(path.t), len(path.x))
         self.assertEqual(len(path.t), len(path.s_d))
+        self.assertEqual(path.slow_zone_reference_s_d, [13.89] * len(path.t))
+        self.assertTrue(path.slow_zone_context["enabled"])
 
         accelerations = [
             (right - left) / 0.1
@@ -195,6 +197,7 @@ class Eval3SlowZoneTests(unittest.TestCase):
             enabled=False)
 
         self.assertEqual(path.x, original_x)
+        self.assertFalse(hasattr(path, "slow_zone_reference_s_d"))
 
 
 if __name__ == "__main__":

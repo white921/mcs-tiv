@@ -29,6 +29,7 @@ STANDSTILL_GAP = 5.0
 LANE_TOLERANCE = 2.0
 MERGE_TOLERANCE = 1.6
 ALIGNMENT_COSINE = math.cos(math.radians(30.0))
+SLOW_ZONE_SPEED_TOLERANCE_MPS = 0.05
 
 
 def _time_half_life_from_environment():
@@ -111,6 +112,150 @@ def _profile(path, vehicle_id, now):
     times = tuple(round(now + DT * index, 3) for index in range(101))
     speeds = tuple(max(0.0, _value_at(path.t, path.s_d, moment)) for moment in times)
     return SpeedProfile(str(vehicle_id), times, speeds)
+
+
+def _slow_zone_path_audit(path, now):
+    """Describe the fixed-zone speed wave inside this negotiation horizon.
+
+    The planner stores the same path before the fixed restriction as an
+    aligned reference.  Comparing those two profiles distinguishes an actual
+    additional slowdown from a turn/follow/yield trajectory that was already
+    below the road limit.
+    """
+    if path is None:
+        return None
+    context = getattr(path, "slow_zone_context", None)
+    reference = getattr(path, "slow_zone_reference_s_d", None)
+    times = getattr(path, "t", None)
+    speeds = getattr(path, "s_d", None)
+    xs = getattr(path, "x", None)
+    ys = getattr(path, "y", None)
+    if not isinstance(context, dict) or not context.get("enabled"):
+        return None
+    if not all(hasattr(values, "__len__") for values in
+               (times, speeds, reference, xs, ys)):
+        return {"available": False, "reason": "missing_aligned_path_arrays"}
+    lengths = {len(times), len(speeds), len(reference), len(xs), len(ys)}
+    if len(lengths) != 1 or not times:
+        return {"available": False, "reason": "inconsistent_aligned_path_arrays"}
+
+    end = float(now) + HORIZON
+    indices = [index for index, moment in enumerate(times)
+               if float(now) - 1e-6 <= moment <= end + 1e-6]
+    if not indices:
+        return {"available": False, "reason": "path_outside_horizon"}
+
+    reductions = [
+        (index, float(reference[index]) - float(speeds[index]))
+        for index in indices
+        if float(reference[index]) - float(speeds[index]) >
+        SLOW_ZONE_SPEED_TOLERANCE_MPS
+    ]
+    start_x = float(context["start_x_m"])
+    end_x = float(context["end_x_m"])
+    center_y = float(context["lane_center_y_m"])
+    lateral_tolerance = float(context["lateral_tolerance_m"])
+    zone_indices = [
+        index for index in indices
+        if (start_x <= float(xs[index]) <= end_x and
+            abs(float(ys[index]) - center_y) <= lateral_tolerance)
+    ]
+    exited_indices = [
+        index for index in indices
+        if (float(xs[index]) > end_x and
+            abs(float(ys[index]) - center_y) <= lateral_tolerance)
+    ]
+    reference_at_horizon = _value_at(times, reference, end)
+    restricted_at_horizon = _value_at(times, speeds, end)
+    horizon_delta = reference_at_horizon - restricted_at_horizon
+    recovered = abs(horizon_delta) <= SLOW_ZONE_SPEED_TOLERANCE_MPS
+    additional_deceleration = bool(reductions)
+    zone_entered = bool(zone_indices)
+    zone_exited = bool(exited_indices)
+    intended = bool(
+        additional_deceleration and zone_entered and zone_exited and recovered)
+    return {
+        "available": True,
+        "zone_entered_within_10s": zone_entered,
+        "zone_exited_within_10s": zone_exited,
+        "additional_deceleration_within_10s": additional_deceleration,
+        "first_additional_deceleration_s": (
+            float(times[reductions[0][0]]) - float(now) if reductions else None),
+        "zone_entry_s": (
+            float(times[zone_indices[0]]) - float(now) if zone_indices else None),
+        "zone_exit_s": (
+            float(times[exited_indices[0]]) - float(now) if exited_indices else None),
+        "maximum_speed_reduction_mps": (
+            max(delta for _, delta in reductions) if reductions else 0.0),
+        "normal_speed_at_10s_mps": reference_at_horizon,
+        "restricted_speed_at_10s_mps": restricted_at_horizon,
+        "speed_difference_at_10s_mps": horizon_delta,
+        "recovered_to_normal_speed_at_10s": recovered,
+        "intended_temporary_slowdown": intended,
+    }
+
+
+def slow_zone_negotiation_audit(receiver, desired, alternative, now):
+    """Return a compact, method-independent fixed-zone audit for one event."""
+    candidates = _latest_planned(receiver)
+    sender_id = str(getattr(desired, "vehID", "unknown"))
+    receiver_id = str(receiver.id)
+    role_paths = [
+        ("sender_desired", desired),
+        ("sender_planned", candidates.get(sender_id)),
+        ("receiver_planned", getattr(receiver, "plannedPath", None)),
+        ("receiver_alternative", alternative),
+    ]
+    actor_object_ids = {id(path) for _, path in role_paths if path is not None}
+    for vehicle_id, path in sorted(candidates.items()):
+        if id(path) in actor_object_ids or vehicle_id in (sender_id, receiver_id):
+            continue
+        role_paths.append(("received_planned", path))
+
+    paths = []
+    evaluated = []
+    for role, path in role_paths:
+        audit = _slow_zone_path_audit(path, now)
+        if audit is None:
+            continue
+        item = {
+            "role": role,
+            "vehicle_id": str(getattr(path, "vehID", "unknown")),
+            "path_id": getattr(path, "pathID", None),
+            **audit,
+        }
+        evaluated.append(item)
+        # Keep every actor path.  For ambient planned paths, retain only the
+        # ones that actually reach the section or experience its speed cap.
+        if (role != "received_planned" or
+                audit.get("zone_entered_within_10s") or
+                audit.get("additional_deceleration_within_10s")):
+            paths.append(item)
+
+    if not evaluated:
+        return {
+            "scenario_enabled": False,
+            "evaluated_path_count": 0,
+            "intended_profile_path_count": 0,
+            "intended_profile_observed": False,
+            "paths": [],
+        }
+    intended_count = sum(
+        bool(item.get("intended_temporary_slowdown")) for item in evaluated)
+    return {
+        "scenario_enabled": True,
+        "horizon_s": HORIZON,
+        "speed_recovery_tolerance_mps": SLOW_ZONE_SPEED_TOLERANCE_MPS,
+        "evaluated_path_count": len(evaluated),
+        "zone_entered_path_count": sum(
+            bool(item.get("zone_entered_within_10s")) for item in evaluated),
+        "additional_deceleration_path_count": sum(
+            bool(item.get("additional_deceleration_within_10s"))
+            for item in evaluated),
+        "intended_profile_path_count": intended_count,
+        "intended_profile_observed": intended_count > 0,
+        "paths": paths,
+    }
 
 
 def _position(path, now):
@@ -393,7 +538,9 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_point):
               "time_weighting": ("uniform" if TIME_HALF_LIFE_S is None
                                  else "exponential-half-life"),
               "time_half_life_s": TIME_HALF_LIFE_S,
-              "follower_replans": len(union_follower_ids) * int(HORIZON / REPLAN_INTERVAL)}
+              "follower_replans": len(union_follower_ids) * int(HORIZON / REPLAN_INTERVAL),
+              "slow_zone_audit": slow_zone_negotiation_audit(
+                  receiver, desired, alternative, now)}
     return result, accept, reject
 
 

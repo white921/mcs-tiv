@@ -139,6 +139,77 @@ class DecelerationLossTests(unittest.TestCase):
         self.assertEqual(before, (receiver_planned.s_d, desired.s_d, receiver.status))
         prediction.configure("off")
 
+    def test_slow_zone_audit_requires_a_temporary_dip_and_recovery(self):
+        context = {
+            "enabled": True,
+            "start_x_m": 172.2,
+            "end_x_m": 174.2,
+            "lane_center_y_m": -1.6,
+            "lateral_tolerance_m": 1.0,
+        }
+        recovered = NS(
+            t=[0.0, 5.0, 6.0, 10.0],
+            x=[160.0, 173.0, 175.0, 210.0],
+            y=[-1.6] * 4,
+            s_d=[10.0, 8.0, 8.5, 10.0],
+            slow_zone_reference_s_d=[10.0] * 4,
+            slow_zone_context=context,
+        )
+        still_slow = NS(**{
+            **recovered.__dict__,
+            "s_d": [10.0, 8.0, 8.5, 9.0],
+        })
+
+        good = prediction._slow_zone_path_audit(recovered, 0.0)
+        bad = prediction._slow_zone_path_audit(still_slow, 0.0)
+
+        self.assertTrue(good["zone_entered_within_10s"])
+        self.assertTrue(good["zone_exited_within_10s"])
+        self.assertTrue(good["additional_deceleration_within_10s"])
+        self.assertTrue(good["recovered_to_normal_speed_at_10s"])
+        self.assertTrue(good["intended_temporary_slowdown"])
+        self.assertAlmostEqual(good["maximum_speed_reduction_mps"], 2.0)
+        self.assertFalse(bad["recovered_to_normal_speed_at_10s"])
+        self.assertFalse(bad["intended_temporary_slowdown"])
+
+    def test_slow_zone_negotiation_summary_is_method_independent(self):
+        context = {
+            "enabled": True,
+            "start_x_m": 172.2,
+            "end_x_m": 174.2,
+            "lane_center_y_m": -1.6,
+            "lateral_tolerance_m": 1.0,
+        }
+
+        def path(veh, kind, name):
+            return NS(
+                vehID=veh, type=kind, pathID=name,
+                t=[0.0, 5.0, 6.0, 10.0],
+                x=[160.0, 173.0, 175.0, 210.0], y=[-1.6] * 4,
+                s_d=[10.0, 8.0, 8.5, 10.0],
+                slow_zone_reference_s_d=[10.0] * 4,
+                slow_zone_context=context,
+            )
+
+        sender_planned = path("a", "planned", "a-planned")
+        desired = path("a", "desired", "a-desired")
+        receiver_planned = path("b", "planned", "b-planned")
+        alternative = path("b", "alter", "b-alter")
+        receiver = NS(
+            id="b", plannedPath=receiver_planned,
+            receivedPaths=[sender_planned])
+
+        audit = prediction.slow_zone_negotiation_audit(
+            receiver, desired, alternative, 0.0)
+
+        self.assertTrue(audit["scenario_enabled"])
+        self.assertTrue(audit["intended_profile_observed"])
+        self.assertEqual(audit["intended_profile_path_count"], 4)
+        self.assertEqual(
+            {item["role"] for item in audit["paths"]},
+            {"sender_desired", "sender_planned", "receiver_planned",
+             "receiver_alternative"})
+
     def test_shadow_uses_newest_sender_planned_packet(self):
         def path(veh, kind, times, speeds, name):
             return NS(vehID=veh, type=kind, pathID=name, t=times, s_d=speeds,

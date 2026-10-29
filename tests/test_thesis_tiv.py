@@ -145,6 +145,15 @@ class ThesisTIVTests(unittest.TestCase):
         self.assertEqual(p.x[1], 1)
         self.assertEqual(snapshot.t[0], .1)
 
+    def test_snapshot_keeps_slow_zone_reference_aligned(self):
+        p = path()
+        p.slow_zone_reference_s_d = [20 + index for index in range(len(p.t))]
+
+        snapshot = tiv.transmitted_path(p, .1)
+
+        self.assertEqual(len(snapshot.t), len(snapshot.slow_zone_reference_s_d))
+        self.assertEqual(snapshot.slow_zone_reference_s_d[0], 21)
+
     def test_snapshot_keeps_short_geometry_time_aligned(self):
         p = path()
         p.x = p.x[:-1]

@@ -32,6 +32,25 @@ The restriction is disabled by default.  Add
 `--eval3-downstream-slow-zone` to enable it.  Omitting that option preserves
 the normal-road scenario.
 
+## Condition-quality audit
+
+With diagnostic traces enabled, every negotiation `started` record and every
+terminal `decision` record includes `details.slow_zone_audit`.  The audit
+compares each restricted path with the aligned path generated before the road
+limit was applied.  It records:
+
+- whether the path entered and exited the section within the next 10 seconds;
+- whether the section caused any additional speed reduction;
+- the first reduction time and maximum speed difference;
+- the normal-road and restricted speeds at 10 seconds; and
+- whether the speed returned to the normal-road value within 0.05 m/s.
+
+`intended_profile_observed` is true only when at least one involved path both
+enters and exits the section, experiences additional deceleration, and has
+recovered at the 10-second horizon.  This is an audit label, not a filter on
+the live decision: all traffic still runs normally, and the qualifying share
+is analysed after the run for both methods.
+
 ## New paired runs
 
 Run these two commands at the same time to use ten SUMO workers in total.  Do
@@ -108,3 +127,7 @@ For each new experiment, verify all of the following before using results:
    the changes between methods.  Report all-speed, route/direction speeds,
    stopped time, throughput where available, hard braking, and physical
    collisions by Seed and as paired summaries.
+7. Report the number and fraction of negotiation decisions whose
+   `slow_zone_audit.intended_profile_observed` is true.  Treat a low qualifying
+   share as a limitation of the scenario condition, independently of which
+   method has the better traffic result.

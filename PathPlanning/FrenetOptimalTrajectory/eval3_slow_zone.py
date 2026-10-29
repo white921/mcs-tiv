@@ -139,6 +139,16 @@ def apply_to_path(path, *, max_speed, max_accel, max_decel, time_step=0.1):
     if len(path.s_d) != sample_count:
         raise ValueError("slow-zone path needs one speed sample per time sample")
 
+    original_speeds = [
+        max(0.0, min(float(speed), float(max_speed)))
+        for speed in path.s_d
+    ]
+    # Keep the normal-road profile aligned with the path so each negotiation
+    # can later audit whether the fixed restriction was reached and whether
+    # its temporary speed loss had recovered at the 10-second horizon.
+    path.slow_zone_reference_s_d = list(original_speeds)
+    path.slow_zone_context = {**manifest(), "enabled": True}
+
     original_x = list(path.x)
     original_y = list(path.y)
     distances = _cumulative_distances(original_x, original_y)
@@ -151,10 +161,6 @@ def apply_to_path(path, *, max_speed, max_accel, max_decel, time_step=0.1):
     if max_speed <= 0 or max_accel <= 0 or deceleration <= 0:
         raise ValueError("vehicle motion limits must be positive")
 
-    original_speeds = [
-        max(0.0, min(float(speed), float(max_speed)))
-        for speed in path.s_d
-    ]
     progress = [0.0]
     speeds = [original_speeds[0]]
     for index in range(1, sample_count):
