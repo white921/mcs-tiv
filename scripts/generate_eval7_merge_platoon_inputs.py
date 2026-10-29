@@ -24,6 +24,7 @@ OFFSETS = {
     "ramp-late-2p0": 2.0,
     "ramp-late-4p0": 4.0,
 }
+VALIDATION_SEEDS = (1, 2, 3, 7, 11)
 
 
 def controlled_events(offset):
@@ -113,7 +114,7 @@ def write_schedule(directory, name, offset, seed):
 def main():
     for name, offset in OFFSETS.items():
         write_schedule("eval7-merge-platoon-search", name, offset, 1)
-        for seed in range(1, 6):
+        for seed in VALIDATION_SEEDS:
             write_schedule(
                 f"eval7-merge-platoon-validation/{name}",
                 f"seed-{seed}", offset, seed)

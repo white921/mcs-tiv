@@ -183,10 +183,13 @@ class FixedVehicleInputTests(unittest.TestCase):
         conditions = sorted(path for path in validation.iterdir()
                             if path.is_dir())
         self.assertEqual(len(conditions), 5)
+        validation_seeds = (1, 2, 3, 7, 11)
         for condition in conditions:
-            paths = sorted(condition.glob("seed-*.jsonl"))
+            paths = [condition / f"seed-{seed}.jsonl"
+                     for seed in validation_seeds]
             self.assertEqual(len(paths), 5)
-            for seed, path in enumerate(paths, 1):
+            self.assertTrue(all(path.is_file() for path in paths))
+            for seed, path in zip(validation_seeds, paths):
                 schedule = load_fixed_vehicle_input(
                     path, expected_case="eval7", expected_seed=seed,
                     expected_flows_vph={
