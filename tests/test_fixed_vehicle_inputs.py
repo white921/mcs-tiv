@@ -170,6 +170,31 @@ class FixedVehicleInputTests(unittest.TestCase):
                         prefix_duration_s=300.0)
                     self.assertTrue(schedule.events)
 
+    def test_eval7_merge_platoon_inputs_cover_search_and_validation(self):
+        search = (
+            ROOT / "fixed_inputs" / "experiments" /
+            "eval7-merge-platoon-search"
+        )
+        self.assertEqual(len(list(search.glob("*.jsonl"))), 5)
+        validation = (
+            ROOT / "fixed_inputs" / "experiments" /
+            "eval7-merge-platoon-validation"
+        )
+        conditions = sorted(path for path in validation.iterdir()
+                            if path.is_dir())
+        self.assertEqual(len(conditions), 5)
+        for condition in conditions:
+            paths = sorted(condition.glob("seed-*.jsonl"))
+            self.assertEqual(len(paths), 5)
+            for seed, path in enumerate(paths, 1):
+                schedule = load_fixed_vehicle_input(
+                    path, expected_case="eval7", expected_seed=seed,
+                    expected_flows_vph={
+                        "requesting": 1000, "accepting": 1000},
+                    expected_bus_share=0.25,
+                    prefix_duration_s=300.0)
+                self.assertTrue(schedule.events)
+
     def test_prefix_is_stable_and_uses_strictly_earlier_events(self):
         path = ROOT / "fixed_inputs" / "thesis" / "eval3" / "seed-1.jsonl"
         empty = load_fixed_vehicle_input(path, prefix_duration_s=0.1)
