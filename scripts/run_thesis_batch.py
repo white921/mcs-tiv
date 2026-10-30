@@ -205,7 +205,8 @@ def run_task(task, args):
             MCS_CONFLICT_AUDIT=str(destination / "conflicts.jsonl"),
             MCS_NEGOTIATION_AUDIT=str(destination / "negotiations.jsonl"),
             MCS_RUNTIME_AUDIT=str(destination / "runtime.jsonl"),
-            MCS_FCD_OUTPUT=str(destination / "fcd.xml.gz"))
+            MCS_FCD_OUTPUT=str(destination / "fcd.xml.gz"),
+            MCS_CHECKPOINT_DIR=str(destination / "checkpoints"))
     if args.deceleration_active:
         env["MCS_DECELERATION_AUDIT"] = str(destination / "deceleration-audit.json")
     command = [args.python, "-u", case["script"], case["alpha"], str(seed),

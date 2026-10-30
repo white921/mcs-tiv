@@ -10,6 +10,7 @@ from contextlib import redirect_stdout
 import numpy as np
 import datetime
 import csv
+import time
 
 
 # the directory in which this script resides
@@ -22,6 +23,7 @@ from animation_merge import Animation
 from frenet_merge import emergency_stop
 from fixed_vehicle_inputs import load_fixed_vehicle_input
 import evaluation_metrics
+import diagnostic_trace
 
 # we need to import python modules from the $SUMO_HOME/tools directory
 # If the the environment variable SUMO_HOME is not set, try to locate the python modules relative to this script
@@ -250,6 +252,7 @@ def run(alpha='0.0', inflow_0=750, inflow_1=750, quiet=False, save_statistics=Tr
     get_followrange = 0
 
     #初期設定（障害物の配置など）
+    diagnostic_trace.initialize()
     set_environment(inflow_0, inflow_1)
     file = alpha + '_' + str(inflow_0) + '_' + str(inflow_1)
     animator = Animation(file)
@@ -257,6 +260,7 @@ def run(alpha='0.0', inflow_0=750, inflow_1=750, quiet=False, save_statistics=Tr
     #シミュレーション開始
     run_until = diagnostic_stop_time if diagnostic_stop_time is not None else simulation_time
     while sumo_time < run_until:
+        step_started = time.perf_counter()
         traci.simulationStep()
         sumo_time = traci.simulation.getTime()
         print("\nTIME:", sumo_time)
@@ -399,6 +403,9 @@ def run(alpha='0.0', inflow_0=750, inflow_1=750, quiet=False, save_statistics=Tr
         evaluation_metrics.observe(
             observed, sumo_time,
             {str(ins.id): traci.vehicle.getAllowedSpeed(ins.id) for ins in observed})
+        diagnostic_trace.record_vehicle_states(observed, sumo_time, traci)
+        diagnostic_trace.record_runtime(
+            sumo_time, {}, len(observed), time.perf_counter() - step_started)
 
         #車両インスタンスを削除
         if poplist:
@@ -552,6 +559,14 @@ if __name__ == "__main__":
 
     # this is the normal way of using traci. sumo is started as a subprocess and then the python script connects and runs
     sumo_command = [sumoBinary, '-c', os.path.join('merge.sumocfg')]
+    fcd_output = os.environ.get("MCS_FCD_OUTPUT")
+    if fcd_output:
+        sumo_command.extend(["--fcd-output", fcd_output])
+    checkpoint_root = os.environ.get("MCS_CHECKPOINT_DIR")
+    if checkpoint_root:
+        os.makedirs(checkpoint_root, exist_ok=True)
+        sumo_command.extend(["--save-state.period", "60",
+                             "--save-state.prefix", os.path.join(checkpoint_root, "sumo-")])
     if options.quiet:
         sumo_command.extend(["--no-step-log", "true"])
 

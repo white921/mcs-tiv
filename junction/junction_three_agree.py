@@ -678,6 +678,14 @@ if __name__ == "__main__":
 
     # this is the normal way of using traci. sumo is started as a subprocess and then the python script connects and runs
     sumo_command = [sumoBinary, '-c', os.path.join('junction_three.sumocfg')]
+    fcd_output = os.environ.get("MCS_FCD_OUTPUT")
+    if fcd_output:
+        sumo_command.extend(["--fcd-output", fcd_output])
+    checkpoint_root = os.environ.get("MCS_CHECKPOINT_DIR")
+    if checkpoint_root:
+        os.makedirs(checkpoint_root, exist_ok=True)
+        sumo_command.extend(["--save-state.period", "60",
+                             "--save-state.prefix", os.path.join(checkpoint_root, "sumo-")])
     if options.quiet:
         sumo_command.extend(["--no-step-log", "true"])
 
