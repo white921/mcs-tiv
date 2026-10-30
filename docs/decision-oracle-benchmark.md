@@ -55,7 +55,8 @@ records for the same `(receiver_id, sender_id, desired_path_id)` negotiation
 are collapsed before outcomes are inspected.  The fixed corpus contains
 Eval.3/5 seeds 1-5 and Eval.7 seeds
 1/2/3/7/11, both Yamashita- and proposal-origin natural runs, and the first
-four decisions from each run: 120 selected events total.  Invalid selected
+four forceable policy decisions from each run: 120 selected events total.
+Physics-only refusals are excluded. Invalid selected
 events are counted and never replaced.  One invocation owns one
 `results/runs/<experiment-id>/` directory; each event owns its checkpoint,
 accept/reject logs, metrics and manifest.  A corpus with any incomplete event
@@ -63,7 +64,9 @@ is not committed or pushed.
 
 Two audited natural-run batches provide the Yamashita- and proposal-origin
 decision traces.  `plan_decision_oracle_corpus.py` validates every discovery
-manifest, fixes the first four unique decisions in natural execution order,
+manifest, fixes the first four unique forceable TIV/proposal Accept/Reject
+decisions in natural execution order (excluding physics-only refusals such as
+`no_feasible_alternative`),
 and writes the immutable 120-event plan.  `run_decision_oracle_corpus.py`
 executes that plan against one shared read-only source snapshot, refuses a
 non-120-event plan, verifies the expected receiver/sender/path identity, and

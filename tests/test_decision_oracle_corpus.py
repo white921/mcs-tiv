@@ -19,13 +19,20 @@ class DecisionOracleCorpusTests(unittest.TestCase):
             trace = Path(directory) / "negotiations.jsonl"
             records = [
                 {"event": "started", "sim_time": 1.0},
+                {"event": "decision", "sim_time": 1.1,
+                 "reason": "no_feasible_alternative",
+                 "receiver_id": "9", "sender_id": "8",
+                 "desired_path_id": "8_1"},
                 {"event": "decision", "sim_time": 2.1,
+                 "reason": "thesis-tiv-fallback",
                  "receiver_id": "2", "sender_id": "1",
                  "desired_path_id": "1_1"},
                 {"event": "decision", "sim_time": 2.0,
+                 "reason": "thesis-tiv-fallback",
                  "receiver_id": "2", "sender_id": "1",
                  "desired_path_id": "1_1"},
                 {"event": "decision", "sim_time": 3.0,
+                 "reason": "deceleration-propagation",
                  "receiver_id": "4", "sender_id": "3",
                  "desired_path_id": "3_1"},
             ]

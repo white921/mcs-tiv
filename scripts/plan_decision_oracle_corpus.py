@@ -58,6 +58,14 @@ def selected_events(trace, count):
     for record in read_jsonl(trace):
         if record.get("event") != "decision":
             continue
+        # The simulator's oracle ordinal advances only after a feasible
+        # alternative exists and the TIV/proposal policy actually chooses
+        # Accept or Reject.  Physics-only refusals such as
+        # ``no_feasible_alternative`` never reach the forceable boundary and
+        # therefore cannot be replayed as an Accept/Reject pair.
+        if record.get("reason") not in {
+                "thesis-tiv-fallback", "deceleration-propagation"}:
+            continue
         decision_ordinal += 1
         identity = (
             str(record["receiver_id"]),
@@ -108,8 +116,9 @@ def build_plan(discoveries, events_per_run=4):
     return {
         "schema": "decision-oracle-plan-v1",
         "selection_rule": (
-            "first four unique receiver/sender/desired-path negotiations in natural-log "
-            "order for each case/origin/seed; invalid events are not replaced"),
+            "first four unique forceable TIV/proposal Accept/Reject decisions in "
+            "natural-log order for each case/origin/seed; physics-only refusals are "
+            "excluded and invalid selected events are not replaced"),
         "events_per_run": events_per_run,
         "event_count": len(events),
         "events": events,
