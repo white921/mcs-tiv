@@ -16,6 +16,28 @@ IMPLEMENTATION = os.environ.get("MCS_TIV_IMPLEMENTATION", "thesis")
 if IMPLEMENTATION not in ("thesis", "legacy-local"):
     raise ValueError("invalid MCS_TIV_IMPLEMENTATION")
 
+# Kept opt-in and deliberately narrow: the oracle runner supplies one
+# deterministic event ordinal and one forced action.  No priority-hold or
+# global policy switch is involved.  The ordinary code path remains byte-for-
+# byte equivalent when these variables are absent.
+ORACLE_TARGET_EVENT = os.environ.get("MCS_ORACLE_TARGET_EVENT")
+ORACLE_FORCE_DECISION = os.environ.get("MCS_ORACLE_FORCE_DECISION")
+if ORACLE_TARGET_EVENT is not None:
+    ORACLE_TARGET_EVENT = int(ORACLE_TARGET_EVENT)
+    if ORACLE_TARGET_EVENT < 1 or ORACLE_FORCE_DECISION not in ("accept", "reject"):
+        raise ValueError("oracle target requires a positive event ordinal and accept/reject force")
+ORACLE_EVENT_COUNT = 0
+
+
+def apply_decision(request, choice):
+    """Apply one already-evaluated negotiation choice exactly once."""
+    if request.get("applied"):
+        raise RuntimeError("negotiation request applied twice")
+    if choice not in ("accept", "reject"):
+        raise ValueError("negotiation choice must be accept or reject")
+    request["applied"] = True
+    return choice
+
 
 def enabled(vehicle):
     return IMPLEMENTATION == "thesis" and vehicle.alpha in (6, 7)
@@ -203,6 +225,7 @@ def send_mcm(vehicle, server, traci):
 
 
 def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
+    global ORACLE_EVENT_COUNT
     desired_ids = [entry["path"].pathID for entry in collisions]
     if vehicle.WithAgreementPhase and vehicle.isWaitAgree:
         if vehicle.waitPath.pathID in desired_ids:
@@ -334,6 +357,18 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
                         "sender_tiv": received.get("value"),
                         "receiver_tiv": planned.get("value"),
                     })
+        ORACLE_EVENT_COUNT += 1
+        # This is intentionally after both policy choices have been computed
+        # and before any mutation of agreement, trajectory, or rejection
+        # state.  Consequently only this event is forced; all other events
+        # continue through the identical live policy.
+        if ORACLE_TARGET_EVENT == ORACLE_EVENT_COUNT:
+            accept = ORACLE_FORCE_DECISION == "accept"
+            prediction_method = "decision-oracle-forced-" + ORACLE_FORCE_DECISION
+        request = {"ordinal": ORACLE_EVENT_COUNT, "time": vehicle.simTime,
+                   "receiver": str(vehicle.id), "sender": str(desired.vehID),
+                   "desired_path_id": str(desired.pathID), "applied": False}
+        accept = apply_decision(request, "accept" if accept else "reject") == "accept"
         COUNTS["receiver_tiv_comparisons"] += 1
         COUNTS["accepted" if accept else "rejected"] += 1
         diagnostic_trace.record_negotiation(
