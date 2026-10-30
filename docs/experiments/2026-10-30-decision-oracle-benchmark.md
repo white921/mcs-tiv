@@ -38,7 +38,7 @@
 
 - Eval.3・1交渉のAccept/Reject分岐は、同一境界fingerprintと安全性ログを含めて機構確認済み。
 - この1件は旧・正規化遅延オラクルの接続smokeであり、本設計の正式結果には含めない。
-- 各自然走行でdecisionを`(simulation_time, receiver_id, sender_id, desired_path_id)`順に重複排除し、結果を見る前に先頭4件を固定する。選択済みイベントが評価不能でも別イベントへ差し替えず、評価不能率へ含める。
+- 各自然走行の決定論的なログ順から、`(simulation_time, receiver_id, sender_id, desired_path_id)`が重複するdecisionを除き、結果を見る前に先頭4件を固定する。選択済みイベントが評価不能でも別イベントへ差し替えず、評価不能率へ含める。
 - 一次集計はケースごと・由来ごとの平均Regretを報告し、ケースを等重みとしたmacro平均Regretを主指標にする。Accuracy、median/p95 Regret、評価不能率は補助指標とする。
 - 主コホートはAccept／Rejectのいずれかで10秒窓内に観測された全車両の和集合とする。影響を受けない車両は両分岐で同量となり差分から相殺される。提案方式が予測した後続車集合は補助診断だけに用いる。
 

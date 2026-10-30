@@ -68,6 +68,7 @@ def common_env(args, source):
         clean_experiment_environment(),
         SUMO_HOME=str(sumo_home),
         PYTHONPATH=str(sumo_home / "tools"),
+        PYTHONDONTWRITEBYTECODE="1",
         MPLBACKEND="Agg", OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1",
         MCS_TIV_IMPLEMENTATION="thesis",
         MCS_DECELERATION_MODE=("active" if args.origin_policy == "proposal"
@@ -87,12 +88,13 @@ def scenario_command(args, source, stop_time, resume=None):
         *case["flows"], "--nogui", "--quiet",
         "--duration", str(args.duration), "--stop-time", str(stop_time),
         "--bus-allocation", "fixed", "--fixed-input", fixed["runtime_path"],
+        "--no-save",
     ]
     if args.origin_policy == "proposal":
         command.append("--deceleration-active")
     is_three_way = case["script"] == "junction_three_agree.py"
     if not is_three_way:
-        command += ["--bus-share", case["bus_share"], "--no-save"]
+        command += ["--bus-share", case["bus_share"]]
     if resume is not None:
         command += ["--resume-checkpoint", str(resume)]
     return command, fixed
@@ -184,6 +186,9 @@ def main():
     parser.add_argument("--sumo-home", type=Path, required=True)
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--source", type=Path,
+        help="shared read-only source snapshot prepared by a corpus runner")
     parser.add_argument("--case", choices=("eval3", "eval5", "eval7"),
                         default="eval3")
     parser.add_argument("--origin-policy", choices=("yamashita", "proposal"),
@@ -192,6 +197,9 @@ def main():
     parser.add_argument("--duration", type=float, default=300.0)
     parser.add_argument("--event-ordinal", type=int, required=True)
     parser.add_argument("--event-time", type=float, required=True)
+    parser.add_argument("--receiver-id")
+    parser.add_argument("--sender-id")
+    parser.add_argument("--desired-path-id")
     args = parser.parse_args()
     if args.output.exists():
         parser.error("output directory already exists")
@@ -201,12 +209,20 @@ def main():
     args.output.mkdir(parents=True)
     event = {"case": args.case, "seed": args.seed,
              "origin_policy": args.origin_policy,
-             "ordinal": args.event_ordinal, "sim_time_s": args.event_time}
+             "ordinal": args.event_ordinal, "sim_time_s": args.event_time,
+             "receiver_id": args.receiver_id, "sender_id": args.sender_id,
+             "desired_path_id": args.desired_path_id}
     event_dir = args.output / (
         f"{args.case}-{args.origin_policy}-seed-{args.seed}-"
         f"event-{args.event_ordinal:04d}")
     event_dir.mkdir()
-    source, initial_hashes = prepare_source(event_dir, args.case)
+    if args.source is None:
+        source, initial_hashes = prepare_source(event_dir, args.case)
+    else:
+        source = args.source.resolve()
+        if not source.is_dir():
+            parser.error(f"source snapshot does not exist: {source}")
+        initial_hashes = source_hashes(source)
     checkpoint = run_capture(args, event, source, event_dir, initial_hashes)
     accept, accept_samples = run_branch(
         args, event, source, event_dir, initial_hashes, checkpoint, "accept")
@@ -216,6 +232,16 @@ def main():
         expected_fingerprint=fingerprint)
 
     request = accept["boundary"]["request"]
+    expected_identity = {
+        "receiver_id": args.receiver_id,
+        "sender_id": args.sender_id,
+        "desired_path_id": args.desired_path_id,
+    }
+    for name, expected in expected_identity.items():
+        if expected is not None and str(request.get(name)) != str(expected):
+            raise RuntimeError(
+                f"selected decision identity mismatch for {name}: "
+                f"expected {expected}, got {request.get(name)}")
     proposal_evaluation = accept["boundary"].get("proposal_evaluation") or {}
     actor_ids = {str(request["sender"]), str(request["receiver"])}
     follower_ids = set(map(str, proposal_evaluation.get(

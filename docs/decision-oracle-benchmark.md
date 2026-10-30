@@ -50,15 +50,37 @@ they do not change the oracle label.
 
 ## Corpus discipline
 
-Events are selected in ascending `(simulation_time, receiver_id, sender_id,
-desired_path_id)` order and deduplicated by that tuple before outcomes are
-inspected.  The fixed corpus contains Eval.3/5 seeds 1-5 and Eval.7 seeds
+Events are selected in deterministic natural-log order and deduplicated by
+`(simulation_time, receiver_id, sender_id, desired_path_id)` before outcomes
+are inspected.  The fixed corpus contains Eval.3/5 seeds 1-5 and Eval.7 seeds
 1/2/3/7/11, both Yamashita- and proposal-origin natural runs, and the first
 four decisions from each run: 120 selected events total.  Invalid selected
 events are counted and never replaced.  One invocation owns one
 `results/runs/<experiment-id>/` directory; each event owns its checkpoint,
 accept/reject logs, metrics and manifest.  A corpus with any incomplete event
 is not committed or pushed.
+
+Two audited natural-run batches provide the Yamashita- and proposal-origin
+decision traces.  `plan_decision_oracle_corpus.py` validates every discovery
+manifest, fixes the first four unique decisions in natural execution order,
+and writes the immutable 120-event plan.  `run_decision_oracle_corpus.py`
+executes that plan against one shared read-only source snapshot, refuses a
+non-120-event plan, verifies the expected receiver/sender/path identity, and
+reports pooled, case, origin, case-origin and macro-case summaries.
+
+```bash
+python scripts/plan_decision_oracle_corpus.py \
+  --yamashita-discovery results/runs/<yamashita-discovery> \
+  --proposal-discovery results/runs/<proposal-discovery> \
+  --output /tmp/decision-oracle-plan.json
+
+python scripts/run_decision_oracle_corpus.py \
+  --plan /tmp/decision-oracle-plan.json \
+  --sumo-home /path/to/sumo \
+  --python /path/to/python \
+  --output results/runs/<decision-oracle-corpus> \
+  --workers 10
+```
 
 The single-event runner used for the first smoke test is:
 
