@@ -59,21 +59,20 @@ def selected_events(trace, count):
         if record.get("event") != "decision":
             continue
         decision_ordinal += 1
-        key = (
-            float(record["sim_time"]),
+        identity = (
             str(record["receiver_id"]),
             str(record["sender_id"]),
             str(record["desired_path_id"]),
         )
-        if key in seen:
+        if identity in seen:
             continue
-        seen.add(key)
+        seen.add(identity)
         selected.append({
             "ordinal": decision_ordinal,
-            "sim_time_s": key[0],
-            "receiver_id": key[1],
-            "sender_id": key[2],
-            "desired_path_id": key[3],
+            "sim_time_s": float(record["sim_time"]),
+            "receiver_id": identity[0],
+            "sender_id": identity[1],
+            "desired_path_id": identity[2],
         })
         if len(selected) == count:
             return selected
@@ -109,7 +108,7 @@ def build_plan(discoveries, events_per_run=4):
     return {
         "schema": "decision-oracle-plan-v1",
         "selection_rule": (
-            "first four unique decision records in deterministic natural-log "
+            "first four unique receiver/sender/desired-path negotiations in natural-log "
             "order for each case/origin/seed; invalid events are not replaced"),
         "events_per_run": events_per_run,
         "event_count": len(events),

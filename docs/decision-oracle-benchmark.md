@@ -50,9 +50,10 @@ they do not change the oracle label.
 
 ## Corpus discipline
 
-Events are selected in deterministic natural-log order and deduplicated by
-`(simulation_time, receiver_id, sender_id, desired_path_id)` before outcomes
-are inspected.  The fixed corpus contains Eval.3/5 seeds 1-5 and Eval.7 seeds
+Events are selected in deterministic natural-log order and repeated decision
+records for the same `(receiver_id, sender_id, desired_path_id)` negotiation
+are collapsed before outcomes are inspected.  The fixed corpus contains
+Eval.3/5 seeds 1-5 and Eval.7 seeds
 1/2/3/7/11, both Yamashita- and proposal-origin natural runs, and the first
 four decisions from each run: 120 selected events total.  Invalid selected
 events are counted and never replaced.  One invocation owns one

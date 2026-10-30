@@ -19,7 +19,7 @@ class DecisionOracleCorpusTests(unittest.TestCase):
             trace = Path(directory) / "negotiations.jsonl"
             records = [
                 {"event": "started", "sim_time": 1.0},
-                {"event": "decision", "sim_time": 2.0,
+                {"event": "decision", "sim_time": 2.1,
                  "receiver_id": "2", "sender_id": "1",
                  "desired_path_id": "1_1"},
                 {"event": "decision", "sim_time": 2.0,
