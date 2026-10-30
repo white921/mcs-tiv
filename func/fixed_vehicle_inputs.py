@@ -83,6 +83,17 @@ class FixedVehicleSchedule:
             )
         return event
 
+    def cursor(self):
+        """Stable, JSON-compatible witness of the remaining fixed inputs."""
+        return {
+            approach: {
+                "remaining": len(events),
+                "next_sequence": (events[0]["sequence"] if events else None),
+                "next_depart_time_s": (events[0]["depart_time_s"] if events else None),
+            }
+            for approach, events in sorted(self._events_by_approach.items())
+        }
+
 
 def _load_records(path):
     records = []

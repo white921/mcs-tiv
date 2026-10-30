@@ -6,6 +6,7 @@ import math
 import os
 from collections import Counter
 import deceleration_prediction
+import decision_oracle
 import diagnostic_trace
 import evaluation_metrics
 from trajectory_arrival import arrival_delay as shared_arrival_delay
@@ -27,6 +28,41 @@ if ORACLE_TARGET_EVENT is not None:
     if ORACLE_TARGET_EVENT < 1 or ORACLE_FORCE_DECISION not in ("accept", "reject"):
         raise ValueError("oracle target requires a positive event ordinal and accept/reject force")
 ORACLE_EVENT_COUNT = 0
+ORACLE_BOUNDARY_AUDIT = os.environ.get("MCS_ORACLE_BOUNDARY_AUDIT")
+ORACLE_EXPECTED_FINGERPRINT = os.environ.get("MCS_ORACLE_EXPECTED_FINGERPRINT")
+_ORACLE_CONTEXT_PROVIDER = None
+
+
+def configure_oracle_context_provider(provider):
+    """Install the Eval.3 controller-state witness used by oracle branches."""
+    global _ORACLE_CONTEXT_PROVIDER
+    _ORACLE_CONTEXT_PROVIDER = provider
+
+
+def _write_oracle_boundary(request, forced_choice):
+    if _ORACLE_CONTEXT_PROVIDER is None:
+        raise RuntimeError("decision oracle context provider is not configured")
+    context = _ORACLE_CONTEXT_PROVIDER(request["manifest"])
+    fingerprint = decision_oracle.canonical_hash(context)
+    if (ORACLE_EXPECTED_FINGERPRINT is not None
+            and fingerprint != ORACLE_EXPECTED_FINGERPRINT):
+        raise ValueError("decision oracle boundary fingerprint mismatch")
+    record = {
+        "schema": "decision-oracle-boundary-v1",
+        "fingerprint": fingerprint,
+        "request": request["manifest"],
+        "yamashita_choice": request["yamashita_choice"],
+        "proposal_choice": request["proposal_choice"],
+        "forced_choice": forced_choice,
+    }
+    if ORACLE_BOUNDARY_AUDIT:
+        destination = os.path.abspath(ORACLE_BOUNDARY_AUDIT)
+        os.makedirs(os.path.dirname(destination), exist_ok=True)
+        temporary = destination + ".tmp"
+        with open(temporary, "w", encoding="utf-8") as stream:
+            json.dump(record, stream, indent=2, sort_keys=True)
+        os.replace(temporary, destination)
+    return record
 
 
 def apply_decision(request, choice):
@@ -37,6 +73,62 @@ def apply_decision(request, choice):
         raise ValueError("negotiation choice must be accept or reject")
     request["applied"] = True
     return choice
+
+
+def apply_negotiation_request(request, choice):
+    """Apply the sole mutable half of a prepared negotiation request."""
+    choice = apply_decision(request, choice)
+    vehicle = request["vehicle"]
+    desired = request["desired"]
+    collision = request["collision"]
+    received = request["received"]
+    planned = request["planned"]
+    prediction_method = request["prediction_method"]
+    accept = choice == "accept"
+    COUNTS["receiver_tiv_comparisons"] += 1
+    COUNTS["accepted" if accept else "rejected"] += 1
+    diagnostic_trace.record_negotiation(
+        vehicle, desired, "decision", accept=accept,
+        reason=prediction_method, collision=collision,
+        details={"sender_tiv": received.get("value"),
+                 "receiver_tiv": planned.get("value")})
+    if len(EXAMPLES) < 100:
+        EXAMPLES.append({"receiver": vehicle.id, "sender": desired.vehID,
+                         "time": vehicle.simTime, "received": received,
+                         "planned": planned, "accept": accept})
+    if not accept:
+        vehicle.alter_straight_path = None
+        vehicle.yetJudgedList.append(desired.pathID)
+        vehicle.count_refuse_utility += 1
+        return "rejected"
+    vehicle.count_accept_utility += 1
+    vehicle.pathID += 1
+    vehicle.alter_straight_path.pathID = vehicle.id + "_" + str(vehicle.pathID)
+    vehicle.alter_straight_path.vehID = vehicle.id
+    if vehicle.WithAgreementPhase:
+        vehicle.alter_straight_path.type = "alter"
+        vehicle.alter_straight_path.yieldTo = desired.vehID
+        vehicle.waitAgreeID = list(desired.negotiationID)
+        vehicle.receiveAgreeID.append(vehicle.id)
+        vehicle.isWaitAgree = True
+        vehicle.waitPath = desired
+        diagnostic_trace.record_negotiation(
+            vehicle, desired, "waiting_for_agreement", accept=True,
+            reason=prediction_method, collision=collision,
+            details={"expected_agreement_ids": vehicle.waitAgreeID,
+                     "received_agreement_ids": vehicle.receiveAgreeID})
+        return "waiting_for_agreement"
+    vehicle.alter_straight_path.type = "planned"
+    vehicle.plannedPath = vehicle.alter_straight_path
+    vehicle.alter_straight_path = None
+    vehicle.status = "yield"
+    vehicle.leader = desired.vehID
+    vehicle.leadPath = desired
+    vehicle.isPathValid = True
+    diagnostic_trace.record_negotiation(
+        vehicle, desired, "applied", accept=True,
+        reason=prediction_method, collision=collision)
+    return "applied"
 
 
 def enabled(vehicle):
@@ -294,6 +386,7 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
         accept = deceleration_prediction.active_decision(
             vehicle, desired, vehicle.alter_straight_path, vehicle.simTime,
             point)
+        yamashita_accept = None
         if accept is None:
             received = getattr(desired, "tiv_by_receiver", {}).get(vehicle.id)
             if received is None:
@@ -312,6 +405,7 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             # Fig.4.2 says >=; two unreachable paths are not an arrival-time tie.
             accept = bool(math.isfinite(received["value"])
                           and planned["value"] >= received["value"])
+            yamashita_accept = accept
             prediction_method = "thesis-tiv-fallback"
         else:
             # Measure the TIV decision on exactly the same event.  It is
@@ -323,6 +417,7 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
                                     traci.vehicletype.getAccel(vehicle.typeID))
                 tiv_accept = bool(math.isfinite(received_tiv["value"])
                                   and planned_tiv["value"] >= received_tiv["value"])
+                yamashita_accept = tiv_accept
                 deceleration_prediction.record_tiv_comparison(accept, tiv_accept)
             else:
                 deceleration_prediction.COUNTS["tiv_comparison_unavailable"] += 1
@@ -330,6 +425,18 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             planned = {"value": None, "source": "deceleration-propagation"}
             received = {"value": None, "source": "deceleration-propagation"}
             prediction_method = "deceleration-propagation"
+        target_event = ORACLE_TARGET_EVENT == ORACLE_EVENT_COUNT + 1
+        proposal_choice = None
+        if target_event:
+            try:
+                proposal_evaluation = deceleration_prediction.evaluate(
+                    vehicle, desired, vehicle.alter_straight_path,
+                    vehicle.simTime, point)
+            except (AttributeError, IndexError, TypeError, ValueError,
+                    ZeroDivisionError):
+                proposal_evaluation = None
+            if proposal_evaluation is not None:
+                proposal_choice = proposal_evaluation.get("decision")
         # TIVtep's directly available prediction is the selected sender and
         # receiver MCM trajectory.  Record it for baseline runs and proposal
         # fallbacks; the active proposal has already registered its richer
@@ -358,60 +465,43 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
                         "receiver_tiv": planned.get("value"),
                     })
         ORACLE_EVENT_COUNT += 1
-        # This is intentionally after both policy choices have been computed
-        # and before any mutation of agreement, trajectory, or rejection
-        # state.  Consequently only this event is forced; all other events
-        # continue through the identical live policy.
-        if ORACLE_TARGET_EVENT == ORACLE_EVENT_COUNT:
-            accept = ORACLE_FORCE_DECISION == "accept"
-            prediction_method = "decision-oracle-forced-" + ORACLE_FORCE_DECISION
-        request = {"ordinal": ORACLE_EVENT_COUNT, "time": vehicle.simTime,
-                   "receiver": str(vehicle.id), "sender": str(desired.vehID),
-                   "desired_path_id": str(desired.pathID), "applied": False}
-        accept = apply_decision(request, "accept" if accept else "reject") == "accept"
-        COUNTS["receiver_tiv_comparisons"] += 1
-        COUNTS["accepted" if accept else "rejected"] += 1
-        diagnostic_trace.record_negotiation(
-            vehicle, desired, "decision", accept=accept,
-            reason=prediction_method, collision=collision,
-            details={"sender_tiv": received.get("value"),
-                     "receiver_tiv": planned.get("value")})
-        if len(EXAMPLES) < 100:
-            EXAMPLES.append({"receiver": vehicle.id, "sender": desired.vehID,
-                             "time": vehicle.simTime, "received": received,
-                             "planned": planned, "accept": accept})
-        if not accept:
-            vehicle.alter_straight_path = None
-            vehicle.yetJudgedList.append(desired.pathID)
-            vehicle.count_refuse_utility += 1
+        request = {
+            "ordinal": ORACLE_EVENT_COUNT,
+            "time": float(vehicle.simTime),
+            "receiver": str(vehicle.id),
+            "sender": str(desired.vehID),
+            "desired_path_id": str(desired.pathID),
+            "alternative_path_id": str(getattr(
+                vehicle.alter_straight_path, "pathID", None)),
+            "vehicle": vehicle,
+            "desired": desired,
+            "collision": collision,
+            "received": received,
+            "planned": planned,
+            "prediction_method": prediction_method,
+            "yamashita_choice": ("accept" if yamashita_accept else "reject"
+                                  if yamashita_accept is not None else None),
+            "proposal_choice": proposal_choice,
+            "applied": False,
+        }
+        request["manifest"] = {
+            key: request[key] for key in (
+                "ordinal", "time", "receiver", "sender", "desired_path_id",
+                "alternative_path_id")
+        }
+        choice = "accept" if accept else "reject"
+        # The branch replay reaches this boundary from the same previous-step
+        # checkpoint.  The complete context fingerprint must match before the
+        # selected event alone may be forced.
+        if target_event:
+            choice = ORACLE_FORCE_DECISION
+            request["prediction_method"] = "decision-oracle-forced-" + choice
+            _write_oracle_boundary(request, choice)
+        outcome = apply_negotiation_request(request, choice)
+        if outcome == "rejected":
             continue
-        vehicle.count_accept_utility += 1
-        vehicle.pathID += 1
-        vehicle.alter_straight_path.pathID = vehicle.id + "_" + str(vehicle.pathID)
-        vehicle.alter_straight_path.vehID = vehicle.id
-        if vehicle.WithAgreementPhase:
-            vehicle.alter_straight_path.type = "alter"
-            vehicle.alter_straight_path.yieldTo = desired.vehID
-            vehicle.waitAgreeID = list(desired.negotiationID)
-            vehicle.receiveAgreeID.append(vehicle.id)
-            vehicle.isWaitAgree = True
-            vehicle.waitPath = desired
-            diagnostic_trace.record_negotiation(
-                vehicle, desired, "waiting_for_agreement", accept=True,
-                reason=prediction_method, collision=collision,
-                details={"expected_agreement_ids": vehicle.waitAgreeID,
-                         "received_agreement_ids": vehicle.receiveAgreeID})
+        if outcome == "waiting_for_agreement":
             return
-        vehicle.alter_straight_path.type = "planned"
-        vehicle.plannedPath = vehicle.alter_straight_path
-        vehicle.alter_straight_path = None
-        vehicle.status = "yield"
-        vehicle.leader = desired.vehID
-        vehicle.leadPath = desired
-        vehicle.isPathValid = True
-        diagnostic_trace.record_negotiation(
-            vehicle, desired, "applied", accept=True,
-            reason=prediction_method, collision=collision)
 
 
 def _write_audit():

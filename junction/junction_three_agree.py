@@ -26,6 +26,7 @@ from fixed_vehicle_inputs import load_fixed_vehicle_input
 import evaluation_metrics
 import diagnostic_trace
 import deceleration_prediction
+import decision_oracle
 import mcs_checkpoint
 import thesis_tiv
 
@@ -127,6 +128,7 @@ def _module_state():
         "thesis_tiv": {
             "COUNTS": thesis_tiv.COUNTS,
             "EXAMPLES": thesis_tiv.EXAMPLES,
+            "ORACLE_EVENT_COUNT": thesis_tiv.ORACLE_EVENT_COUNT,
         },
     }
 
@@ -158,6 +160,76 @@ def _restore_module_state(state):
     tiv = state["thesis_tiv"]
     _replace_state(thesis_tiv.COUNTS, tiv["COUNTS"])
     thesis_tiv.EXAMPLES[:] = tiv["EXAMPLES"]
+    thesis_tiv.ORACLE_EVENT_COUNT = tiv.get("ORACLE_EVENT_COUNT", 0)
+
+
+def _path_witness(path):
+    if path is None:
+        return None
+    samples = {}
+    for name in ("t", "x", "y", "s_d", "yaw"):
+        values = getattr(path, name, None)
+        if values is not None:
+            samples[name] = [float(value) for value in values]
+    return {
+        "path_id": str(getattr(path, "pathID", None)),
+        "vehicle_id": str(getattr(path, "vehID", None)),
+        "type": getattr(path, "type", None),
+        "yield_to": str(getattr(path, "yieldTo", None)),
+        "content_hash": decision_oracle.canonical_hash(samples),
+    }
+
+
+def _controller_witness(vehicle):
+    desired = getattr(vehicle, "desiredPaths", None) or []
+    received = getattr(vehicle, "receivedPaths", None) or []
+    return {
+        "id": str(vehicle.id),
+        "status": getattr(vehicle, "status", None),
+        "route": getattr(vehicle, "route", None),
+        "road": getattr(vehicle, "road", None),
+        "lane": getattr(vehicle, "lane", None),
+        "path_counter": getattr(vehicle, "pathID", None),
+        "is_path_valid": bool(getattr(vehicle, "isPathValid", False)),
+        "is_wait_agree": bool(getattr(vehicle, "isWaitAgree", False)),
+        "wait_agree_ids": list(getattr(vehicle, "waitAgreeID", []) or []),
+        "receive_agree_ids": list(getattr(vehicle, "receiveAgreeID", []) or []),
+        "yet_judged_ids": list(getattr(vehicle, "yetJudgedList", []) or []),
+        "leader": str(getattr(vehicle, "leader", None)),
+        "planned": _path_witness(getattr(vehicle, "plannedPath", None)),
+        "desired": [_path_witness(path) for path in desired],
+        "alternative": _path_witness(
+            getattr(vehicle, "alter_straight_path", None)),
+        "wait_path": _path_witness(getattr(vehicle, "waitPath", None)),
+        "received": [_path_witness(path) for path in received],
+    }
+
+
+def _oracle_boundary_context(request_manifest):
+    running_ids = sorted(str(value) for value in traci.vehicle.getIDList())
+    physical = []
+    for vehicle_id in running_ids:
+        x, y = traci.vehicle.getPosition(vehicle_id)
+        physical.append({
+            "id": vehicle_id, "x": float(x), "y": float(y),
+            "speed": float(traci.vehicle.getSpeed(vehicle_id)),
+        })
+    fixed_cursor = (fixed_input_schedule.cursor()
+                    if fixed_input_schedule is not None else None)
+    controllers = sorted(
+        (_controller_witness(vehicle) for vehicle in vehicle_instance),
+        key=lambda item: item["id"])
+    return {
+        "request": request_manifest,
+        "sim_time_s": float(traci.simulation.getTime()),
+        "physical_vehicles": physical,
+        "fixed_input_cursor": fixed_cursor,
+        "python_random_state_hash": decision_oracle.canonical_hash(
+            repr(random.getstate())),
+        "vehicle_type_random_state_hash": decision_oracle.canonical_hash(
+            repr(vehicle_type_rng.getstate())),
+        "controller_state_hash": decision_oracle.canonical_hash(controllers),
+    }
 
 
 def _checkpoint_globals():
@@ -442,6 +514,7 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False, save_sta
     get_followrange = 0
 
     #初期設定（障害物の配置など）
+    thesis_tiv.configure_oracle_context_provider(_oracle_boundary_context)
     diagnostic_trace.initialize()
     if resume_checkpoint:
         checkpoint_manifest, checkpoint_payload, _ = mcs_checkpoint.load(
@@ -712,7 +785,8 @@ def run(alpha=0, inflow_0=750, inflow_1=750, inflow_2=750, quiet=False, save_sta
             time.perf_counter() - step_started)
 
         checkpoint_root = os.environ.get("MCS_CHECKPOINT_DIR")
-        if checkpoint_root and mcs_checkpoint.is_due(sumo_time):
+        if checkpoint_root and (mcs_checkpoint.is_due(sumo_time)
+                                or mcs_checkpoint.is_requested(sumo_time)):
             local_values = locals()
             run_state = {
                 name: local_values[name] for name in CHECKPOINT_RUN_FIELDS
@@ -877,7 +951,8 @@ if __name__ == "__main__":
 
     # this is the normal way of using traci. sumo is started as a subprocess and then the python script connects and runs
     sumo_command = [sumoBinary, '-c', os.path.join('junction_three.sumocfg')]
-    if os.environ.get("MCS_CHECKPOINT_DIR") or resume_checkpoint:
+    if (os.environ.get("MCS_CHECKPOINT_DIR") or resume_checkpoint
+            or os.environ.get("MCS_CHECKPOINT_AT")):
         sumo_command.extend([
             "--save-state.precision", "16",
             "--save-state.rng", "true",

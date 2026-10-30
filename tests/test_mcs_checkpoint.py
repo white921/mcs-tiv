@@ -19,6 +19,11 @@ class MCSCheckpointTests(unittest.TestCase):
             self.assertTrue(mcs_checkpoint.is_due(60.0))
             self.assertTrue(mcs_checkpoint.is_due(120.0))
 
+    def test_explicit_checkpoint_time(self):
+        with patch.dict(os.environ, {"MCS_CHECKPOINT_AT": "27.3, 41.2"}):
+            self.assertTrue(mcs_checkpoint.is_requested(27.3))
+            self.assertFalse(mcs_checkpoint.is_requested(27.4))
+
     def test_save_and_load_paired_state(self):
         with tempfile.TemporaryDirectory() as directory:
             def save_state(path):

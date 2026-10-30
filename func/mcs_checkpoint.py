@@ -26,11 +26,28 @@ def configured_interval():
     return value
 
 
+def configured_times():
+    """Return explicit one-shot checkpoint times from the environment."""
+    raw = os.environ.get("MCS_CHECKPOINT_AT", "").strip()
+    if not raw:
+        return ()
+    values = tuple(float(item.strip()) for item in raw.split(",") if item.strip())
+    if any(value <= 0 for value in values):
+        raise ValueError("MCS_CHECKPOINT_AT times must be positive")
+    return values
+
+
 def is_due(sim_time, interval=None):
     interval = configured_interval() if interval is None else float(interval)
     if interval <= 0 or sim_time <= 0:
         return False
     return abs(sim_time / interval - round(sim_time / interval)) <= 1e-6
+
+
+def is_requested(sim_time, times=None):
+    """Whether ``sim_time`` matches an explicit one-shot checkpoint time."""
+    times = configured_times() if times is None else tuple(float(value) for value in times)
+    return any(abs(float(sim_time) - value) <= 1e-6 for value in times)
 
 
 def checkpoint_name(sim_time):
@@ -108,6 +125,7 @@ def capture_shared_modules(evaluation_metrics, deceleration_prediction, thesis_t
         "thesis_tiv": {
             "COUNTS": thesis_tiv.COUNTS,
             "EXAMPLES": thesis_tiv.EXAMPLES,
+            "ORACLE_EVENT_COUNT": thesis_tiv.ORACLE_EVENT_COUNT,
         },
     }
 
@@ -140,6 +158,7 @@ def restore_shared_modules(
     tiv = state["thesis_tiv"]
     _replace_mapping(thesis_tiv.COUNTS, tiv["COUNTS"])
     thesis_tiv.EXAMPLES[:] = tiv["EXAMPLES"]
+    thesis_tiv.ORACLE_EVENT_COUNT = tiv.get("ORACLE_EVENT_COUNT", 0)
 
 
 def restore_vehicle_controls(traci, vehicles):

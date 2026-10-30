@@ -3,6 +3,8 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace as NS
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "func"))
 import decision_oracle as oracle
@@ -74,6 +76,27 @@ class DecisionOracleTests(unittest.TestCase):
         self.assertEqual(thesis_tiv.apply_decision(request, "accept"), "accept")
         with self.assertRaises(RuntimeError):
             thesis_tiv.apply_decision(request, "reject")
+
+    def test_apply_negotiation_request_rejects_without_accept_side_effects(self):
+        desired = NS(pathID="13_23", vehID="13")
+        vehicle = NS(
+            id="15", simTime=27.4, alter_straight_path=object(),
+            yetJudgedList=[], count_refuse_utility=0, count_accept_utility=0,
+            pathID=5, WithAgreementPhase=True)
+        request = {
+            "vehicle": vehicle, "desired": desired, "collision": {},
+            "received": {"value": 1}, "planned": {"value": 2},
+            "prediction_method": "test", "applied": False,
+        }
+        with patch.object(thesis_tiv.diagnostic_trace, "record_negotiation"):
+            self.assertEqual(
+                thesis_tiv.apply_negotiation_request(request, "reject"),
+                "rejected")
+        self.assertIsNone(vehicle.alter_straight_path)
+        self.assertEqual(vehicle.yetJudgedList, ["13_23"])
+        self.assertEqual(vehicle.count_refuse_utility, 1)
+        with self.assertRaises(RuntimeError):
+            thesis_tiv.apply_negotiation_request(request, "accept")
 
 
 if __name__ == "__main__":

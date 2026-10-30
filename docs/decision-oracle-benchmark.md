@@ -23,13 +23,17 @@ metrics.
 
 ## Checkpoint contract
 
-The checkpoint must be made after the candidate alternative is generated and
-before the decision is applied.  It consists of SUMO native state (including
-RNG), the controller object graph, planned/desired/received trajectories,
-agreement state, fixed-input queues/cursor, Python and vehicle-type RNG state,
-diagnostic/metric state, and a compact fingerprint of time, vehicle IDs,
-positions, speeds, fixed-input cursor, RNG state and controller-state hash.
-Both branches record the same restored fingerprint in their manifests.
+The persisted checkpoint is made at the end of the simulator step immediately
+before the decision.  It consists of SUMO native state (including RNG), the
+controller object graph, planned/desired/received trajectories, agreement
+state, fixed-input queues/cursor, Python and vehicle-type RNG state, and
+diagnostic/metric state.  Each branch deterministically replays the next 0.1 s
+to the decision boundary.  Before applying a choice it hashes the decision
+identity, time, every active vehicle's position and speed, the fixed-input
+cursor, both RNG states, controller/agreement fields and the full path content.
+The reject branch is aborted unless this fingerprint exactly matches the
+accept branch.  This outer-step replay avoids trying to pickle a Python call
+stack while still proving that only the target choice differs.
 
 The accept branch applies the existing agreement/alternative-path mechanism
 for the selected event; the reject branch applies the existing rejected-path
@@ -54,3 +58,20 @@ Eval.3 fixed-seed events.  One invocation owns one
 `results/runs/<experiment-id>/` directory; each event owns its checkpoint,
 accept/reject logs, metrics and manifest.  A corpus with any incomplete event
 is not committed or pushed.
+
+The single-event runner used for the first smoke test is:
+
+```bash
+python scripts/run_decision_oracle.py \
+  --sumo-home /path/to/sumo \
+  --python /path/to/python \
+  --output results/runs/<unique-id> \
+  --seed 1 --duration 300 \
+  --event-ordinal 1 --event-time 27.4
+```
+
+It creates one event directory with the capture checkpoint, two branch logs,
+boundary records, 0.1-second state traces, branch manifests, the oracle label,
+and Yamashita/proposal correctness and regret.  A nonzero process exit, changed
+source hash, missing boundary record, mismatched fingerprint, or collision
+leaves the event invalid rather than silently substituting another run.

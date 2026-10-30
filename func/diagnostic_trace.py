@@ -116,6 +116,8 @@ def record_vehicle_states(vehicles, sim_time, traci):
             "x": float(vehicle.pos_x),
             "y": float(vehicle.pos_y),
             "speed_mps": float(vehicle.speed),
+            "allowed_speed_mps": _safe(
+                lambda: float(traci.vehicle.getAllowedSpeed(vehicle_id))),
             "accel_mps2": float(vehicle.accel),
             "angle_deg": _safe(lambda: float(traci.vehicle.getAngle(vehicle_id))),
             "slope_deg": _safe(lambda: float(traci.vehicle.getSlope(vehicle_id))),
