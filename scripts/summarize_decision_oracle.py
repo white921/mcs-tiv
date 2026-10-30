@@ -20,7 +20,8 @@ def read_event(path):
     if not manifest.is_file():
         raise ValueError(f"missing event manifest: {path}")
     event = json.loads(manifest.read_text(encoding="utf-8"))
-    if event.get("schema") != "decision-oracle-event-v1":
+    if event.get("schema") not in (
+            "decision-oracle-event-v1", "decision-oracle-event-v2"):
         raise ValueError(f"unsupported event manifest: {path}")
     for branch in ("accept", "reject"):
         value = event.get("branches", {}).get(branch, {})
@@ -29,7 +30,9 @@ def read_event(path):
         if not value.get("restore_fingerprint_match"):
             raise ValueError(f"restore mismatch in {branch}: {path}")
     accept, reject = event["branches"]["accept"]["metrics"], event["branches"]["reject"]["metrics"]
-    label = decision_oracle.oracle_choice(accept, reject, event.get("tie_tolerance_s", decision_oracle.TIE_TOLERANCE_S))
+    label = decision_oracle.oracle_choice(
+        accept, reject,
+        event.get("tie_tolerance_m", decision_oracle.TIE_TOLERANCE_M))
     scores = {name: decision_oracle.score_policy(choice, accept, reject, label)
               for name, choice in event.get("policy_choices", {}).items()}
     return {"event_id": event.get("event_id"), "oracle": label, "policy_scores": scores,

@@ -25,6 +25,7 @@ from fixed_vehicle_inputs import load_fixed_vehicle_input
 import evaluation_metrics
 import diagnostic_trace
 import deceleration_prediction
+import decision_oracle
 import mcs_checkpoint
 import thesis_tiv
 
@@ -130,6 +131,14 @@ def _restore_checkpoint_globals(state):
     count_accepted[:] = state["count_accepted"]
     random.setstate(state["random_state"])
     vehicle_type_rng.setstate(state["vehicle_type_random_state"])
+
+
+def _oracle_boundary_context(request_manifest):
+    return decision_oracle.boundary_context(
+        request_manifest=request_manifest, traci=traci,
+        vehicles=vehicle_instance, fixed_input_schedule=fixed_input_schedule,
+        python_random_state=random.getstate(),
+        vehicle_type_random_state=vehicle_type_rng.getstate())
 
 
 def build_vehicle_type_schedules(lane_counts, target_bus_share):
@@ -300,6 +309,7 @@ def run(alpha='0.0', inflow_0=750, inflow_1=750, quiet=False, save_statistics=Tr
     get_followrange = 0
 
     #初期設定（障害物の配置など）
+    thesis_tiv.configure_oracle_context_provider(_oracle_boundary_context)
     diagnostic_trace.initialize()
     if resume_checkpoint:
         checkpoint_manifest, checkpoint_payload, _ = mcs_checkpoint.load(

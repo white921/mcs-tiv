@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one audited Eval.3 Accept/Reject counterfactual event.
+"""Run one audited Eval.3/5/7 Accept/Reject counterfactual event.
 
 The branch pair restores the same checkpoint from the simulator step directly
 before the decision.  Each replay must reproduce an identical pre-decision
@@ -45,6 +45,7 @@ def branch_samples(path, start_s, end_s):
             if reference is None:
                 continue
             samples.setdefault(str(vehicle["vehicle_id"]), []).append({
+                "sim_time_s": moment,
                 "speed_mps": vehicle["speed_mps"],
                 "reference_speed_mps": reference,
                 "accel_mps2": vehicle.get("accel_mps2", 0.0),
@@ -68,21 +69,30 @@ def common_env(args, source):
         SUMO_HOME=str(sumo_home),
         PYTHONPATH=str(sumo_home / "tools"),
         MPLBACKEND="Agg", OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1",
-        MCS_TIV_IMPLEMENTATION="thesis", MCS_DECELERATION_MODE="off",
+        MCS_TIV_IMPLEMENTATION="thesis",
+        MCS_DECELERATION_MODE=("active" if args.origin_policy == "proposal"
+                               else "off"),
+        MCS_DECELERATION_LOSS_LAMBDA="1.0",
+        MCS_DECELERATION_TIME_HALF_LIFE_S="0.0",
     )
 
 
 def scenario_command(args, source, stop_time, resume=None):
-    case = CASES["eval3"]
+    case = CASES[args.case]
     fixed = fixed_input_details(
-        "eval3", args.seed, args.duration, "fixed",
+        args.case, args.seed, args.duration, "fixed",
         prefix_duration=args.duration, source_root=source)
     command = [
         args.python, "-u", case["script"], case["alpha"], str(args.seed),
-        *case["flows"], "--nogui", "--quiet", "--no-save",
+        *case["flows"], "--nogui", "--quiet",
         "--duration", str(args.duration), "--stop-time", str(stop_time),
         "--bus-allocation", "fixed", "--fixed-input", fixed["runtime_path"],
     ]
+    if args.origin_policy == "proposal":
+        command.append("--deceleration-active")
+    is_three_way = case["script"] == "junction_three_agree.py"
+    if not is_three_way:
+        command += ["--bus-share", case["bus_share"], "--no-save"]
     if resume is not None:
         command += ["--resume-checkpoint", str(resume)]
     return command, fixed
@@ -102,7 +112,7 @@ def run_capture(args, event, source, event_dir, initial_hashes):
     )
     command, fixed = scenario_command(args, source, checkpoint_time)
     code, elapsed = run_process(
-        command, source / "junction", env,
+        command, source / CASES[args.case]["folder"], env,
         capture_dir / "stdout.log", capture_dir / "stderr.log")
     checkpoint = capture_dir / "checkpoints" / mcs_checkpoint.checkpoint_name(checkpoint_time)
     manifest = {
@@ -140,7 +150,7 @@ def run_branch(args, event, source, event_dir, initial_hashes, checkpoint,
         env["MCS_ORACLE_EXPECTED_FINGERPRINT"] = expected_fingerprint
     command, _ = scenario_command(args, source, end_time, checkpoint)
     code, elapsed = run_process(
-        command, source / "junction", env,
+        command, source / CASES[args.case]["folder"], env,
         destination / "stdout.log", destination / "stderr.log")
     boundary_path = destination / "boundary.json"
     boundary = json.loads(boundary_path.read_text(encoding="utf-8")) \
@@ -174,6 +184,10 @@ def main():
     parser.add_argument("--sumo-home", type=Path, required=True)
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--case", choices=("eval3", "eval5", "eval7"),
+                        default="eval3")
+    parser.add_argument("--origin-policy", choices=("yamashita", "proposal"),
+                        default="yamashita")
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--duration", type=float, default=300.0)
     parser.add_argument("--event-ordinal", type=int, required=True)
@@ -185,11 +199,14 @@ def main():
         parser.error("event ordinal must be positive")
 
     args.output.mkdir(parents=True)
-    event = {"case": "eval3", "seed": args.seed,
+    event = {"case": args.case, "seed": args.seed,
+             "origin_policy": args.origin_policy,
              "ordinal": args.event_ordinal, "sim_time_s": args.event_time}
-    event_dir = args.output / f"event-{args.event_ordinal:04d}"
+    event_dir = args.output / (
+        f"{args.case}-{args.origin_policy}-seed-{args.seed}-"
+        f"event-{args.event_ordinal:04d}")
     event_dir.mkdir()
-    source, initial_hashes = prepare_source(event_dir, "eval3")
+    source, initial_hashes = prepare_source(event_dir, args.case)
     checkpoint = run_capture(args, event, source, event_dir, initial_hashes)
     accept, accept_samples = run_branch(
         args, event, source, event_dir, initial_hashes, checkpoint, "accept")
@@ -198,23 +215,30 @@ def main():
         args, event, source, event_dir, initial_hashes, checkpoint, "reject",
         expected_fingerprint=fingerprint)
 
-    cohort = set(accept_samples) | set(reject_samples)
+    request = accept["boundary"]["request"]
+    proposal_evaluation = accept["boundary"].get("proposal_evaluation") or {}
+    actor_ids = {str(request["sender"]), str(request["receiver"])}
+    follower_ids = set(map(str, proposal_evaluation.get(
+        "union_follower_ids", ())))
+    cohort = actor_ids | follower_ids
     accept_metrics = decision_oracle.realised_metrics(accept_samples, cohort)
     reject_metrics = decision_oracle.realised_metrics(reject_samples, cohort)
+    accept_follower_metrics = decision_oracle.realised_metrics(
+        accept_samples, follower_ids)
+    reject_follower_metrics = decision_oracle.realised_metrics(
+        reject_samples, follower_ids)
     accept_metrics["safety"] = accept["safety"]
     reject_metrics["safety"] = reject["safety"]
     oracle = decision_oracle.oracle_choice(accept_metrics, reject_metrics)
-    policy_choices = {
-        "yamashita": accept["boundary"].get("yamashita_choice"),
-        "proposal": accept["boundary"].get("proposal_choice"),
-    }
+    policy_choices = decision_oracle.policy_choices(
+        accept["boundary"].get("yamashita_choice"), proposal_evaluation)
     policy_scores = {
         name: decision_oracle.score_policy(choice, accept_metrics,
                                            reject_metrics, oracle)
         for name, choice in policy_choices.items()
     }
     manifest = {
-        "schema": "decision-oracle-event-v1", "event": event,
+        "schema": "decision-oracle-event-v2", "event": event,
         "checkpoint": str(checkpoint),
         "branches": {
             "accept": {**accept, "metrics": accept_metrics},
@@ -224,10 +248,19 @@ def main():
         "policy_choices": policy_choices, "oracle": oracle,
         "policy_scores": policy_scores,
         "cohort_vehicle_ids": sorted(cohort),
+        "actor_vehicle_ids": sorted(actor_ids),
+        "follower_vehicle_ids": sorted(follower_ids),
+        "secondary_follower_only": {
+            "accept": accept_follower_metrics,
+            "reject": reject_follower_metrics,
+            "accept_minus_reject_distance_m": (
+                accept_follower_metrics["distance_m"]
+                - reject_follower_metrics["distance_m"]),
+        },
     }
     write_json(event_dir / "manifest.json", manifest)
     experiment = {
-        "schema": "decision-oracle-experiment-v1",
+        "schema": "decision-oracle-experiment-v2",
         "events": [event_dir.name], "event_count": 1,
         "summary": decision_oracle.summarize([manifest]),
         "git": git_metadata(),

@@ -16,7 +16,10 @@ from dataclasses import dataclass, asdict
 
 DT = 0.1
 HORIZON_S = 10.0
-TIE_TOLERANCE_S = 1e-6
+TIE_TOLERANCE_M = 1e-6
+# Backward-compatible alias for old smoke manifests.  New benchmark records
+# always name the unit explicitly as metres.
+TIE_TOLERANCE_S = TIE_TOLERANCE_M
 
 
 @dataclass(frozen=True)
@@ -83,14 +86,78 @@ def checkpoint_fingerprint(*, sim_time_s, vehicle_states, fixed_input_cursor,
                            "controller_state_hash": controller_state_hash})
 
 
+def _path_witness(path):
+    if path is None:
+        return None
+    samples = {}
+    for name in ("t", "x", "y", "s_d", "yaw"):
+        values = getattr(path, name, None)
+        if values is not None:
+            samples[name] = [float(value) for value in values]
+    return {"path_id": str(getattr(path, "pathID", None)), "samples": samples}
+
+
+def _controller_witness(vehicle):
+    return {
+        "id": str(vehicle.id),
+        "status": getattr(vehicle, "status", None),
+        "route": getattr(vehicle, "route", None),
+        "road": getattr(vehicle, "road", None),
+        "lane": getattr(vehicle, "lane", None),
+        "path_counter": getattr(vehicle, "pathID", None),
+        "is_path_valid": bool(getattr(vehicle, "isPathValid", False)),
+        "is_wait_agree": bool(getattr(vehicle, "isWaitAgree", False)),
+        "wait_agree_ids": list(getattr(vehicle, "waitAgreeID", []) or []),
+        "receive_agree_ids": list(getattr(vehicle, "receiveAgreeID", []) or []),
+        "yet_judged_ids": list(getattr(vehicle, "yetJudgedList", []) or []),
+        "leader": str(getattr(vehicle, "leader", None)),
+        "planned": _path_witness(getattr(vehicle, "plannedPath", None)),
+        "desired": [_path_witness(path) for path in
+                    (getattr(vehicle, "desiredPaths", None) or [])],
+        "alternative": _path_witness(
+            getattr(vehicle, "alter_straight_path", None)),
+        "wait_path": _path_witness(getattr(vehicle, "waitPath", None)),
+        "received": [_path_witness(path) for path in
+                     (getattr(vehicle, "receivedPaths", None) or [])],
+    }
+
+
+def boundary_context(*, request_manifest, traci, vehicles,
+                     fixed_input_schedule, python_random_state,
+                     vehicle_type_random_state):
+    """Build the scenario-independent decision-boundary replay witness."""
+    running_ids = sorted(str(value) for value in traci.vehicle.getIDList())
+    physical = []
+    for vehicle_id in running_ids:
+        x, y = traci.vehicle.getPosition(vehicle_id)
+        physical.append({"id": vehicle_id, "x": float(x), "y": float(y),
+                         "speed": float(traci.vehicle.getSpeed(vehicle_id))})
+    fixed_cursor = (fixed_input_schedule.cursor()
+                    if fixed_input_schedule is not None else None)
+    controllers = sorted((_controller_witness(vehicle) for vehicle in vehicles),
+                         key=lambda item: item["id"])
+    return {
+        "request": request_manifest,
+        "sim_time_s": float(traci.simulation.getTime()),
+        "physical_vehicles": physical,
+        "fixed_input_cursor": fixed_cursor,
+        "python_random_state_hash": canonical_hash(repr(python_random_state)),
+        "vehicle_type_random_state_hash": canonical_hash(
+            repr(vehicle_type_random_state)),
+        "controller_state_hash": canonical_hash(controllers),
+    }
+
+
 def realised_metrics(samples, cohort):
-    """Integrate D_i=max(0,1-v/v_ref) at exactly the simulator cadence.
+    """Integrate realised motion at exactly the simulator cadence.
 
     ``samples`` is a mapping ``vehicle_id -> [{speed_mps, reference_speed_mps,
     accel_mps2}, ...]``.  Vehicles absent for a sample simply have no motion
-    contribution; the cohort itself is supplied by the union of both branches.
+    contribution.  ``distance_m`` is the benchmark's primary outcome; the
+    normalised delay and lost-distance values are retained as diagnostics.
     """
-    result = {"delay_s": 0.0, "lost_distance_m": 0.0, "speed_sum_mps": 0.0,
+    result = {"distance_m": 0.0, "delay_s": 0.0,
+              "lost_distance_m": 0.0, "speed_sum_mps": 0.0,
               "speed_samples": 0, "stop_time_s": 0.0, "hard_brake_time_s": 0.0,
               "arrived_vehicle_ids": [], "invalid_reason": None}
     for vehicle_id in sorted(cohort):
@@ -100,6 +167,7 @@ def realised_metrics(samples, cohort):
                 result["invalid_reason"] = "nonphysical_speed_or_reference"
                 return result
             shortfall = max(0.0, 1.0 - speed / reference)
+            result["distance_m"] += DT * speed
             result["delay_s"] += DT * shortfall
             result["lost_distance_m"] += DT * max(0.0, reference - speed)
             result["speed_sum_mps"] += speed
@@ -111,17 +179,19 @@ def realised_metrics(samples, cohort):
     return result
 
 
-def oracle_choice(accept, reject, tie_tolerance_s=TIE_TOLERANCE_S):
-    """Return accept/reject/tie, excluding unsafe or incomplete branches."""
+def oracle_choice(accept, reject, tie_tolerance_m=TIE_TOLERANCE_M):
+    """Choose the branch with greater realised 10-second travel distance."""
     for name, branch in (("accept", accept), ("reject", reject)):
         if branch.get("invalid_reason"):
             return {"valid": False, "reason": name + ":" + branch["invalid_reason"]}
         if not branch.get("safety", {}).get("valid", False):
             return {"valid": False, "reason": name + ":safety_invalid"}
-    difference = float(accept["delay_s"]) - float(reject["delay_s"])
-    choice = "tie" if abs(difference) <= tie_tolerance_s else ("accept" if difference < 0 else "reject")
-    return {"valid": True, "choice": choice, "difference_s": difference,
-            "tie_tolerance_s": tie_tolerance_s}
+    difference = float(accept["distance_m"]) - float(reject["distance_m"])
+    choice = ("tie" if abs(difference) <= tie_tolerance_m
+              else ("accept" if difference > 0 else "reject"))
+    return {"valid": True, "choice": choice,
+            "accept_minus_reject_distance_m": difference,
+            "tie_tolerance_m": tie_tolerance_m}
 
 
 def score_policy(choice, accept, reject, oracle):
@@ -131,9 +201,41 @@ def score_policy(choice, accept, reject, oracle):
     if choice not in ("accept", "reject"):
         return {"scored": False, "reason": "invalid_policy_choice"}
     selected = accept if choice == "accept" else reject
-    optimum = min(float(accept["delay_s"]), float(reject["delay_s"]))
+    optimum = max(float(accept["distance_m"]), float(reject["distance_m"]))
     return {"scored": True, "correct": oracle["choice"] == "tie" or choice == oracle["choice"],
-            "regret_s": max(0.0, float(selected["delay_s"]) - optimum)}
+            "regret_m": max(0.0, optimum - float(selected["distance_m"]))}
+
+
+def policy_choices(yamashita_choice, proposal_evaluation,
+                   lambdas=(0.25, 0.5, 0.75, 1.0)):
+    """Evaluate all planned decision rules on one immutable boundary state."""
+    choices = {"yamashita": yamashita_choice}
+    if not proposal_evaluation:
+        choices["arrival_only"] = None
+        for value in lambdas:
+            choices[f"proposal_lambda_{value:g}"] = None
+        return choices
+    arrival_status = proposal_evaluation.get("arrival_status")
+    if arrival_status == "both_reached":
+        arrival = float(proposal_evaluation["arrival_margin_s"])
+        loss = float(proposal_evaluation["loss_margin_s"])
+        choices["arrival_only"] = "accept" if arrival <= 0 else "reject"
+        for value in lambdas:
+            choices[f"proposal_lambda_{value:g}"] = (
+                "accept" if arrival + float(value) * loss <= 0 else "reject")
+    elif arrival_status == "receiver_unreached":
+        choices["arrival_only"] = "accept"
+        for value in lambdas:
+            choices[f"proposal_lambda_{value:g}"] = "accept"
+    elif arrival_status in ("request_unreached", "both_unreached"):
+        choices["arrival_only"] = "reject"
+        for value in lambdas:
+            choices[f"proposal_lambda_{value:g}"] = "reject"
+    else:
+        choices["arrival_only"] = None
+        for value in lambdas:
+            choices[f"proposal_lambda_{value:g}"] = None
+    return choices
 
 
 def summarize(events):
@@ -149,15 +251,16 @@ def summarize(events):
         for name, score in event.get("policy_scores", {}).items():
             if not score.get("scored"):
                 continue
-            bucket = output["policies"].setdefault(name, {"n": 0, "correct": 0, "regrets_s": []})
+            bucket = output["policies"].setdefault(
+                name, {"n": 0, "correct": 0, "regrets_m": []})
             bucket["n"] += 1
             bucket["correct"] += int(bool(score["correct"]))
-            bucket["regrets_s"].append(float(score["regret_s"]))
+            bucket["regrets_m"].append(float(score["regret_m"]))
     output["invalid_reasons"] = dict(output["invalid_reasons"])
     for bucket in output["policies"].values():
-        regrets = sorted(bucket.pop("regrets_s"))
+        regrets = sorted(bucket.pop("regrets_m"))
         bucket["accuracy"] = bucket["correct"] / bucket["n"] if bucket["n"] else None
-        bucket["mean_regret_s"] = sum(regrets) / len(regrets) if regrets else None
-        bucket["median_regret_s"] = regrets[(len(regrets) - 1) // 2] if regrets else None
-        bucket["p95_regret_s"] = regrets[min(len(regrets) - 1, math.ceil(.95 * len(regrets)) - 1)] if regrets else None
+        bucket["mean_regret_m"] = sum(regrets) / len(regrets) if regrets else None
+        bucket["median_regret_m"] = regrets[(len(regrets) - 1) // 2] if regrets else None
+        bucket["p95_regret_m"] = regrets[min(len(regrets) - 1, math.ceil(.95 * len(regrets)) - 1)] if regrets else None
     return output

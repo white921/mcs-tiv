@@ -26,35 +26,49 @@ class DecisionOracleTests(unittest.TestCase):
                                            "b": [{"speed_mps": 10, "reference_speed_mps": 10}]}, {"a", "b"})
         self.assertAlmostEqual(metrics["delay_s"], .05)
         self.assertAlmostEqual(metrics["lost_distance_m"], .5)
+        self.assertAlmostEqual(metrics["distance_m"], 1.5)
         self.assertAlmostEqual(metrics["hard_brake_time_s"], .1)
 
     def test_safety_invalid_and_regret(self):
-        accept = {"delay_s": 2.0, "safety": {"valid": True}}
-        reject = {"delay_s": 3.0, "safety": {"valid": True}}
+        accept = {"distance_m": 3.0, "safety": {"valid": True}}
+        reject = {"distance_m": 2.0, "safety": {"valid": True}}
         decision = oracle.oracle_choice(accept, reject)
         self.assertEqual(decision["choice"], "accept")
         score = oracle.score_policy("reject", accept, reject, decision)
         self.assertFalse(score["correct"])
-        self.assertEqual(score["regret_s"], 1.0)
+        self.assertEqual(score["regret_m"], 1.0)
         reject["safety"] = {"valid": False}
         self.assertFalse(oracle.oracle_choice(accept, reject)["valid"])
 
     def test_summary(self):
         events = [{"oracle": {"valid": True, "choice": "accept"},
-                   "policy_scores": {"proposal": {"scored": True, "correct": True, "regret_s": 0}}},
+                   "policy_scores": {"proposal": {"scored": True, "correct": True, "regret_m": 0}}},
                   {"oracle": {"valid": False, "reason": "accept:safety_invalid"}}]
         total = oracle.summarize(events)
         self.assertEqual(total["events_valid"], 1)
         self.assertEqual(total["invalid_reasons"]["accept:safety_invalid"], 1)
+
+    def test_policy_choices_reuse_one_boundary_evaluation(self):
+        choices = oracle.policy_choices("reject", {
+            "arrival_status": "both_reached",
+            "arrival_margin_s": -0.5,
+            "loss_margin_s": 1.0,
+        })
+        self.assertEqual(choices["yamashita"], "reject")
+        self.assertEqual(choices["arrival_only"], "accept")
+        self.assertEqual(choices["proposal_lambda_0.25"], "accept")
+        self.assertEqual(choices["proposal_lambda_0.5"], "accept")
+        self.assertEqual(choices["proposal_lambda_0.75"], "reject")
+        self.assertEqual(choices["proposal_lambda_1"], "reject")
 
     def test_completed_event_requires_matching_restore(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "events" / "0001"
             root.mkdir(parents=True)
             branch = {"completed": True, "restore_fingerprint_match": True,
-                      "metrics": {"delay_s": 1.0, "safety": {"valid": True}}}
+                      "metrics": {"distance_m": 2.0, "safety": {"valid": True}}}
             event = {"schema": "decision-oracle-event-v1", "branches":
-                     {"accept": branch, "reject": {**branch, "metrics": {"delay_s": 2.0, "safety": {"valid": True}}}},
+                     {"accept": branch, "reject": {**branch, "metrics": {"distance_m": 1.0, "safety": {"valid": True}}}},
                      "policy_choices": {"proposal": "accept"}}
             (root / "manifest.json").write_text(json.dumps(event))
             output = summarize_decision_oracle.read_event(root)

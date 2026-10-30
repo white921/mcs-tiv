@@ -34,7 +34,7 @@ _ORACLE_CONTEXT_PROVIDER = None
 
 
 def configure_oracle_context_provider(provider):
-    """Install the Eval.3 controller-state witness used by oracle branches."""
+    """Install the scenario controller-state witness used by oracle branches."""
     global _ORACLE_CONTEXT_PROVIDER
     _ORACLE_CONTEXT_PROVIDER = provider
 
@@ -53,8 +53,20 @@ def _write_oracle_boundary(request, forced_choice):
         "request": request["manifest"],
         "yamashita_choice": request["yamashita_choice"],
         "proposal_choice": request["proposal_choice"],
+        "proposal_evaluation": request.get("proposal_evaluation"),
         "forced_choice": forced_choice,
     }
+    def clean(value):
+        if hasattr(value, "item"):
+            return clean(value.item())
+        if isinstance(value, float) and not math.isfinite(value):
+            return "unreached"
+        if isinstance(value, dict):
+            return {str(key): clean(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple, set)):
+            return [clean(item) for item in value]
+        return value
+    record = clean(record)
     if ORACLE_BOUNDARY_AUDIT:
         destination = os.path.abspath(ORACLE_BOUNDARY_AUDIT)
         os.makedirs(os.path.dirname(destination), exist_ok=True)
@@ -427,6 +439,7 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             prediction_method = "deceleration-propagation"
         target_event = ORACLE_TARGET_EVENT == ORACLE_EVENT_COUNT + 1
         proposal_choice = None
+        proposal_evaluation = None
         if target_event:
             try:
                 proposal_evaluation = deceleration_prediction.evaluate(
@@ -482,6 +495,7 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             "yamashita_choice": ("accept" if yamashita_accept else "reject"
                                   if yamashita_accept is not None else None),
             "proposal_choice": proposal_choice,
+            "proposal_evaluation": proposal_evaluation,
             "applied": False,
         }
         request["manifest"] = {
