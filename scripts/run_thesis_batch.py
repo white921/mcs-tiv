@@ -56,6 +56,15 @@ def clean_experiment_environment():
         env.pop(name, None)
     return env
 
+
+TIV_SCORING_MANIFEST = {
+    "implementation": "environment-trapezoid-10s-v1",
+    "environment_term": "trapezoid integral of 0.1-second speed samples",
+    "horizon_s": 10.0, "step_s": 0.1, "endpoints": 101, "intervals": 100,
+    "short_trajectory_completion": "terminal predicted speed",
+    "environment_coefficient": 0.1, "performance_term": "disabled (0.0)",
+}
+
 # These are the five published result families for which the audited source
 # contains an exact scenario runner.  Eval.1/2 need their comparison matrices
 # audited separately before they can be called paper reproductions.
@@ -232,6 +241,7 @@ def run_task(task, args):
             "prefix_sha256_scope": "canonical vehicle JSONL records with depart_time_s < prefix_duration_s",
         } if fixed_input is not None else None),
         "decision_method": "deceleration-propagation" if args.deceleration_active else "thesis-tiv",
+        "tiv_scoring": dict(TIV_SCORING_MANIFEST),
         "common_instrumentation": {
             "version": "shared-diagnostics-env-clean-v1",
             "decision_controls_cleared": sorted(CONTROLLED_MCS_ENV),
