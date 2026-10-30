@@ -59,6 +59,24 @@ class DecisionOracleCorpusTests(unittest.TestCase):
                 args, ROOT, 10.0)
             self.assertIn("--no-save", command)
 
+    def test_boundary_identity_uses_boundary_request_field_names(self):
+        request = {
+            "receiver": "15",
+            "sender": "9",
+            "desired_path_id": "9_42",
+        }
+        run_decision_oracle.validate_event_identity(request, {
+            "receiver_id": "15",
+            "sender_id": "9",
+            "desired_path_id": "9_42",
+        })
+        with self.assertRaisesRegex(RuntimeError, "receiver_id"):
+            run_decision_oracle.validate_event_identity(request, {
+                "receiver_id": "16",
+                "sender_id": "9",
+                "desired_path_id": "9_42",
+            })
+
 
 if __name__ == "__main__":
     unittest.main()

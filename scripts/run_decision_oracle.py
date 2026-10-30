@@ -181,6 +181,24 @@ def run_branch(args, event, source, event_dir, initial_hashes, checkpoint,
     return manifest, samples
 
 
+def validate_event_identity(request, expected_identity):
+    """Verify a planned trace identity against the oracle boundary schema."""
+    request_fields = {
+        "receiver_id": "receiver",
+        "sender_id": "sender",
+        "desired_path_id": "desired_path_id",
+    }
+    for name, expected in expected_identity.items():
+        if expected is None:
+            continue
+        request_name = request_fields[name]
+        actual = request.get(request_name)
+        if str(actual) != str(expected):
+            raise RuntimeError(
+                f"selected decision identity mismatch for {name}: "
+                f"expected {expected}, got {actual}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sumo-home", type=Path, required=True)
@@ -242,11 +260,7 @@ def main():
         "sender_id": args.sender_id,
         "desired_path_id": args.desired_path_id,
     }
-    for name, expected in expected_identity.items():
-        if expected is not None and str(request.get(name)) != str(expected):
-            raise RuntimeError(
-                f"selected decision identity mismatch for {name}: "
-                f"expected {expected}, got {request.get(name)}")
+    validate_event_identity(request, expected_identity)
     proposal_evaluation = accept["boundary"].get("proposal_evaluation") or {}
     actor_ids = {str(request["sender"]), str(request["receiver"])}
     follower_ids = set(map(str, proposal_evaluation.get(
