@@ -30,15 +30,29 @@ class DecisionOracleTests(unittest.TestCase):
         self.assertAlmostEqual(metrics["hard_brake_time_s"], .1)
 
     def test_safety_invalid_and_regret(self):
-        accept = {"distance_m": 3.0, "safety": {"valid": True}}
+        accept = {"distance_m": 4.0, "safety": {"valid": True}}
         reject = {"distance_m": 2.0, "safety": {"valid": True}}
         decision = oracle.oracle_choice(accept, reject)
         self.assertEqual(decision["choice"], "accept")
         score = oracle.score_policy("reject", accept, reject, decision)
         self.assertFalse(score["correct"])
-        self.assertEqual(score["regret_m"], 1.0)
+        self.assertEqual(score["regret_m"], 2.0)
         reject["safety"] = {"valid": False}
         self.assertFalse(oracle.oracle_choice(accept, reject)["valid"])
+
+    def test_primary_cohort_is_independent_of_proposal_followers(self):
+        cohort = oracle.primary_cohort_ids(
+            {"actor": [], "accept-only": []},
+            {"actor": [], "reject-only": []},
+            {"actor"},
+        )
+        self.assertEqual(
+            cohort, {"actor", "accept-only", "reject-only"})
+
+    def test_one_metre_difference_is_a_tie(self):
+        accept = {"distance_m": 3.0, "safety": {"valid": True}}
+        reject = {"distance_m": 2.0, "safety": {"valid": True}}
+        self.assertEqual(oracle.oracle_choice(accept, reject)["choice"], "tie")
 
     def test_summary(self):
         events = [{"oracle": {"valid": True, "choice": "accept"},
@@ -66,7 +80,7 @@ class DecisionOracleTests(unittest.TestCase):
             root = Path(temporary) / "events" / "0001"
             root.mkdir(parents=True)
             branch = {"completed": True, "restore_fingerprint_match": True,
-                      "metrics": {"distance_m": 2.0, "safety": {"valid": True}}}
+                      "metrics": {"distance_m": 3.0, "safety": {"valid": True}}}
             event = {"schema": "decision-oracle-event-v1", "branches":
                      {"accept": branch, "reject": {**branch, "metrics": {"distance_m": 1.0, "safety": {"valid": True}}}},
                      "policy_choices": {"proposal": "accept"}}

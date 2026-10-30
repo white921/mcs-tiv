@@ -220,7 +220,8 @@ def main():
     actor_ids = {str(request["sender"]), str(request["receiver"])}
     follower_ids = set(map(str, proposal_evaluation.get(
         "union_follower_ids", ())))
-    cohort = actor_ids | follower_ids
+    cohort = decision_oracle.primary_cohort_ids(
+        accept_samples, reject_samples, actor_ids)
     accept_metrics = decision_oracle.realised_metrics(accept_samples, cohort)
     reject_metrics = decision_oracle.realised_metrics(reject_samples, cohort)
     accept_follower_metrics = decision_oracle.realised_metrics(

@@ -15,7 +15,7 @@
 - 対象: Eval.3、Eval.5、Eval.7。
 - 交渉前状態の由来: 山下方式の自然走行と提案方式の自然走行を両方含め、由来別と統合を報告する。
 - 一次正解: 要求車、受入車、Accept/Rejectのいずれかで影響を受ける後続車の集合`S`について、`Delta D = sum_i integral(v_i^Accept - v_i^Reject)dt`。
-- `Delta D > 0`はAccept、`Delta D < 0`はReject、予め固定した等価許容幅内はtieとする。
+- `Delta D > 1.0 m`はAccept、`Delta D < -1.0 m`はReject、`|Delta D| <= 1.0 m`はtieとする。
 - 二次指標: 後続車のみの移動距離差、正規化遅延、停止時間、hard brake、物理衝突。
 - 比較方式: 山下方式、到着時間項のみ、提案方式`lambda=0.25/0.5/0.75/1.0`。
 - 指標: Accuracy、Regret [m]、fallback/評価不能率。
@@ -26,18 +26,21 @@
 | 項目 | 値 |
 | --- | --- |
 | ケース | Eval.3 / Eval.5 / Eval.7 |
-| seed | 各ケースの文書化済み固定seedから選択 |
+| seed | Eval.3/5=`1,2,3,4,5`、Eval.7=`1,2,3,7,11` |
 | オラクル時間 | 交渉直後10秒、0.1秒刻み |
+| サンプル数 | 3ケース × 2由来 × 5 seed × 各4交渉 = 120交渉 |
 | 入力 | コミット済み固定車両入力 |
 | Python / SUMO | Ubuntu実行時にmanifestで確定 |
 | 実装ブランチ | `codex/decision-oracle-benchmark` |
-| 現在の実装基点 | `b5c9d7e`+本設計修正 |
+| 現在の実装基点 | `5bb8589`+主コホート・tie幅固定修正 |
 
 ## 現在の確認範囲
 
 - Eval.3・1交渉のAccept/Reject分岐は、同一境界fingerprintと安全性ログを含めて機構確認済み。
 - この1件は旧・正規化遅延オラクルの接続smokeであり、本設計の正式結果には含めない。
-- 正式コーパスの件数とtie許容幅は、結果を見る前に固定して追記する。
+- 各自然走行でdecisionを`(simulation_time, receiver_id, sender_id, desired_path_id)`順に重複排除し、結果を見る前に先頭4件を固定する。選択済みイベントが評価不能でも別イベントへ差し替えず、評価不能率へ含める。
+- 一次集計はケースごと・由来ごとの平均Regretを報告し、ケースを等重みとしたmacro平均Regretを主指標にする。Accuracy、median/p95 Regret、評価不能率は補助指標とする。
+- 主コホートはAccept／Rejectのいずれかで10秒窓内に観測された全車両の和集合とする。影響を受けない車両は両分岐で同量となり差分から相殺される。提案方式が予測した後続車集合は補助診断だけに用いる。
 
 ## 完了条件
 

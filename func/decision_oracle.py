@@ -16,7 +16,7 @@ from dataclasses import dataclass, asdict
 
 DT = 0.1
 HORIZON_S = 10.0
-TIE_TOLERANCE_M = 1e-6
+TIE_TOLERANCE_M = 1.0
 # Backward-compatible alias for old smoke manifests.  New benchmark records
 # always name the unit explicitly as metres.
 TIE_TOLERANCE_S = TIE_TOLERANCE_M
@@ -177,6 +177,18 @@ def realised_metrics(samples, cohort):
     result["mean_speed_mps"] = (result["speed_sum_mps"] / result["speed_samples"]
                                 if result["speed_samples"] else None)
     return result
+
+
+def primary_cohort_ids(accept_samples, reject_samples, actor_ids=()):
+    """Use a policy-independent union of every vehicle observed in either branch.
+
+    Vehicles unaffected by the forced decision contribute the same distance to
+    both branches and therefore cancel.  Including them is safer than selecting
+    the primary cohort from a proposal-specific predicted follower set.
+    """
+    return ({str(value) for value in actor_ids}
+            | {str(value) for value in accept_samples}
+            | {str(value) for value in reject_samples})
 
 
 def oracle_choice(accept, reject, tie_tolerance_m=TIE_TOLERANCE_M):
