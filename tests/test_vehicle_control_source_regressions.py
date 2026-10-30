@@ -75,6 +75,20 @@ class VehicleControlSourceRegressionTests(unittest.TestCase):
             self.assertNotIn('print("collision :"', source, relative)
             self.assertIn("sumo_physical_collision_episodes", source, relative)
 
+    def test_active_runners_support_explicit_decision_boundary_checkpoints(self):
+        for relative in (
+                "junction/junction_three_agree.py",
+                "junction/junction_four_agree.py",
+                "merge/merge_agree2512.py"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            self.assertIn(
+                "mcs_checkpoint.is_requested(sumo_time)", source, relative)
+            self.assertGreaterEqual(
+                source.count('os.environ.get("MCS_CHECKPOINT_AT")'),
+                1,
+                relative,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

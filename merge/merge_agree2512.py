@@ -510,7 +510,8 @@ def run(alpha='0.0', inflow_0=750, inflow_1=750, quiet=False, save_statistics=Tr
         diagnostic_trace.record_runtime(
             sumo_time, {}, len(observed), time.perf_counter() - step_started)
         checkpoint_root = os.environ.get("MCS_CHECKPOINT_DIR")
-        if checkpoint_root and mcs_checkpoint.is_due(sumo_time):
+        if checkpoint_root and (mcs_checkpoint.is_due(sumo_time)
+                                or mcs_checkpoint.is_requested(sumo_time)):
             local_values = locals()
             run_state = {name: local_values[name]
                          for name in CHECKPOINT_RUN_FIELDS}
@@ -672,7 +673,8 @@ if __name__ == "__main__":
 
     # this is the normal way of using traci. sumo is started as a subprocess and then the python script connects and runs
     sumo_command = [sumoBinary, '-c', os.path.join('merge.sumocfg')]
-    if os.environ.get("MCS_CHECKPOINT_DIR") or resume_checkpoint:
+    if (os.environ.get("MCS_CHECKPOINT_DIR") or resume_checkpoint
+            or os.environ.get("MCS_CHECKPOINT_AT")):
         sumo_command.extend([
             "--save-state.precision", "16",
             "--save-state.rng", "true",
