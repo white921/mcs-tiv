@@ -39,6 +39,7 @@
 | 実装ブランチ | `codex/decision-oracle-benchmark` |
 | 自然走行source | `f5c417589bee0f6ba2a808c587ca876b7aa517a3` |
 | 反実仮評価source | `0c337d2cd1cc01ffb4d3e286ca2a228d74cc19c1` |
+| 正式結果branch / commit | `codex/decision-oracle-formal-120-results` / `ba781aa` |
 | plan SHA-256 | `b9a6f438beb32865c6e0ce31f9471506a027d1a1b574165e84991428f3aa1753` |
 
 ## 実行と完全性
@@ -111,7 +112,7 @@ case/originをまたぐ頑健性と不確実性まで考慮すると、提案の
 - [x] Accept/Rejectの境界fingerprint一致
 - [x] 安全性・ログ・artifact完全性を確認
 - [x] 由来別・ケース別・統合のAccuracy/Regretを集計
-- [ ] 結果専用commitをpush
+- [x] 結果専用commitをpush
 
 ## 限界
 
