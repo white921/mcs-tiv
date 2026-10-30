@@ -15,6 +15,12 @@ IMPLEMENTATION = os.environ.get("MCS_TIV_IMPLEMENTATION", "thesis")
 if IMPLEMENTATION not in ("thesis", "legacy-local"):
     raise ValueError("invalid MCS_TIV_IMPLEMENTATION")
 
+# Branch-fixed, not a runtime option: every result from this branch uses the
+# same environmental scoring definition.
+TIV_SCORING_IMPLEMENTATION = "environment-trapezoid-10s-v1"
+ENVIRONMENT_HORIZON_S = 10.0
+ENVIRONMENT_STEP_S = 0.1
+
 
 def enabled(vehicle):
     return IMPLEMENTATION == "thesis" and vehicle.alpha in (6, 7)
@@ -113,11 +119,70 @@ def environmental_term(vehicle, own_path, maximum_speed):
     return total
 
 
+def trapezoid_speed_integral(path, horizon_s=ENVIRONMENT_HORIZON_S,
+                             step_s=ENVIRONMENT_STEP_S):
+    """Integrate speed over 100 0.1-second intervals of the 10-second MCM.
+
+    Predictions that end early are extended at their terminal predicted speed
+    so all candidates have the same 10-second evaluation horizon.
+    """
+    if horizon_s <= 0 or step_s <= 0:
+        raise ValueError("invalid integration horizon or step")
+    intervals = int(round(horizon_s / step_s))
+    if not math.isclose(intervals * step_s, horizon_s, abs_tol=1e-9):
+        raise ValueError("horizon must be divisible by step")
+    available = min(len(path.t), len(path.s_d))
+    if not available:
+        raise ValueError("trajectory has no speed samples")
+    times = [float(path.t[i]) for i in range(available)]
+    speeds = [float(path.s_d[i]) for i in range(available)]
+    start = times[0]
+
+    def speed_at(offset):
+        target = start + offset
+        if target >= times[-1]:
+            return speeds[-1]
+        for i in range(1, len(times)):
+            if target <= times[i]:
+                previous, following = times[i - 1], times[i]
+                if following <= previous:
+                    return speeds[i]
+                fraction = (target - previous) / (following - previous)
+                return speeds[i - 1] + fraction * (speeds[i] - speeds[i - 1])
+        return speeds[-1]
+
+    samples = [speed_at(i * step_s) for i in range(intervals + 1)]
+    return step_s * (sum(samples) - .5 * (samples[0] + samples[-1]))
+
+
+def integrated_environmental_term(vehicle, own_path, maximum_speed):
+    total = trapezoid_speed_integral(own_path)
+    angle = math.radians(vehicle.angle)
+    forward = (math.sin(angle), math.cos(angle))
+    latest = {}
+    for path in vehicle.receivedPaths:
+        if path.type != "planned" or path.vehID == vehicle.id:
+            continue
+        previous = latest.get(path.vehID)
+        if previous is None or path.t[0] > previous.t[0]:
+            latest[path.vehID] = path
+    for path in latest.values():
+        x, y = position_at(path, vehicle.simTime)
+        dx, dy = x - vehicle.pos_x, y - vehicle.pos_y
+        longitudinal = dx * forward[0] + dy * forward[1]
+        lateral = abs(dx * forward[1] - dy * forward[0])
+        if longitudinal < 0 and lateral < 1.0:
+            total += trapezoid_speed_integral(path) * following_rate(
+                math.hypot(dx, dy), maximum_speed)
+    return total
+
+
 def score(vehicle, path, point, maximum_speed, maximum_acceleration):
     horizon = transmitted_path(path, vehicle.simTime)
     dt = arrival_delay(horizon, point, vehicle.simTime)
-    environment = environmental_term(vehicle, horizon, maximum_speed)
-    performance = .1 * maximum_acceleration if vehicle.alpha == 7 else 0.0
+    environment = integrated_environmental_term(vehicle, horizon, maximum_speed)
+    # The velocity time series already reflects acceleration capability.
+    performance = 0.0
     return {"value": dt - .1 * environment + performance,
             "arrival_delay": dt, "speed_weighted_sum": environment,
             "performance_term": performance}

@@ -85,10 +85,27 @@ class ThesisTIVTests(unittest.TestCase):
     def test_formula_own_vehicle_and_performance(self):
         v = vehicle()
         result = tiv.score(v, v.plannedPath, (20, 0), 10, 3)
-        self.assertAlmostEqual(result["value"], 2 - .1 * 10 + .1 * 3)
-        self.assertAlmostEqual(tiv.score(v, v.plannedPath, (20, 0), 10, 1)["value"], 1.1)
+        self.assertAlmostEqual(result["value"], 2 - .1 * 100)
+        self.assertAlmostEqual(tiv.score(v, v.plannedPath, (20, 0), 10, 1)["value"], -8)
         v.alpha = 6
-        self.assertAlmostEqual(tiv.score(v, v.plannedPath, (20, 0), 10, 3)["value"], 1)
+        self.assertAlmostEqual(tiv.score(v, v.plannedPath, (20, 0), 10, 3)["value"], -8)
+
+    def test_environment_integral_uses_101_endpoints_and_100_intervals(self):
+        self.assertAlmostEqual(tiv.trapezoid_speed_integral(path(speed=10)), 100)
+
+    def test_short_trajectory_is_completed_with_terminal_speed(self):
+        short = path(speed=10)
+        short.t = short.t[:51]
+        short.s_d = short.s_d[:51]
+        self.assertAlmostEqual(tiv.trapezoid_speed_integral(short), 100)
+
+    def test_integrated_score_has_no_acceleration_capability_term(self):
+        v = vehicle()
+        score_low = tiv.score(v, v.plannedPath, (20, 0), 10, 1)
+        score_high = tiv.score(v, v.plannedPath, (20, 0), 10, 99)
+        self.assertEqual(score_low["performance_term"], 0)
+        self.assertEqual(score_high["performance_term"], 0)
+        self.assertAlmostEqual(score_low["value"], score_high["value"])
 
     def test_actual_followers_unique_planned_terminal_speed(self):
         v = vehicle()
@@ -146,12 +163,12 @@ class ThesisTIVTests(unittest.TestCase):
         api = traci()
         tiv.send_mcm(sender, server, api)
         packet = server[1]
-        self.assertAlmostEqual(packet.tiv_by_receiver["2"]["value"], 1.3)
+        self.assertAlmostEqual(packet.tiv_by_receiver["2"]["value"], -8)
         desired.x[0] = 999
         self.assertEqual(packet.x[0], 0)
         api.vehicle.getAllowedSpeed.assert_called_once_with("1")
 
-    def decision(self, desired_value=1.3):
+    def decision(self, desired_value=-8):
         v = vehicle("2")
         desired = path("1", "desired")
         desired.tiv_by_receiver = {"2": {"value": desired_value, "point": (20, 0),
