@@ -189,6 +189,9 @@ def main():
     parser.add_argument(
         "--source", type=Path,
         help="shared read-only source snapshot prepared by a corpus runner")
+    parser.add_argument(
+        "--git-metadata-json", type=Path,
+        help="start-of-batch Git metadata supplied by a corpus runner")
     parser.add_argument("--case", choices=("eval3", "eval5", "eval7"),
                         default="eval3")
     parser.add_argument("--origin-policy", choices=("yamashita", "proposal"),
@@ -205,6 +208,8 @@ def main():
         parser.error("output directory already exists")
     if args.event_ordinal < 1:
         parser.error("event ordinal must be positive")
+    run_git = (json.loads(args.git_metadata_json.read_text(encoding="utf-8"))
+               if args.git_metadata_json is not None else git_metadata())
 
     args.output.mkdir(parents=True)
     event = {"case": args.case, "seed": args.seed,
@@ -266,6 +271,7 @@ def main():
     }
     manifest = {
         "schema": "decision-oracle-event-v2", "event": event,
+        "git": run_git,
         "checkpoint": str(checkpoint),
         "branches": {
             "accept": {**accept, "metrics": accept_metrics},
@@ -290,7 +296,7 @@ def main():
         "schema": "decision-oracle-experiment-v2",
         "events": [event_dir.name], "event_count": 1,
         "summary": decision_oracle.summarize([manifest]),
-        "git": git_metadata(),
+        "git": run_git,
         "source_unchanged": source_hashes(source) == initial_hashes,
         "exit_code": 0,
     }

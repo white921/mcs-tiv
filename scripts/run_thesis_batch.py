@@ -375,7 +375,7 @@ def run_task(task, args):
                             if args.resume_checkpoint is not None else None),
         } if supports_replay_checkpoint and args.checkpoint_interval > 0 else None),
         "source_sha256": initial_hashes,
-        "git": git_metadata(),
+        "git": args.run_git_metadata,
         "python_version": sys.version,
         "platform": platform.platform(),
         "sumo_version": subprocess.check_output([str(sumo_home / "bin" / "sumo"), "--version"], text=True),
@@ -483,6 +483,7 @@ def main():
         parser.error("--sumo-home must contain bin/sumo and tools/traci")
     if args.paper is not None and not args.paper.is_file():
         parser.error("--paper must name an existing PDF")
+    args.run_git_metadata = git_metadata()
     try:
         tasks = build_tasks(args.cases, args.seeds_per_case, args.seeds)
     except ValueError as error:
@@ -535,7 +536,7 @@ def main():
         "workers": args.workers,
         "diagnostic_traces": bool(args.diagnostic_traces),
         "checkpoint_interval_s": args.checkpoint_interval,
-        "git": git_metadata(),
+        "git": args.run_git_metadata,
     }
     write_json(args.output / "experiment-manifest.json", experiment_manifest)
     emit("experiment_started", tasks=len(tasks), workers=args.workers,

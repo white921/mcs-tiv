@@ -38,7 +38,7 @@ def event_manifest(output):
     return matches[0]
 
 
-def run_event(args, source, output_root, index, event):
+def run_event(args, source, git_metadata_path, output_root, index, event):
     slug = event_slug(index, event)
     output = output_root / "events" / slug
     log_dir = output_root / "runner-logs"
@@ -47,6 +47,7 @@ def run_event(args, source, output_root, index, event):
         "--sumo-home", str(args.sumo_home),
         "--python", str(args.python),
         "--source", str(source),
+        "--git-metadata-json", str(git_metadata_path),
         "--output", str(output),
         "--case", event["case"],
         "--origin-policy", event["origin_policy"],
@@ -121,16 +122,23 @@ def main():
     if plan.get("event_count") != 120 or len(plan.get("events", ())) != 120:
         parser.error("the preregistered plan must contain exactly 120 events")
 
+    run_git = git_metadata()
+    if run_git.get("dirty") is not False:
+        parser.error("formal corpus requires a clean worktree at startup")
     args.output.mkdir(parents=True)
     (args.output / "events").mkdir()
     (args.output / "runner-logs").mkdir()
     (args.output / "plan.json").write_bytes(plan_bytes)
+    git_metadata_path = args.output / "run-git-metadata.json"
+    write_json(git_metadata_path, run_git)
     source, initial_hashes = prepare_source(args.output, "eval3")
     started = time.time()
     results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as pool:
         futures = [
-            pool.submit(run_event, args, source, args.output, index, event)
+            pool.submit(
+                run_event, args, source, git_metadata_path,
+                args.output, index, event)
             for index, event in enumerate(plan["events"], 1)
         ]
         for future in concurrent.futures.as_completed(futures):
@@ -158,7 +166,7 @@ def main():
         "failed_event_count": len(failures),
         "failures": failures,
         "source_unchanged": unchanged,
-        "git": git_metadata(),
+        "git": run_git,
         "python": str(args.python),
         "sumo_home": str(args.sumo_home),
         "duration_s": args.duration,
