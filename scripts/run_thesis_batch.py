@@ -35,6 +35,27 @@ from fixed_vehicle_inputs import load_fixed_vehicle_input  # noqa: E402
 SPEED = re.compile(r"^all_speed\s*:\s*(\S+)\s*$", re.MULTILINE)
 MIX = re.compile(r"^vehicle_mix\s*:\s*Bus\s+(\d+)\s+Car\s+(\d+)", re.MULTILINE)
 
+# Shared instrumentation only: remove all controls capable of changing a
+# decision before launching each isolated simulation.
+CONTROLLED_MCS_ENV = {
+    "MCS_CHECKPOINT_DIR", "MCS_CHECKPOINT_INTERVAL", "MCS_CONFLICT_AUDIT",
+    "MCS_DECELERATION_AUDIT", "MCS_DECELERATION_MODE",
+    "MCS_DECELERATION_LOSS_LAMBDA", "MCS_DECELERATION_TIME_HALF_LIFE_S",
+    "MCS_EVALUATION_AUDIT", "MCS_FCD_OUTPUT", "MCS_NEGOTIATION_AUDIT",
+    "MCS_PHYSICAL_COLLISION_AUDIT", "MCS_PREDICTION_EVENT_AUDIT",
+    "MCS_PRIORITY_HOLD_ACTIVATION_SPEED", "MCS_PRIORITY_HOLD_MAX_DURATION",
+    "MCS_PRIORITY_HOLD_MODE", "MCS_PRIORITY_HOLD_PROGRESS_TIMEOUT",
+    "MCS_PRIORITY_HOLD_QUEUE_GROWTH_LIMIT", "MCS_RUNTIME_AUDIT",
+    "MCS_TIV_AUDIT", "MCS_TIV_IMPLEMENTATION", "MCS_VEHICLE_STATE_AUDIT",
+}
+
+
+def clean_experiment_environment():
+    env = dict(os.environ)
+    for name in CONTROLLED_MCS_ENV:
+        env.pop(name, None)
+    return env
+
 # These are the five published result families for which the audited source
 # contains an exact scenario runner.  Eval.1/2 need their comparison matrices
 # audited separately before they can be called paper reproductions.
@@ -161,7 +182,7 @@ def run_task(task, args):
     source, initial_hashes = prepare_source(destination, case)
     sumo_home = args.sumo_home.resolve()
     is_three_way = case["folder"] == "junction" and case["script"] == "junction_three_agree.py"
-    env = dict(os.environ,
+    env = dict(clean_experiment_environment(),
                SUMO_HOME=str(sumo_home),
                PYTHONPATH=str(sumo_home / "tools"),
                MPLBACKEND="Agg", OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1",
@@ -169,12 +190,13 @@ def run_task(task, args):
                MCS_TIV_AUDIT=str(destination / "tiv-audit.json"),
                MCS_EVALUATION_AUDIT=str(destination / "evaluation-metrics.json"),
                MCS_PREDICTION_EVENT_AUDIT=str(destination / "prediction-events.jsonl"))
-    if args.diagnostic_traces and is_three_way:
+    if args.diagnostic_traces:
         env.update(
             MCS_VEHICLE_STATE_AUDIT=str(destination / "vehicle-states.jsonl"),
             MCS_CONFLICT_AUDIT=str(destination / "conflicts.jsonl"),
             MCS_NEGOTIATION_AUDIT=str(destination / "negotiations.jsonl"),
-            MCS_RUNTIME_AUDIT=str(destination / "runtime.jsonl"))
+            MCS_RUNTIME_AUDIT=str(destination / "runtime.jsonl"),
+            MCS_FCD_OUTPUT=str(destination / "fcd.xml.gz"))
     if args.deceleration_active:
         env["MCS_DECELERATION_AUDIT"] = str(destination / "deceleration-audit.json")
     command = [args.python, "-u", case["script"], case["alpha"], str(seed),
@@ -210,6 +232,11 @@ def run_task(task, args):
             "prefix_sha256_scope": "canonical vehicle JSONL records with depart_time_s < prefix_duration_s",
         } if fixed_input is not None else None),
         "decision_method": "deceleration-propagation" if args.deceleration_active else "thesis-tiv",
+        "common_instrumentation": {
+            "version": "shared-diagnostics-env-clean-v1",
+            "decision_controls_cleared": sorted(CONTROLLED_MCS_ENV),
+            "priority_hold": {"mode": "off", "enabled": False},
+        },
         "diagnostic_traces_requested": args.diagnostic_traces,
         "diagnostic_traces_enabled": bool(args.diagnostic_traces and is_three_way),
         "trace_schema_version": 1 if args.diagnostic_traces and is_three_way else None,
