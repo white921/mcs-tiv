@@ -4,6 +4,10 @@
 
 `planned`
 
+- 実装・固定入力source: `codex/decision-oracle-benchmark@b0167da1ef2e6e7a53f364f40ec3a38125d4d52a`
+- Ubuntu検証worktree: `/home/yamada/UbuntuData/ドキュメント/卒論研究/mcs-tiv-eval7-flow-sweep`
+- Ubuntu正式環境: Python 3.15.1 / SUMO 1.28.0、127 tests成功
+
 本試験は改善条件を探すための試験であり、ここで良い結果が出ても最終的な優位性の
 根拠にはしない。条件を選んだ後に優位性を主張する場合は、未使用seedで別途確認する。
 
@@ -49,6 +53,9 @@ seedごとの固定順序を与え、300、500、700台/時の車列が順に包
 SHA-256は同ディレクトリの`SHA256SUMS`に固定する。チェックサム一覧自体の
 SHA-256は`79201fef0c5d47bdef22d600412809735e852f4d76b871e472c6dd01531ec26d`である。
 1000/1000の5ファイルは、既存の同seed固定入力とバイト単位で一致することを確認した。
+Ubuntuでは全20ファイルのSHA-256一致と読み込みを確認した。生成時Pythonの記録欄は
+Macの3.14.5、Ubuntu再生成時は3.15.1となるためファイル全体の再生成比較は一致しないが、
+車両イベント列は一致することを確認した。実行にはcommit済みファイルをそのまま使う。
 
 ## 評価指標
 
@@ -66,9 +73,9 @@ SHA-256は`79201fef0c5d47bdef22d600412809735e852f4d76b871e472c6dd01531ec26d`で�
 
 ## 完了条件
 
-- [ ] 4条件 × 5 seedの固定入力を生成・検証し、SHA-256を記録
-- [ ] 実装と固定入力をcommit/push
-- [ ] Ubuntu正式環境で全テスト
+- [x] 4条件 × 5 seedの固定入力を生成・検証し、SHA-256を記録
+- [x] 実装と固定入力をcommit/push
+- [x] Ubuntu正式環境で全テスト
 - [ ] 各方式のsmokeを正常完了
 - [ ] 40 runを正常完了
 - [ ] 全件`exit_code=0`、`source_unchanged=true`、物理衝突と重大ログを確認
