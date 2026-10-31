@@ -2,7 +2,18 @@
 
 ## 状態
 
-`planned`
+`running`
+
+- source: `1029f7fc28cd02891fd2039b3a1ad1961da4c924`
+- Ubuntu worktree: `/home/yamada/UbuntuData/ドキュメント/卒論研究/mcs-tiv-rejection-wait-development-formal`
+- systemd unit: `mcs-repeated-rejection-wait-development-15-20261031.service`
+- output: `results/runs/repeated-rejection-wait-development-300s-15runs-20261031T`
+
+UbuntuのPython 3.15.1 / SUMO 1.28.0環境で124 testsが成功した。
+Eval.3 seed 6を80秒まで動かしたsmokeも正常終了し、`exit_code=0`、
+`source_unchanged=true`、物理衝突0、重大ログ異常0を確認した。27判断のうち
+反復拒否待ちは7回の拒否判断に適用され、監査記録上の最大値は2.0秒だった。
+その後、同じsourceからclean worktreeを新設し、正式15 runを開始した。
 
 ## 目的
 
@@ -65,9 +76,9 @@
 
 ## 完了条件
 
-- [ ] 実装とテストをcommit/push
-- [ ] Ubuntu正式環境で全テスト
-- [ ] 単一seedの短時間smokeで式・監査・正常終了を確認
+- [x] 実装とテストをcommit/push
+- [x] Ubuntu正式環境で全テスト
+- [x] 単一seedの短時間smokeで式・監査・正常終了を確認
 - [ ] 15 runを正常完了
 - [ ] 全件`exit_code=0`、`source_unchanged=true`、物理衝突と重大ログを確認
 - [ ] 山下方式・従来改善提案とケース別／seed別に比較
