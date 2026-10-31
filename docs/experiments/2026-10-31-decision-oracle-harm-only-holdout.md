@@ -10,6 +10,18 @@ SUMO 1.18.0を指定したためcheckpoint復元時刻が0.0となって停止�
 保全・除外した。正式環境のPython 3.15.1 / SUMO 1.28.0でやり直したsmokeは、
 計画ID一致、両分岐exit 0、同一fingerprint、source unchanged、物理衝突0で成功した。
 
+自然走行の交渉場面収集は、山下方式15 runと改善提案方式15 runの全30 runが
+正常完了した。全件で`exit_code=0`、`source_unchanged=true`、開始時Git
+`6dc6ddc` clean、Python 3.15.1 / SUMO 1.28.0、両方式の固定入力hash一致、
+必須artifactあり、物理衝突0、stderr重大異常0を確認した。
+
+事前固定ルールから120イベントplanを作成し、formal corpusを実行中である。
+
+- plan: `/tmp/decision-oracle-harm-holdout-plan-20261031T1448JST-6dc6ddc.json`
+- plan SHA-256: `3ff0d0920ec547a321cceade051d00faa0e6f5b41a7c1561dd925238f7e168d1`
+- formal output: `results/runs/decision-oracle-harm-holdout-formal-120-20261031T`
+- formal source: `6dc6ddc3cc97ef3b7e66da39d4f5ee4201bf4f2f`
+
 ## 目的
 
 2026-10-30の120イベントをdevelopment corpusとして診断し、到着時間項を
@@ -67,8 +79,8 @@ holdout結果を見て式、lambda、seed、イベント選択を変更しない
 
 - [x] 改善式・固定入力・holdout条件をcommit/push
 - [x] Ubuntuで全テストと単一交渉smoke
-- [ ] 山下／提案の自然走行30 runを正常完了・検証
-- [ ] 120件planと入力hashを結果を見る前に固定
+- [x] 山下／提案の自然走行30 runを正常完了・検証
+- [x] 120件planと入力hashを結果を見る前に固定
 - [ ] 反実仮想120件を正常完了・完全性検証
 - [ ] 主指標・補助指標・cluster bootstrapを集計
 - [ ] 正常結果のみ専用commitでpush
