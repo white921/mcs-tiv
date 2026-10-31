@@ -1,0 +1,143 @@
+{
+  "record_type": "decision-oracle-branch",
+  "event": {
+    "case": "eval3",
+    "seed": 9,
+    "origin_policy": "yamashita",
+    "ordinal": 3,
+    "sim_time_s": 20.0,
+    "receiver_id": "9",
+    "sender_id": "0",
+    "desired_path_id": "0_24"
+  },
+  "choice": "reject",
+  "command": [
+    "/media/yamada/UbuntuData/home-yamada/Documents/\u5352\u696d\u7814\u7a76/mcs-tiv/.venv-py315-sumo128/bin/python",
+    "-u",
+    "junction_three_agree.py",
+    "7",
+    "9",
+    "400",
+    "400",
+    "400",
+    "--nogui",
+    "--quiet",
+    "--duration",
+    "300.0",
+    "--stop-time",
+    "30.0",
+    "--bus-allocation",
+    "fixed",
+    "--fixed-input",
+    "../fixed_inputs/thesis/eval3/seed-9.jsonl",
+    "--no-save",
+    "--resume-checkpoint",
+    "/home/yamada/UbuntuData/\u30c9\u30ad\u30e5\u30e1\u30f3\u30c8/\u5352\u8ad6\u7814\u7a76/mcs-tiv-harm-holdout-corpus/results/runs/decision-oracle-harm-holdout-formal-120-20261031T/events/011-eval3-yamashita-seed-9-event-0003/eval3-yamashita-seed-9-event-0003/capture/checkpoints/t0000019.9"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 117.1793183030095,
+  "boundary": {
+    "fingerprint": "a77ad2e5a99c55a29141d5fedbbf7d08cf38e165a11d7fd08850d38c2dbc1635",
+    "forced_choice": "reject",
+    "proposal_choice": "reject",
+    "proposal_evaluation": {
+      "accept_follower_ids": [
+        "11",
+        "13",
+        "3"
+      ],
+      "accept_loss_m": 15.996800000000016,
+      "accept_time_equivalent_loss_s": 1.1516774658027369,
+      "arrival_margin_s": 0.6000000000000014,
+      "arrival_status": "both_reached",
+      "decision": "reject",
+      "decision_basis": "combined_margin",
+      "effective_loss_margin_s": 0.9974497840172798,
+      "excluded_loss_vehicle_ids": [
+        "0",
+        "9"
+      ],
+      "final_margin_s": 2.594899568034561,
+      "follower_count": 3,
+      "follower_replans": 30,
+      "loss_lambda": 2.0,
+      "loss_margin_s": 0.9974497840172798,
+      "loss_vehicle_ids": [
+        "11",
+        "13",
+        "3"
+      ],
+      "negative_loss_credit_s": 0.0,
+      "receiver_arrival_reached": true,
+      "receiver_arrival_s": 7.899999999999999,
+      "reject_follower_ids": [
+        "11",
+        "13",
+        "3"
+      ],
+      "reject_loss_m": 2.1422224999999995,
+      "reject_minus_accept_m": -13.854577500000017,
+      "reject_time_equivalent_loss_s": 0.15422768178545712,
+      "replan_interval_s": 1.0,
+      "request_arrival_reached": true,
+      "request_arrival_s": 8.5,
+      "time_half_life_s": null,
+      "time_weighting": "uniform",
+      "union_follower_ids": [
+        "11",
+        "13",
+        "3"
+      ],
+      "vehicle_ids": [
+        "0",
+        "11",
+        "13",
+        "3",
+        "9"
+      ],
+      "vehicle_loss_details": {
+        "11": {
+          "accept_loss_m": 0.05650000000004192,
+          "accept_loss_s": 0.004067674586036135,
+          "allowed_speed_mps": 13.89,
+          "reject_loss_m": 0.05650000000004192,
+          "reject_loss_s": 0.004067674586036135
+        },
+        "13": {
+          "accept_loss_m": 16.025599999999972,
+          "accept_loss_s": 1.1537508999280037,
+          "allowed_speed_mps": 13.89,
+          "reject_loss_m": 0.1395999999999546,
+          "reject_loss_s": 0.010050395968319265
+        },
+        "3": {
+          "accept_loss_m": -0.08529999999999861,
+          "accept_loss_s": -0.006141108711302996,
+          "allowed_speed_mps": 13.89,
+          "reject_loss_m": 1.946122500000003,
+          "reject_loss_s": 0.14010961123110172
+        }
+      },
+      "weighted_loss_margin_s": 1.9948995680345596
+    },
+    "request": {
+      "alternative_path_id": "",
+      "desired_path_id": "0_24",
+      "ordinal": 3,
+      "receiver": "9",
+      "sender": "0",
+      "time": 20.0
+    },
+    "schema": "decision-oracle-boundary-v1",
+    "yamashita_choice": "reject"
+  },
+  "completed": true,
+  "source_unchanged": true,
+  "restore_fingerprint_match": true,
+  "safety": {
+    "valid": true,
+    "physical_collision_records": 0
+  },
+  "sample_vehicle_count": 12,
+  "sample_count": 1097
+}
