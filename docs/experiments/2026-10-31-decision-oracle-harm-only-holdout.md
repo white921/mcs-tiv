@@ -15,7 +15,7 @@ SUMO 1.18.0を指定したためcheckpoint復元時刻が0.0となって停止�
 `6dc6ddc` clean、Python 3.15.1 / SUMO 1.28.0、両方式の固定入力hash一致、
 必須artifactあり、物理衝突0、stderr重大異常0を確認した。
 
-事前固定ルールから120イベントplanを作成し、formal corpusを実行中である。
+事前固定ルールから120イベントplanを作成し、同じplanでformal corpusを完了した。
 
 - plan: `/tmp/decision-oracle-harm-holdout-plan-20261031T1448JST-6dc6ddc.json`
 - plan SHA-256: `3ff0d0920ec547a321cceade051d00faa0e6f5b41a7c1561dd925238f7e168d1`
