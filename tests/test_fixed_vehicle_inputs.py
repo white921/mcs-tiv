@@ -14,6 +14,10 @@ sys.path.insert(0, str(ROOT / "func"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from fixed_vehicle_inputs import CASE_SPECS, load_fixed_vehicle_input
+from generate_fixed_vehicle_inputs import (
+    generate_eval7_flow_sweep_records,
+    generate_records,
+)
 from run_thesis_batch import CASES, build_tasks, fixed_input_details
 
 
@@ -140,6 +144,55 @@ class FixedVehicleInputTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "does not document"):
             build_tasks(["eval7"], seeds=[5])
+
+    def test_eval7_flow_sweep_records_preserve_requested_flows(self):
+        for requesting in (300, 500, 700, 1000):
+            with self.subTest(requesting=requesting):
+                records = generate_eval7_flow_sweep_records(6, requesting, 1000)
+                self.assertEqual(
+                    records[0]["flows_vph"],
+                    {"requesting": requesting, "accepting": 1000},
+                )
+                counts = {
+                    approach: sum(
+                        record.get("approach") == approach for record in records[1:]
+                    )
+                    for approach in ("requesting", "accepting")
+                }
+                self.assertEqual(counts["requesting"], int(requesting / 6))
+                self.assertEqual(counts["accepting"], 166)
+
+    def test_eval7_flow_sweep_keeps_mainline_fixed_and_merging_sets_nested(self):
+        conditions = {
+            requesting: generate_eval7_flow_sweep_records(6, requesting, 1000)
+            for requesting in (300, 500, 700, 1000)
+        }
+        accepting_streams = []
+        requesting_times = []
+        for records in conditions.values():
+            accepting_streams.append([
+                (record["depart_time_s"], record["vehicle_type"])
+                for record in records[1:] if record["approach"] == "accepting"
+            ])
+            requesting_times.append({
+                record["depart_time_s"]
+                for record in records[1:] if record["approach"] == "requesting"
+            })
+        self.assertTrue(all(
+            stream == accepting_streams[0] for stream in accepting_streams[1:]
+        ))
+        for smaller, larger in zip(requesting_times, requesting_times[1:]):
+            self.assertLess(smaller, larger)
+
+    def test_eval7_flow_override_selects_matching_fixed_input(self):
+        details = fixed_input_details(
+            "eval7", 6, 300, "fixed", flows=(500, 1000)
+        )
+        self.assertEqual(
+            details["relative_path"],
+            "fixed_inputs/thesis/eval7-flow-sweep/"
+            "requesting-500-accepting-1000/seed-6.jsonl",
+        )
 
 
 class FixedScenarioRuntimeTests(unittest.TestCase):

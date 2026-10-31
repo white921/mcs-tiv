@@ -196,12 +196,20 @@ def deceleration_prediction_manifest(args):
 
 
 def fixed_input_details(
-    name, seed, duration, bus_allocation, prefix_duration=None, source_root=ROOT
+    name, seed, duration, bus_allocation, prefix_duration=None, source_root=ROOT,
+    flows=None,
 ):
     """Return the committed 600-second input selected for a batch task."""
     pattern = CASES[name].get("fixed_input")
     if pattern is None or bus_allocation != "fixed":
         return None
+    selected_flows = tuple(str(flow) for flow in (flows or CASES[name]["flows"]))
+    if name == "eval7" and selected_flows != tuple(CASES[name]["flows"]):
+        requesting, accepting = selected_flows
+        pattern = (
+            "fixed_inputs/thesis/eval7-flow-sweep/"
+            f"requesting-{requesting}-accepting-{accepting}/seed-{{seed}}.jsonl"
+        )
     if not 0 < duration <= 600:
         raise ValueError("fixed vehicle input duration must be in (0, 600]")
     if prefix_duration is None:
@@ -210,7 +218,19 @@ def fixed_input_details(
         raise ValueError("fixed vehicle input prefix must be in (0, duration]")
     relative_path = Path(pattern.format(seed=seed))
     path = source_root / relative_path
-    schedule = load_fixed_vehicle_input(path, prefix_duration_s=prefix_duration)
+    expected_flows = None
+    if name == "eval7":
+        expected_flows = {
+            "requesting": int(selected_flows[0]),
+            "accepting": int(selected_flows[1]),
+        }
+    schedule = load_fixed_vehicle_input(
+        path,
+        expected_case=name,
+        expected_seed=seed,
+        expected_flows_vph=expected_flows,
+        prefix_duration_s=prefix_duration,
+    )
     metadata = schedule.metadata
     if metadata.get("case") != name or metadata.get("seed") != seed:
         raise ValueError(f"fixed input metadata mismatch: {relative_path}")
@@ -325,13 +345,19 @@ def run_task(task, args):
         env.update(
             MCS_DECELERATION_AUDIT=str(destination / "deceleration-audit.json"),
         )
+    flows = (
+        [str(flow) for flow in args.eval7_flows]
+        if name == "eval7" and args.eval7_flows is not None
+        else case["flows"]
+    )
     command = [args.python, "-u", case["script"], case["alpha"], str(seed),
-               *case["flows"], "--nogui", "--quiet", "--duration", str(args.duration),
+               *flows, "--nogui", "--quiet", "--duration", str(args.duration),
                "--bus-allocation", args.bus_allocation]
     fixed_input = fixed_input_details(
         name, seed, args.duration, args.bus_allocation,
         prefix_duration=args.duration,
         source_root=source,
+        flows=flows,
     )
     if fixed_input is not None:
         command += ["--fixed-input", fixed_input["runtime_path"]]
@@ -351,6 +377,8 @@ def run_task(task, args):
         "simulation_id": f"{name}-seed-{seed}",
         "experiment_directory": str(args.output),
         "case": name, "seed": seed, "command": command,
+        "flows_vph": ({"requesting": int(flows[0]), "accepting": int(flows[1])}
+                      if name == "eval7" else [int(flow) for flow in flows]),
         "input_duration": args.duration, "stop_time": args.stop_time or args.duration,
         "paper_reference_mean_mps": case["reference"],
         "bus_allocation": args.bus_allocation,
@@ -457,6 +485,9 @@ def main():
                         help="run only these documented development or holdout seeds for every selected case")
     parser.add_argument("--duration", type=float, default=600,
                         help="scenario duration in seconds (300 for diagnostic comparisons; default: 600)")
+    parser.add_argument(
+        "--eval7-flows", type=int, nargs=2, metavar=("REQUESTING", "ACCEPTING"),
+        help="override Eval.7 merging/mainline flows and select the matching fixed input")
     parser.add_argument("--stop-time", type=float,
                         help="smoke test only; retains 600-second input schedule")
     parser.add_argument("--paper", type=Path)
@@ -491,6 +522,11 @@ def main():
         parser.error("--seeds-per-case and --seeds cannot be combined")
     if not 0 < args.duration <= 600:
         parser.error("--duration must be in (0, 600]")
+    if args.eval7_flows is not None:
+        if "eval7" not in args.cases:
+            parser.error("--eval7-flows requires --cases eval7")
+        if any(flow < 0 or flow > 1800 for flow in args.eval7_flows):
+            parser.error("--eval7-flows values must be between 0 and 1800 veh/h")
     if args.stop_time is not None and not 0 < args.stop_time <= args.duration:
         parser.error("--stop-time must be in (0, --duration]")
     if not args.deceleration_time_half_life >= 0:
@@ -560,6 +596,10 @@ def main():
         "rejection_wait_cap_s": (
             args.rejection_wait_cap if args.deceleration_active else None),
         "cases": list(args.cases),
+        "eval7_flows_vph": ({
+            "requesting": args.eval7_flows[0],
+            "accepting": args.eval7_flows[1],
+        } if args.eval7_flows is not None else None),
         "tasks": [{"case": case, "seed": seed} for case, seed in tasks],
         "duration_s": args.duration,
         "stop_time_s": args.stop_time,
