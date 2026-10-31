@@ -35,6 +35,7 @@ CASES = {
 
 DURATION_S = 600.0
 BUS_SHARE = 0.25
+EVAL7_SWEEP_REQUESTING_FLOWS = (300, 500, 700, 1000)
 
 
 def build_vehicle_type_schedules(counts, rng):
@@ -117,44 +118,123 @@ def generate_records(case_name, seed, flows_vph=None):
 
 
 def generate_eval7_flow_sweep_records(seed, requesting_flow, accepting_flow=1000):
-    """Build nested Eval.7 inputs while keeping the mainline stream identical."""
-    if accepting_flow != 1000 or not 0 <= requesting_flow <= 1000:
+    """Build time-balanced nested Eval.7 inputs with stable vehicle types."""
+    if (accepting_flow != 1000 or
+            requesting_flow not in EVAL7_SWEEP_REQUESTING_FLOWS):
         raise ValueError(
             "Eval.7 flow-sweep generation requires accepting=1000 and "
-            "requesting between 0 and 1000 veh/h"
+            f"requesting in {EVAL7_SWEEP_REQUESTING_FLOWS} veh/h"
         )
-    master = generate_records("eval7", seed)
-    if requesting_flow == 1000:
-        return master
 
-    accepting = [dict(record) for record in master[1:]
-                 if record["approach"] == "accepting"]
-    requesting_master = [dict(record) for record in master[1:]
-                         if record["approach"] == "requesting"]
-    requesting_count = int(DURATION_S / 3600 * requesting_flow)
+    def minute_counts(flow):
+        total = int(DURATION_S / 3600 * flow)
+        base, extra = divmod(total, 10)
+        first_extra = int(total / 2 + 0.5) - base * 5
+        second_extra = extra - first_extra
+        counts = [base] * 10
+        rng = random.Random(f"{seed}:eval7-flow-sweep-bins:{flow}")
+        for half, half_extra in ((0, first_extra), (1, second_extra)):
+            bins = list(range(half * 5, half * 5 + 5))
+            rng.shuffle(bins)
+            for bin_index in bins[:half_extra]:
+                counts[bin_index] += 1
+        return counts
 
-    # One seed-specific ordering makes lower-flow schedules strict subsets of
-    # higher-flow schedules instead of independently redrawing arrival times.
-    selection_order = list(range(len(requesting_master)))
-    selection_rng = random.Random(f"{seed}:eval7-requesting-flow-sweep")
-    selection_rng.shuffle(selection_order)
-    selected_indices = set(selection_order[:requesting_count])
-    requesting = [record for index, record in enumerate(requesting_master)
-                  if index in selected_indices]
+    counts_by_flow = {
+        flow: minute_counts(flow) for flow in EVAL7_SWEEP_REQUESTING_FLOWS
+    }
+    accepting_counts = minute_counts(accepting_flow)
 
-    target_bus_count = int((len(accepting) + len(requesting)) * BUS_SHARE + 0.5)
-    accepting_bus_count = sum(
-        record["vehicle_type"] == "Bus" for record in accepting
+    def build_stream(approach, counts):
+        events_by_bin = []
+        for bin_index, count in enumerate(counts):
+            slots = list(range(30))
+            rng = random.Random(
+                f"{seed}:eval7-flow-sweep-slots:{approach}:{bin_index}"
+            )
+            rng.shuffle(slots)
+            events = []
+            for slot in slots[:count]:
+                depart_time = round(bin_index * 60 + slot * 2.0, 1) + 0.1
+                events.append({
+                    "record_type": "vehicle",
+                    "sequence": None,
+                    "depart_time_s": depart_time,
+                    "approach": approach,
+                    "depart_lane": CASE_SPECS["eval7"]["depart_lanes"][approach],
+                    "route": "main",
+                    "vehicle_type": "Car",
+                })
+            events_by_bin.append(events)
+        return events_by_bin
+
+    accepting_by_bin = build_stream("accepting", accepting_counts)
+    requesting_master_by_bin = build_stream(
+        "requesting", counts_by_flow[max(EVAL7_SWEEP_REQUESTING_FLOWS)]
     )
-    requesting_bus_count = target_bus_count - accepting_bus_count
-    if not 0 <= requesting_bus_count <= len(requesting):
-        raise ValueError("fixed mainline bus count cannot satisfy requested total bus share")
-    type_order = list(range(len(requesting)))
-    type_rng = random.Random(f"{seed}:eval7-flow-sweep-types:{requesting_flow}")
-    type_rng.shuffle(type_order)
-    bus_indices = set(type_order[:requesting_bus_count])
-    for index, record in enumerate(requesting):
-        record["vehicle_type"] = "Bus" if index in bus_indices else "Car"
+    accepting = [event for events in accepting_by_bin for event in events]
+    requesting_sets = {
+        flow: {
+            event["depart_time_s"]
+            for bin_index, events in enumerate(requesting_master_by_bin)
+            for event in events[:counts_by_flow[flow][bin_index]]
+        }
+        for flow in EVAL7_SWEEP_REQUESTING_FLOWS
+    }
+
+    # The mainline stream is identical in every condition: 21 buses in each
+    # 300-second half. Requesting buses are assigned once to nested flow layers,
+    # so a shared vehicle never changes type between traffic conditions.
+    for half in (0, 1):
+        half_accepting = [
+            event for event in accepting
+            if (event["depart_time_s"] < 300) == (half == 0)
+        ]
+        rng = random.Random(f"{seed}:eval7-flow-sweep-types:accepting:{half}")
+        rng.shuffle(half_accepting)
+        for event in half_accepting[:21]:
+            event["vehicle_type"] = "Bus"
+
+    requesting_master = [
+        event for events in requesting_master_by_bin for event in events
+    ]
+    previous_times = set()
+    previous_bus_target = {0: 0, 1: 0}
+    for flow in EVAL7_SWEEP_REQUESTING_FLOWS:
+        current_times = requesting_sets[flow]
+        layer_times = current_times - previous_times
+        for half in (0, 1):
+            half_layer = [
+                event for event in requesting_master
+                if event["depart_time_s"] in layer_times and
+                ((event["depart_time_s"] < 300) == (half == 0))
+            ]
+            requesting_half_count = sum(
+                (depart_time < 300) == (half == 0)
+                for depart_time in current_times
+            )
+            accepting_half_count = sum(
+                (event["depart_time_s"] < 300) == (half == 0)
+                for event in accepting
+            )
+            total_bus_target = int(
+                (requesting_half_count + accepting_half_count) * BUS_SHARE + 0.5
+            )
+            requesting_bus_target = total_bus_target - 21
+            buses_to_add = requesting_bus_target - previous_bus_target[half]
+            rng = random.Random(
+                f"{seed}:eval7-flow-sweep-types:requesting:{flow}:{half}"
+            )
+            rng.shuffle(half_layer)
+            for event in half_layer[:buses_to_add]:
+                event["vehicle_type"] = "Bus"
+            previous_bus_target[half] = requesting_bus_target
+        previous_times = current_times
+
+    requesting = [
+        event for event in requesting_master
+        if event["depart_time_s"] in requesting_sets[requesting_flow]
+    ]
 
     approach_rank = {
         name: index for index, name in enumerate(CASE_SPECS["eval7"]["approach_order"])
@@ -165,10 +245,20 @@ def generate_eval7_flow_sweep_records(seed, requesting_flow, accepting_flow=1000
     )
     for sequence, record in enumerate(events):
         record["sequence"] = sequence
-    metadata = dict(master[0])
-    metadata["flows_vph"] = {
+    metadata = {
+        "record_type": "metadata",
+        "schema_version": SCHEMA_VERSION,
+        "case": "eval7",
+        "seed": seed,
+        "duration_s": DURATION_S,
+        "scenario": "merge",
+        "flows_vph": {
         "requesting": requesting_flow,
         "accepting": accepting_flow,
+        },
+        "bus_share": BUS_SHARE,
+        "bus_allocation": "fixed-nearest",
+        "generated_with_python": platform.python_version(),
     }
     return [metadata, *events]
 
@@ -203,10 +293,11 @@ def main():
         if "eval7" not in args.cases:
             parser.error("--eval7-requesting-flows requires --cases eval7")
         if args.eval7_accepting_flow != 1000 or any(
-                flow < 0 or flow > 1000 for flow in args.eval7_requesting_flows):
+                flow not in EVAL7_SWEEP_REQUESTING_FLOWS
+                for flow in args.eval7_requesting_flows):
             parser.error(
                 "the nested Eval.7 sweep requires accepting=1000 and "
-                "requesting flows between 0 and 1000 veh/h")
+                f"requesting flows in {EVAL7_SWEEP_REQUESTING_FLOWS} veh/h")
         if len(set(args.eval7_requesting_flows)) != len(args.eval7_requesting_flows):
             parser.error("--eval7-requesting-flows must be unique")
     failures = []

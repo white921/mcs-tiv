@@ -184,6 +184,49 @@ class FixedVehicleInputTests(unittest.TestCase):
         for smaller, larger in zip(requesting_times, requesting_times[1:]):
             self.assertLess(smaller, larger)
 
+        for smaller_records, larger_records in zip(
+                conditions.values(), list(conditions.values())[1:]):
+            smaller_types = {
+                record["depart_time_s"]: record["vehicle_type"]
+                for record in smaller_records[1:]
+                if record["approach"] == "requesting"
+            }
+            larger_types = {
+                record["depart_time_s"]: record["vehicle_type"]
+                for record in larger_records[1:]
+                if record["approach"] == "requesting"
+            }
+            self.assertTrue(all(
+                larger_types[depart_time] == vehicle_type
+                for depart_time, vehicle_type in smaller_types.items()
+            ))
+
+    def test_eval7_flow_sweep_balances_the_300_second_prefix(self):
+        expected_requesting = {300: 25, 500: 42, 700: 58, 1000: 83}
+        for seed in HOLDOUT_SEEDS:
+            for requesting, expected_count in expected_requesting.items():
+                with self.subTest(seed=seed, requesting=requesting):
+                    records = generate_eval7_flow_sweep_records(
+                        seed, requesting, 1000
+                    )
+                    prefix = [
+                        record for record in records[1:]
+                        if record["depart_time_s"] < 300
+                    ]
+                    self.assertEqual(
+                        sum(record["approach"] == "requesting" for record in prefix),
+                        expected_count,
+                    )
+                    self.assertEqual(
+                        sum(record["approach"] == "accepting" for record in prefix),
+                        83,
+                    )
+                    expected_buses = int(len(prefix) * 0.25 + 0.5)
+                    self.assertEqual(
+                        sum(record["vehicle_type"] == "Bus" for record in prefix),
+                        expected_buses,
+                    )
+
     def test_eval7_flow_override_selects_matching_fixed_input(self):
         details = fixed_input_details(
             "eval7", 6, 300, "fixed", flows=(500, 1000)
