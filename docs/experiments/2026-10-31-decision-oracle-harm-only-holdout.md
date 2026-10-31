@@ -2,7 +2,13 @@
 
 ## 状態
 
-`planned`
+`running`
+
+実装・固定入力・事前登録sourceは`6dc6ddc3cc97ef3b7e66da39d4f5ee4201bf4f2f`。
+Ubuntuのclean worktreeで120 testsが成功した。最初のsmokeは誤って
+SUMO 1.18.0を指定したためcheckpoint復元時刻が0.0となって停止し、不完全結果を
+保全・除外した。正式環境のPython 3.15.1 / SUMO 1.28.0でやり直したsmokeは、
+計画ID一致、両分岐exit 0、同一fingerprint、source unchanged、物理衝突0で成功した。
 
 ## 目的
 
@@ -59,8 +65,8 @@ holdout結果を見て式、lambda、seed、イベント選択を変更しない
 
 ## 完了条件
 
-- [ ] 改善式・固定入力・holdout条件をcommit/push
-- [ ] Ubuntuで全テストと単一交渉smoke
+- [x] 改善式・固定入力・holdout条件をcommit/push
+- [x] Ubuntuで全テストと単一交渉smoke
 - [ ] 山下／提案の自然走行30 runを正常完了・検証
 - [ ] 120件planと入力hashを結果を見る前に固定
 - [ ] 反実仮想120件を正常完了・完全性検証
