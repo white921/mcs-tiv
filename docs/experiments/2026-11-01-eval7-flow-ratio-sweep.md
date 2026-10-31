@@ -11,6 +11,10 @@
 - 提案方式unit: `mcs-eval7-flow-sweep-formal10-proposal-20261101.service`
 - 山下方式output root: `/home/yamada/UbuntuData/ドキュメント/卒論研究/mcs-tiv-eval7-flow-sweep-formal-yamashita/results/runs/`
 - 提案方式output root: `/home/yamada/UbuntuData/ドキュメント/卒論研究/mcs-tiv-eval7-flow-sweep-formal-proposal/results/runs/`
+- 丸め修正source: `codex/decision-oracle-benchmark@c320385ee212cf58699ed50bd7ba112871189020`
+- 再開後山下方式unit: `mcs-eval7-flow-sweep-resume-yamashita-20261101.service`
+- 再開後提案方式unit: `mcs-eval7-flow-sweep-resume-proposal-20261101.service`
+- 再開後worktree: `/home/yamada/UbuntuData/ドキュメント/卒論研究/mcs-tiv-eval7-flow-sweep-resume`、`/home/yamada/UbuntuData/ドキュメント/卒論研究/mcs-tiv-eval7-flow-sweep-resume-proposal`
 
 各unitは合流側300、500、700、1000台/時の順に実行する。各条件は5 seed・5並列で、
 山下方式と提案方式を並行実行し、全体で10並列とする。開始時manifestでsource
@@ -30,6 +34,10 @@ commit/pushしない。1000条件は未実行。
 300秒以降の合流側車種だけを調整する。700条件は600秒全体のバスを71台、
 1000条件は83台とし、メインライン車列の共通性と合流側車列の包含関係も保持した。
 全20ファイルの300秒prefix hashが修正前と一致することを確認した。
+修正後sourceはUbuntuのPython 3.15.1 / SUMO 1.28.0環境で129 tests成功、
+固定入力20件のchecksum一致、生成イベント列の一致を確認した。700/1000と1000/1000だけを
+新しいoutput名（`...300s-w5-resume-20261101T`）で再開し、両方式5並列ずつの合計10並列とした。
+開始時manifestでsource `c320385e`、Git clean、合流側700/本線側1000、提案方式`lambda=2`を確認した。
 
 本試験は改善条件を探すための試験であり、ここで良い結果が出ても最終的な優位性の
 根拠にはしない。条件を選んだ後に優位性を主張する場合は、未使用seedで別途確認する。
