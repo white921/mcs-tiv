@@ -37,21 +37,24 @@ EXPECTED = {
         "buses": 83,
     },
 }
+HOLDOUT_SEEDS = (6, 8, 9, 10, 12)
 
 
 class FixedVehicleInputTests(unittest.TestCase):
     def paths(self):
         return sorted((ROOT / "fixed_inputs" / "thesis").glob("*/*.jsonl"))
 
-    def test_files_match_batch_cases_and_documented_seeds(self):
+    def test_files_match_batch_cases_and_documented_seed_sets(self):
         expected_paths = {
             ROOT / "fixed_inputs" / "thesis" / case / f"seed-{seed}.jsonl"
             for case, values in EXPECTED.items()
-            for seed in values["seeds"]
+            for seed in values["seeds"] + HOLDOUT_SEEDS
         }
         self.assertEqual(set(self.paths()), expected_paths)
         for case, values in EXPECTED.items():
             self.assertEqual(tuple(CASES[case]["seeds"]), values["seeds"])
+            self.assertEqual(
+                tuple(CASES[case]["holdout_seeds"]), HOLDOUT_SEEDS)
 
     def test_every_file_loads_identically_and_preserves_conditions(self):
         for path in self.paths():
@@ -89,7 +92,7 @@ class FixedVehicleInputTests(unittest.TestCase):
 
     def test_batch_manifest_metadata_uses_relative_path_schema_and_sha256(self):
         for case, values in EXPECTED.items():
-            for seed in values["seeds"]:
+            for seed in values["seeds"] + HOLDOUT_SEEDS:
                 with self.subTest(case=case, seed=seed):
                     details = fixed_input_details(case, seed, 600, "fixed")
                     path = ROOT / details["relative_path"]
@@ -130,6 +133,7 @@ class FixedVehicleInputTests(unittest.TestCase):
 
     def test_batch_can_select_seed_five_without_changing_defaults(self):
         self.assertEqual(build_tasks(["eval3"], seeds=[5]), [("eval3", 5)])
+        self.assertEqual(build_tasks(["eval3"], seeds=[6]), [("eval3", 6)])
         self.assertEqual(
             build_tasks(["eval3"], seeds_per_case=2),
             [("eval3", 1), ("eval3", 2)],

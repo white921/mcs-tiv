@@ -219,7 +219,7 @@ def score_policy(choice, accept, reject, oracle):
 
 
 def policy_choices(yamashita_choice, proposal_evaluation,
-                   lambdas=(0.25, 0.5, 0.75, 1.0)):
+                   lambdas=(0.25, 0.5, 0.75, 1.0, 2.0)):
     """Evaluate all planned decision rules on one immutable boundary state."""
     choices = {"yamashita": yamashita_choice}
     if not proposal_evaluation:
@@ -231,10 +231,11 @@ def policy_choices(yamashita_choice, proposal_evaluation,
     if arrival_status == "both_reached":
         arrival = float(proposal_evaluation["arrival_margin_s"])
         loss = float(proposal_evaluation["loss_margin_s"])
+        effective_loss = max(loss, 0.0)
         choices["arrival_only"] = "accept" if arrival <= 0 else "reject"
         for value in lambdas:
             choices[f"proposal_lambda_{value:g}"] = (
-                "accept" if arrival + float(value) * loss <= 0 else "reject")
+                "accept" if arrival + float(value) * effective_loss <= 0 else "reject")
     elif arrival_status == "receiver_unreached":
         choices["arrival_only"] = "accept"
         for value in lambdas:

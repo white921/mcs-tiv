@@ -23,7 +23,7 @@ def read_jsonl(path):
                 yield json.loads(line)
 
 
-def run_manifests(root):
+def run_manifests(root, cases=CASES):
     found = {}
     for path in sorted(root.rglob("manifest.json")):
         try:
@@ -31,7 +31,7 @@ def run_manifests(root):
         except (OSError, json.JSONDecodeError):
             continue
         case, seed = value.get("case"), value.get("seed")
-        if case not in CASES or seed not in CASES[case]:
+        if case not in cases or seed not in cases[case]:
             continue
         if value.get("exit_code") != 0 or value.get("source_unchanged") is not True:
             raise ValueError(f"discovery run is not valid: {path}")
@@ -87,17 +87,17 @@ def selected_events(trace, count):
     raise ValueError(f"only {len(selected)} unique decisions in {trace}; need {count}")
 
 
-def build_plan(discoveries, events_per_run=4):
+def build_plan(discoveries, events_per_run=4, cases=CASES):
     events = []
     sources = {}
     for origin in ("yamashita", "proposal"):
-        runs = run_manifests(discoveries[origin])
-        required = {(case, seed) for case, seeds in CASES.items() for seed in seeds}
+        runs = run_manifests(discoveries[origin], cases)
+        required = {(case, seed) for case, seeds in cases.items() for seed in seeds}
         missing = sorted(required - set(runs))
         if missing:
             raise ValueError(f"missing {origin} discovery runs: {missing}")
         for case in ("eval3", "eval5", "eval7"):
-            for seed in CASES[case]:
+            for seed in cases[case]:
                 run_dir, manifest = runs[(case, seed)]
                 trace = negotiation_path(run_dir)
                 sources[f"{origin}:{case}:{seed}"] = {
@@ -132,15 +132,23 @@ def main():
     parser.add_argument("--proposal-discovery", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--events-per-run", type=int, default=4)
+    parser.add_argument(
+        "--seeds", type=int, nargs=5,
+        help="five preregistered seeds shared by Eval.3/5/7")
     args = parser.parse_args()
     if args.output.exists():
         parser.error("output already exists")
     if args.events_per_run != 4:
         parser.error("the preregistered corpus requires exactly four events per run")
+    if args.seeds is not None and (
+            len(set(args.seeds)) != 5 or any(seed < 0 for seed in args.seeds)):
+        parser.error("--seeds must contain five unique non-negative integers")
+    cases = (CASES if args.seeds is None else
+             {case: tuple(args.seeds) for case in CASES})
     plan = build_plan({
         "yamashita": args.yamashita_discovery.resolve(),
         "proposal": args.proposal_discovery.resolve(),
-    }, args.events_per_run)
+    }, args.events_per_run, cases)
     args.output.write_text(
         json.dumps(plan, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     print(json.dumps({"event_count": plan["event_count"],

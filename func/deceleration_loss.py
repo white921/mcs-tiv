@@ -106,7 +106,10 @@ def time_equivalent_decision(
     """Compare Accept and Reject on one time-equivalent scale.
 
     ``M = (t_request - t_receiver) + lambda *
-    (loss_accept_seconds - loss_reject_seconds)``.  ``M <= 0`` accepts.
+    max(loss_accept_seconds - loss_reject_seconds, 0)``.  ``M <= 0``
+    accepts.  The signed loss margin is still returned for diagnostics, but
+    an uncertain predicted follower benefit cannot overturn an arrival-time
+    preference for Reject.
     Distance losses are converted with each vehicle's positive finite allowed
     speed, never its instantaneous speed.
     """
@@ -147,7 +150,8 @@ def time_equivalent_decision(
     request_arrival_s = float(request_arrival_s)
     receiver_arrival_s = float(receiver_arrival_s)
     loss_margin_s = accept_loss_s - reject_loss_s
-    weighted_loss_margin_s = loss_lambda * loss_margin_s
+    effective_loss_margin_s = max(loss_margin_s, 0.0)
+    weighted_loss_margin_s = loss_lambda * effective_loss_margin_s
     request_reached = math.isfinite(request_arrival_s)
     receiver_reached = math.isfinite(receiver_arrival_s)
     if (not request_reached and request_arrival_s > 0 and
@@ -190,6 +194,8 @@ def time_equivalent_decision(
         "accept_time_equivalent_loss_s": accept_loss_s,
         "reject_time_equivalent_loss_s": reject_loss_s,
         "loss_margin_s": loss_margin_s,
+        "effective_loss_margin_s": effective_loss_margin_s,
+        "negative_loss_credit_s": min(loss_margin_s, 0.0),
         "loss_lambda": loss_lambda,
         "weighted_loss_margin_s": weighted_loss_margin_s,
         "final_margin_s": final_margin_s,

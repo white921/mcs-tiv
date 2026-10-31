@@ -82,6 +82,7 @@ CASES = {
         "folder": "junction", "script": "junction_three_agree.py", "alpha": "7",
         "flows": ["400", "400", "400"], "bus_share": "0.25",
         "seeds": [1, 2, 3, 4, 5], "reference": 7.4159,
+        "holdout_seeds": [6, 8, 9, 10, 12],
         "fixed_input": "fixed_inputs/thesis/eval3/seed-{seed}.jsonl",
     },
     "eval4": {
@@ -93,6 +94,7 @@ CASES = {
         "folder": "junction", "script": "junction_four_agree.py", "alpha": "7",
         "flows": ["300", "300", "300", "300"], "bus_share": "0.25",
         "seeds": [1, 2, 3, 4, 5], "reference": 6.4420,
+        "holdout_seeds": [6, 8, 9, 10, 12],
         "fixed_input": "fixed_inputs/thesis/eval5/seed-{seed}.jsonl",
     },
     "eval6": {
@@ -104,6 +106,7 @@ CASES = {
         "folder": "merge", "script": "merge_agree2512.py", "alpha": "7",
         "flows": ["1000", "1000"], "bus_share": "0.25",
         "seeds": [1, 2, 3, 7, 11], "reference": 4.2084,
+        "holdout_seeds": [6, 8, 9, 10, 12],
         "fixed_input": "fixed_inputs/thesis/eval7/seed-{seed}.jsonl",
     },
 }
@@ -174,7 +177,7 @@ def deceleration_prediction_manifest(args):
         "time_half_life_s": (args.deceleration_time_half_life or None),
         "decision_formula": (
             "M=(t_request-t_receiver)+lambda*"
-            "(accept_time_loss-reject_time_loss); accept iff M<=0"),
+            "max(accept_time_loss-reject_time_loss,0); accept iff M<=0"),
         "loss_lambda": args.deceleration_loss_lambda,
         "loss_scope": "detected followers excluding request and receiver vehicles",
         "excluded_loss_roles": ["request_vehicle", "receiver_vehicle"],
@@ -218,7 +221,8 @@ def build_tasks(case_names, seeds_per_case=None, seeds=None):
     for name in case_names:
         documented = CASES[name]["seeds"]
         if seeds is not None:
-            unknown = [seed for seed in seeds if seed not in documented]
+            allowed = set(documented) | set(CASES[name].get("holdout_seeds", ()))
+            unknown = [seed for seed in seeds if seed not in allowed]
             if unknown:
                 raise ValueError(f"{name} does not document seeds: {unknown}")
             selected = seeds
@@ -434,7 +438,7 @@ def main():
     parser.add_argument("--seeds-per-case", type=int,
                         help="run only this many leading documented seeds per case (smoke tests)")
     parser.add_argument("--seeds", type=int, nargs="+",
-                        help="run only these documented seeds for every selected case")
+                        help="run only these documented development or holdout seeds for every selected case")
     parser.add_argument("--duration", type=float, default=600,
                         help="scenario duration in seconds (300 for diagnostic comparisons; default: 600)")
     parser.add_argument("--stop-time", type=float,

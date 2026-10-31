@@ -122,11 +122,18 @@ def serialize(records):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / "fixed_inputs" / "thesis")
+    parser.add_argument(
+        "--seeds", type=int, nargs="+",
+        help="generate this explicit seed set for every case instead of the development seeds")
     parser.add_argument("--check", action="store_true", help="fail if committed files differ")
     args = parser.parse_args()
+    if args.seeds is not None and (
+            any(seed < 0 for seed in args.seeds) or
+            len(set(args.seeds)) != len(args.seeds)):
+        parser.error("--seeds must be unique non-negative integers")
     failures = []
     for case_name, case in CASES.items():
-        for seed in case["seeds"]:
+        for seed in (args.seeds if args.seeds is not None else case["seeds"]):
             path = args.output / case_name / f"seed-{seed}.jsonl"
             expected = serialize(generate_records(case_name, seed))
             if args.check:

@@ -74,6 +74,19 @@ class DecisionOracleTests(unittest.TestCase):
         self.assertEqual(choices["proposal_lambda_0.5"], "accept")
         self.assertEqual(choices["proposal_lambda_0.75"], "reject")
         self.assertEqual(choices["proposal_lambda_1"], "reject")
+        self.assertEqual(choices["proposal_lambda_2"], "reject")
+
+    def test_policy_choices_do_not_credit_predicted_follower_benefit(self):
+        choices = oracle.policy_choices("accept", {
+            "arrival_status": "both_reached",
+            "arrival_margin_s": 0.25,
+            "loss_margin_s": -2.0,
+        })
+
+        self.assertEqual(choices["arrival_only"], "reject")
+        self.assertTrue(all(
+            choice == "reject" for name, choice in choices.items()
+            if name.startswith("proposal_lambda_")))
 
     def test_completed_event_requires_matching_restore(self):
         with tempfile.TemporaryDirectory() as temporary:

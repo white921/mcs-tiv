@@ -72,6 +72,22 @@ class DecelerationLossTests(unittest.TestCase):
         self.assertEqual(tie["final_margin_s"], 0)
         self.assertEqual(tie["decision"], "accept")
 
+    def test_predicted_follower_benefit_is_audited_but_not_credited(self):
+        reference = {"v": self.profile((10, 10, 10))}
+        neutral = {"v": self.profile((10, 10, 10))}
+        slow = {"v": self.profile((5, 5, 5))}
+
+        result = loss.time_equivalent_decision(
+            reference, neutral, slow, {"v": 10},
+            request_arrival_s=2.25, receiver_arrival_s=2.0,
+            loss_lambda=2.0)
+
+        self.assertLess(result["loss_margin_s"], 0)
+        self.assertEqual(result["effective_loss_margin_s"], 0)
+        self.assertLess(result["negative_loss_credit_s"], 0)
+        self.assertAlmostEqual(result["final_margin_s"], .25)
+        self.assertEqual(result["decision"], "reject")
+
     def test_request_unreachable_rejects_even_when_both_unreachable(self):
         reference = {"v": self.profile((10, 10, 10))}
         for receiver_arrival in (2, math.inf):
