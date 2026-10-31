@@ -2,11 +2,19 @@
 
 ## 状態
 
-`planned`
+`running`
 
 - 実装・固定入力source: `codex/decision-oracle-benchmark@6869e4627a6fa02441a6fbcc5a305cc81b748594`
 - Ubuntu検証worktree: `/home/yamada/UbuntuData/ドキュメント/卒論研究/mcs-tiv-eval7-flow-sweep`
 - Ubuntu正式環境: Python 3.15.1 / SUMO 1.28.0、128 tests成功
+- 山下方式unit: `mcs-eval7-flow-sweep-formal-yamashita-20261101.service`
+- 提案方式unit: `mcs-eval7-flow-sweep-formal-proposal-20261101.service`
+- 山下方式output root: `/home/yamada/UbuntuData/ドキュメント/卒論研究/mcs-tiv-eval7-flow-sweep-formal-yamashita/results/runs/`
+- 提案方式output root: `/home/yamada/UbuntuData/ドキュメント/卒論研究/mcs-tiv-eval7-flow-sweep-formal-proposal/results/runs/`
+
+各unitは合流側300、500、700、1000台/時の順に実行する。各条件は5 seed・4並列で、
+山下方式と提案方式を並行実行する。開始時manifestでsource `6869e46` clean、固定条件
+300/1000、各5 seed、提案`lambda=2`を確認した。
 
 本試験は改善条件を探すための試験であり、ここで良い結果が出ても最終的な優位性の
 根拠にはしない。条件を選んだ後に優位性を主張する場合は、未使用seedで別途確認する。
@@ -82,7 +90,7 @@ Macの3.14.5、Ubuntu再生成時は3.15.1となるためファイル全体の�
 - [x] 4条件 × 5 seedの固定入力を生成・検証し、SHA-256を記録
 - [x] 実装と固定入力をcommit/push
 - [x] Ubuntu正式環境で全テスト
-- [ ] 各方式のsmokeを正常完了
+- [x] 各方式のsmokeを正常完了
 - [ ] 40 runを正常完了
 - [ ] 全件`exit_code=0`、`source_unchanged=true`、物理衝突と重大ログを確認
 - [ ] 条件別・seed別に比較
