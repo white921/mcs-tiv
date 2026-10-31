@@ -101,20 +101,25 @@ def time_equivalent_decision(
     request_arrival_s: float,
     receiver_arrival_s: float,
     loss_lambda: float = 1.0,
+    rejection_wait_s: float = 0.0,
     time_half_life_s: float | None = None,
 ) -> dict:
     """Compare Accept and Reject on one time-equivalent scale.
 
     ``M = (t_request - t_receiver) + lambda *
-    max(loss_accept_seconds - loss_reject_seconds, 0)``.  ``M <= 0``
-    accepts.  The signed loss margin is still returned for diagnostics, but
-    an uncertain predicted follower benefit cannot overturn an arrival-time
-    preference for Reject.
+    max(loss_accept_seconds - loss_reject_seconds, 0) - rejection_wait``.
+    ``M <= 0`` accepts.  The observed wait term only applies when both actors
+    can reach the conflict point.  The signed predicted loss margin is still
+    returned for diagnostics, but an uncertain predicted follower benefit
+    cannot overturn an arrival-time preference for Reject.
     Distance losses are converted with each vehicle's positive finite allowed
     speed, never its instantaneous speed.
     """
     if not math.isfinite(loss_lambda) or loss_lambda < 0:
         raise ValueError("loss lambda must be finite and non-negative")
+    rejection_wait_s = float(rejection_wait_s)
+    if not math.isfinite(rejection_wait_s) or rejection_wait_s < 0:
+        raise ValueError("rejection wait must be finite and non-negative")
     vehicle_ids = set(reference)
     if vehicle_ids != set(accept) or vehicle_ids != set(reject):
         raise ValueError("reference, accept and reject must cover identical vehicle IDs")
@@ -152,6 +157,7 @@ def time_equivalent_decision(
     loss_margin_s = accept_loss_s - reject_loss_s
     effective_loss_margin_s = max(loss_margin_s, 0.0)
     weighted_loss_margin_s = loss_lambda * effective_loss_margin_s
+    rejection_wait_credit_s = 0.0
     request_reached = math.isfinite(request_arrival_s)
     receiver_reached = math.isfinite(receiver_arrival_s)
     if (not request_reached and request_arrival_s > 0 and
@@ -180,7 +186,9 @@ def time_equivalent_decision(
         arrival_status = "both_reached"
         decision_basis = "combined_margin"
         arrival_margin_s = request_arrival_s - receiver_arrival_s
-        final_margin_s = arrival_margin_s + weighted_loss_margin_s
+        rejection_wait_credit_s = rejection_wait_s
+        final_margin_s = (
+            arrival_margin_s + weighted_loss_margin_s - rejection_wait_credit_s)
         decision = "accept" if final_margin_s <= 0 else "reject"
     return {
         **distance,
@@ -198,6 +206,8 @@ def time_equivalent_decision(
         "negative_loss_credit_s": min(loss_margin_s, 0.0),
         "loss_lambda": loss_lambda,
         "weighted_loss_margin_s": weighted_loss_margin_s,
+        "rejection_wait_s": rejection_wait_s,
+        "rejection_wait_credit_s": rejection_wait_credit_s,
         "final_margin_s": final_margin_s,
         "vehicle_loss_details": details,
         "decision": decision,

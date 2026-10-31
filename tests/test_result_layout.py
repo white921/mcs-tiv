@@ -20,6 +20,7 @@ class ResultLayoutTests(unittest.TestCase):
             "deceleration_active": True,
             "deceleration_time_half_life": 0.0,
             "deceleration_loss_lambda": 1.0,
+            "rejection_wait_cap": 0.0,
             "cases": ["eval3"],
             "seeds": [1, 2, 3, 4, 5],
             "seeds_per_case": None,
@@ -72,6 +73,7 @@ class ResultLayoutTests(unittest.TestCase):
             "MCS_DECELERATION_MODE": "active",
             "MCS_DECELERATION_TIME_HALF_LIFE_S": "99",
             "MCS_DECELERATION_LOSS_LAMBDA": "99",
+            "MCS_REJECTION_WAIT_CAP_S": "99",
             "MCS_FCD_OUTPUT": "/tmp/old-fcd.xml",
             "MCS_CHECKPOINT_DIR": "/tmp/old-checkpoint",
         }
@@ -97,6 +99,13 @@ class ResultLayoutTests(unittest.TestCase):
         self.assertEqual(
             manifest["excluded_loss_roles"],
             ["request_vehicle", "receiver_vehicle"])
+
+    def test_manifest_records_repeated_rejection_wait_formula(self):
+        manifest = RUNNER.deceleration_prediction_manifest(
+            self.args(deceleration_loss_lambda=2.0, rejection_wait_cap=10.0))
+
+        self.assertEqual(manifest["rejection_wait_cap_s"], 10.0)
+        self.assertIn("consecutive_pair_rejection_wait", manifest["decision_formula"])
 
 
 if __name__ == "__main__":

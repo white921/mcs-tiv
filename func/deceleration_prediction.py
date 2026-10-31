@@ -50,12 +50,24 @@ def _loss_lambda_from_environment():
 
 LOSS_LAMBDA = _loss_lambda_from_environment()
 
+
+def _rejection_wait_cap_from_environment():
+    value = float(os.environ.get("MCS_REJECTION_WAIT_CAP_S", "0"))
+    if not math.isfinite(value) or value < 0:
+        raise ValueError("MCS_REJECTION_WAIT_CAP_S must be finite and non-negative")
+    return value
+
+
+REJECTION_WAIT_CAP_S = _rejection_wait_cap_from_environment()
+REJECTION_WAIT_RESET_GAP_S = 2 * REPLAN_INTERVAL
+
 COUNTS = Counter()
 RECORDS = []
 # A desired MCM is normally regenerated every second.  Keep an active
 # proposal decision for that one planning interval so the 0.1 s SUMO loop does
 # not repeatedly negotiate the very same desired path.
 ACTIVE_DECISION_UNTIL = {}
+REJECTION_WAIT_EPISODES = {}
 MODE = os.environ.get("MCS_DECELERATION_MODE", "off")
 if MODE not in ("off", "shadow", "active"):
     raise ValueError("MCS_DECELERATION_MODE must be off, shadow, or active")
@@ -68,6 +80,33 @@ def configure(mode):
         raise ValueError("MCS_DECELERATION_MODE must be off, shadow, or active")
     MODE = mode
     ACTIVE_DECISION_UNTIL.clear()
+    REJECTION_WAIT_EPISODES.clear()
+
+
+def _rejection_wait(receiver, desired, now):
+    """Return current repeated-rejection wait without changing live state."""
+    key = (str(receiver.id), str(desired.vehID))
+    episode = REJECTION_WAIT_EPISODES.get(key)
+    if (episode is None or now < episode["started_at"] or
+            now - episode["last_seen_at"] > REJECTION_WAIT_RESET_GAP_S):
+        return key, 0.0, False
+    wait_s = max(0.0, now - episode["started_at"])
+    return key, min(wait_s, REJECTION_WAIT_CAP_S), True
+
+
+def _update_rejection_wait(key, now, rejected, continued):
+    """Advance or clear one observed sender/receiver rejection episode."""
+    if REJECTION_WAIT_CAP_S <= 0:
+        return
+    if not rejected:
+        REJECTION_WAIT_EPISODES.pop(key, None)
+        return
+    if continued:
+        REJECTION_WAIT_EPISODES[key]["last_seen_at"] = now
+    else:
+        REJECTION_WAIT_EPISODES[key] = {
+            "started_at": now, "last_seen_at": now,
+        }
 
 
 def active_decision_is_locked(receiver, desired, now):
@@ -310,7 +349,8 @@ def _case_profiles(roots, candidates, now):
     return profiles
 
 
-def _evaluate_detail(receiver, desired, alternative, now, conflict_point):
+def _evaluate_detail(receiver, desired, alternative, now, conflict_point,
+                     rejection_wait_s=0.0):
     """Return the comparison and both case profiles for instrumentation."""
     sender_id, receiver_id = str(desired.vehID), str(receiver.id)
     candidates = _latest_planned(receiver)
@@ -380,6 +420,7 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_point):
         receiver_arrival_s=arrival_delay(
             receiver_planned, conflict_point, now),
         loss_lambda=LOSS_LAMBDA,
+        rejection_wait_s=rejection_wait_s,
         time_half_life_s=TIME_HALF_LIFE_S)
     union_follower_ids = accept_follower_ids | reject_follower_ids
     result = {**result, "vehicle_ids": sorted(union_ids),
@@ -424,14 +465,16 @@ def direct_tiv_profiles(receiver, desired, alternative, now, decision):
             for vehicle_id, path in roots.items()}
 
 
-def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode):
+def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode,
+                       rejection_wait_s=0.0):
     """Evaluate and audit a proposal decision without mutating vehicle state."""
     if MODE != mode:
         return None
     COUNTS[mode + "_attempts"] += 1
     try:
         result, accept_profiles, reject_profiles = _evaluate_detail(
-            receiver, desired, alternative, now, conflict_point)
+            receiver, desired, alternative, now, conflict_point,
+            rejection_wait_s=rejection_wait_s)
     except (AttributeError, IndexError, TypeError, ValueError, ZeroDivisionError) as error:
         COUNTS[mode + "_unsupported"] += 1
         record = {"time": now, "receiver": str(receiver.id),
@@ -446,7 +489,10 @@ def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode
             evaluation_metrics.register_prediction(
                 now, result["decision"], result["follower_count"], chosen_profiles,
                 metadata={
-                    "method": "deceleration-propagation",
+                    "method": (
+                        "deceleration-propagation-rejection-wait"
+                        if REJECTION_WAIT_CAP_S > 0
+                        else "deceleration-propagation"),
                     "predictor": "10s-kinematic-following",
                     "receiver_id": str(receiver.id), "sender_id": str(desired.vehID),
                     "desired_path_id": str(desired.pathID),
@@ -477,6 +523,8 @@ def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode
                     "effective_loss_margin_s": result["effective_loss_margin_s"],
                     "negative_loss_credit_s": result["negative_loss_credit_s"],
                     "weighted_loss_margin_s": result["weighted_loss_margin_s"],
+                    "rejection_wait_s": result["rejection_wait_s"],
+                    "rejection_wait_credit_s": result["rejection_wait_credit_s"],
                     "final_margin_s": result["final_margin_s"],
                     "loss_lambda": result["loss_lambda"],
                 })
@@ -501,10 +549,17 @@ def active_decision(receiver, desired, alternative, now, conflict_point):
     Keeping the unavailable case as ``None`` lets the caller retain the
     baseline TIV rule rather than creating an unsafe synthetic decision.
     """
+    wait_key, rejection_wait_s, continued = _rejection_wait(
+        receiver, desired, now)
     record = _record_evaluation(
-        receiver, desired, alternative, now, conflict_point, "active")
+        receiver, desired, alternative, now, conflict_point, "active",
+        rejection_wait_s=rejection_wait_s)
     if record is None or record["status"] != "evaluated":
         return None
+    rejected = record["decision"] == "reject"
+    _update_rejection_wait(wait_key, now, rejected, continued)
+    if rejected and rejection_wait_s > 0:
+        COUNTS["repeated_rejection_wait_applied"] += 1
     key = (str(receiver.id), str(desired.vehID), str(desired.pathID))
     ACTIVE_DECISION_UNTIL[key] = now + REPLAN_INTERVAL
     return record["decision"] == "accept"
@@ -524,7 +579,12 @@ def _write_audit():
     if destination:
         with open(destination, "w") as stream:
             json.dump(evaluation_metrics.json_safe({
-                "mode": MODE, "counts": dict(COUNTS), "records": RECORDS,
+                "mode": MODE,
+                "loss_lambda": LOSS_LAMBDA,
+                "rejection_wait_cap_s": REJECTION_WAIT_CAP_S,
+                "rejection_wait_reset_gap_s": REJECTION_WAIT_RESET_GAP_S,
+                "counts": dict(COUNTS),
+                "records": RECORDS,
             }), stream, indent=2,
                       allow_nan=False)
 

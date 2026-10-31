@@ -88,6 +88,29 @@ class DecelerationLossTests(unittest.TestCase):
         self.assertAlmostEqual(result["final_margin_s"], .25)
         self.assertEqual(result["decision"], "reject")
 
+    def test_observed_rejection_wait_can_reverse_a_repeated_reject(self):
+        reference = {"v": self.profile((10, 10, 10))}
+        neutral = {"v": self.profile((10, 10, 10))}
+
+        result = loss.time_equivalent_decision(
+            reference, neutral, neutral, {"v": 10},
+            request_arrival_s=3.0, receiver_arrival_s=2.0,
+            rejection_wait_s=1.25)
+
+        self.assertAlmostEqual(result["rejection_wait_credit_s"], 1.25)
+        self.assertAlmostEqual(result["final_margin_s"], -.25)
+        self.assertEqual(result["decision"], "accept")
+
+    def test_rejection_wait_does_not_override_unreachable_arrival(self):
+        reference = {"v": self.profile((10, 10, 10))}
+        result = loss.time_equivalent_decision(
+            reference, reference, reference, {"v": 10},
+            request_arrival_s=math.inf, receiver_arrival_s=2.0,
+            rejection_wait_s=10.0)
+
+        self.assertEqual(result["rejection_wait_credit_s"], 0)
+        self.assertEqual(result["decision"], "reject")
+
     def test_request_unreachable_rejects_even_when_both_unreachable(self):
         reference = {"v": self.profile((10, 10, 10))}
         for receiver_arrival in (2, math.inf):
@@ -382,6 +405,30 @@ class DecelerationLossTests(unittest.TestCase):
         newer_desired = path("a", "desired", "a_desired_2", [13, 13, 13])
         self.assertFalse(prediction.active_decision_is_locked(receiver, newer_desired, 0.1))
         prediction.configure("off")
+
+    def test_rejection_wait_episode_accumulates_resets_and_clears(self):
+        receiver = NS(id="b")
+        desired = NS(vehID="a")
+        with patch.object(prediction, "REJECTION_WAIT_CAP_S", 10.0):
+            prediction.configure("active")
+            key, wait, continued = prediction._rejection_wait(
+                receiver, desired, 1.0)
+            self.assertEqual(wait, 0)
+            prediction._update_rejection_wait(key, 1.0, True, continued)
+
+            key, wait, continued = prediction._rejection_wait(
+                receiver, desired, 2.0)
+            self.assertTrue(continued)
+            self.assertEqual(wait, 1.0)
+            prediction._update_rejection_wait(key, 2.0, True, continued)
+
+            _, wait, continued = prediction._rejection_wait(
+                receiver, desired, 4.1)
+            self.assertFalse(continued)
+            self.assertEqual(wait, 0)
+            prediction._update_rejection_wait(key, 4.1, False, continued)
+            self.assertNotIn(("b", "a"), prediction.REJECTION_WAIT_EPISODES)
+            prediction.configure("off")
 
 
 if __name__ == "__main__":
