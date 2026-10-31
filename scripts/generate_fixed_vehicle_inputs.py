@@ -184,7 +184,10 @@ def generate_eval7_flow_sweep_records(seed, requesting_flow, accepting_flow=1000
 
     # The mainline stream is identical in every condition: 21 buses in each
     # 300-second half. Requesting buses are assigned once to nested flow layers,
-    # so a shared vehicle never changes type between traffic conditions.
+    # so a shared vehicle never changes type between traffic conditions. The
+    # first half is rounded independently because the formal runs use that
+    # 300-second prefix. The second half absorbs any rounding remainder so the
+    # complete 600-second file also has the nearest possible 25% bus share.
     for half in (0, 1):
         half_accepting = [
             event for event in accepting
@@ -217,9 +220,23 @@ def generate_eval7_flow_sweep_records(seed, requesting_flow, accepting_flow=1000
                 (event["depart_time_s"] < 300) == (half == 0)
                 for event in accepting
             )
-            total_bus_target = int(
-                (requesting_half_count + accepting_half_count) * BUS_SHARE + 0.5
+            first_requesting_count = sum(
+                depart_time < 300 for depart_time in current_times
             )
+            first_accepting_count = sum(
+                event["depart_time_s"] < 300 for event in accepting
+            )
+            first_half_bus_target = int(
+                (first_requesting_count + first_accepting_count)
+                * BUS_SHARE + 0.5
+            )
+            if half == 0:
+                total_bus_target = first_half_bus_target
+            else:
+                full_bus_target = int(
+                    (len(current_times) + len(accepting)) * BUS_SHARE + 0.5
+                )
+                total_bus_target = full_bus_target - first_half_bus_target
             requesting_bus_target = total_bus_target - 21
             buses_to_add = requesting_bus_target - previous_bus_target[half]
             rng = random.Random(

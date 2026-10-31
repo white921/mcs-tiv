@@ -162,6 +162,19 @@ class FixedVehicleInputTests(unittest.TestCase):
                 self.assertEqual(counts["requesting"], int(requesting / 6))
                 self.assertEqual(counts["accepting"], 166)
 
+    def test_eval7_flow_sweep_committed_files_all_validate(self):
+        paths = sorted(
+            (ROOT / "fixed_inputs" / "thesis" / "eval7-flow-sweep").glob(
+                "*/*.jsonl"
+            )
+        )
+        self.assertEqual(len(paths), 20)
+        for path in paths:
+            with self.subTest(path=path):
+                schedule = load_fixed_vehicle_input(path, prefix_duration_s=300)
+                self.assertEqual(schedule.metadata["case"], "eval7")
+                self.assertEqual(schedule.prefix_duration_s, 300.0)
+
     def test_eval7_flow_sweep_keeps_mainline_fixed_and_merging_sets_nested(self):
         conditions = {
             requesting: generate_eval7_flow_sweep_records(6, requesting, 1000)
