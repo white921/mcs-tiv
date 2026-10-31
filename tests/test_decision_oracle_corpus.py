@@ -1,9 +1,11 @@
 import json
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace as NS
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -58,6 +60,16 @@ class DecisionOracleCorpusTests(unittest.TestCase):
             command, _ = run_decision_oracle.scenario_command(
                 args, ROOT, 10.0)
             self.assertIn("--no-save", command)
+
+    def test_proposal_origin_replay_uses_explicit_loss_lambda(self):
+        args = NS(
+            sumo_home=Path("/tmp/sumo"), origin_policy="proposal",
+            deceleration_loss_lambda=2.0)
+
+        with mock.patch.dict(os.environ, {}, clear=True):
+            env = run_decision_oracle.common_env(args, ROOT)
+
+        self.assertEqual(env["MCS_DECELERATION_LOSS_LAMBDA"], "2.0")
 
     def test_boundary_identity_uses_boundary_request_field_names(self):
         request = {

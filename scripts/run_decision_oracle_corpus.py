@@ -6,6 +6,7 @@ import argparse
 import concurrent.futures
 import hashlib
 import json
+import math
 from pathlib import Path
 import subprocess
 import sys
@@ -53,6 +54,7 @@ def run_event(args, source, git_metadata_path, output_root, index, event):
         "--origin-policy", event["origin_policy"],
         "--seed", str(event["seed"]),
         "--duration", str(args.duration),
+        "--deceleration-loss-lambda", str(args.deceleration_loss_lambda),
         "--event-ordinal", str(event["ordinal"]),
         "--event-time", str(event["sim_time_s"]),
         "--receiver-id", str(event["receiver_id"]),
@@ -109,12 +111,18 @@ def main():
     parser.add_argument("--python", type=Path, default=Path(sys.executable))
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--duration", type=float, default=300.0)
+    parser.add_argument(
+        "--deceleration-loss-lambda", type=float, default=1.0,
+        help="proposal-origin loss weight used by the discovery batch")
     parser.add_argument("--workers", type=int, default=10)
     args = parser.parse_args()
     if args.output.exists():
         parser.error("output directory already exists")
     if args.workers < 1:
         parser.error("workers must be positive")
+    if (not math.isfinite(args.deceleration_loss_lambda) or
+            args.deceleration_loss_lambda < 0):
+        parser.error("--deceleration-loss-lambda must be finite and non-negative")
     plan_bytes = args.plan.read_bytes()
     plan = json.loads(plan_bytes)
     if plan.get("schema") != "decision-oracle-plan-v1":
@@ -170,6 +178,7 @@ def main():
         "python": str(args.python),
         "sumo_home": str(args.sumo_home),
         "duration_s": args.duration,
+        "deceleration_loss_lambda": args.deceleration_loss_lambda,
         "workers": args.workers,
         "started_epoch": started,
         "ended_epoch": time.time(),
