@@ -408,8 +408,9 @@ class CAV:
 
     # 経路変更の必要があるか判定
     def checkPathChangeNecessity(self):
-
-        if self.status not in ["yield", "lanechange"] and self.lane == 0 and self.pos_x >= mergeStartPos:
+        negotiation_start = thesis_tiv.merge_negotiation_start_position(
+            self, mergeStartPos, 300.0, maxSpeed)
+        if self.status not in ["yield", "lanechange"] and self.lane == 0 and self.pos_x >= negotiation_start:
             return True
         else:
             return False

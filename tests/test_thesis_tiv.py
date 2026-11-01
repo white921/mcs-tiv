@@ -48,6 +48,27 @@ def traci():
 
 
 class ThesisTIVTests(unittest.TestCase):
+    def test_merge_negotiation_start_keeps_legacy_trigger_when_disabled(self):
+        with patch.object(tiv, "MERGE_NEGOTIATION_LEAD_S", 0.0):
+            self.assertEqual(
+                tiv.merge_negotiation_start_position(
+                    NS(allowed_speed_mps=13.89), 200, 300, 13.89),
+                200.0)
+
+    def test_merge_negotiation_start_uses_free_flow_deadline(self):
+        with patch.object(tiv, "MERGE_NEGOTIATION_LEAD_S", 10.0):
+            self.assertAlmostEqual(
+                tiv.merge_negotiation_start_position(
+                    NS(allowed_speed_mps=13.89), 200, 300, 13.89),
+                161.1)
+
+    def test_merge_negotiation_start_falls_back_to_map_speed(self):
+        with patch.object(tiv, "MERGE_NEGOTIATION_LEAD_S", 10.0):
+            self.assertAlmostEqual(
+                tiv.merge_negotiation_start_position(
+                    NS(allowed_speed_mps=None), 200, 300, 10.0),
+                200.0)
+
     def test_vertical_opposing_lanes_are_not_treated_as_same_corridor(self):
         self.assertFalse(tiv.trajectories_are_too_close(
             148.4, 32, 151.6, 32,

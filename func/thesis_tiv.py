@@ -28,6 +28,34 @@ def _agreement_lease_seconds_from_environment():
 AGREEMENT_LEASE_S = _agreement_lease_seconds_from_environment()
 AGREEMENT_LEASE_REGION_TOLERANCE_M = 2.0
 
+
+def _merge_negotiation_lead_seconds_from_environment():
+    value = float(os.environ.get("MCS_MERGE_NEGOTIATION_LEAD_S", "0"))
+    if not math.isfinite(value) or value < 0:
+        raise ValueError(
+            "MCS_MERGE_NEGOTIATION_LEAD_S must be finite and non-negative")
+    return value
+
+
+MERGE_NEGOTIATION_LEAD_S = (
+    _merge_negotiation_lead_seconds_from_environment())
+
+
+def merge_negotiation_start_position(
+        vehicle, legacy_start_m, lane_end_m, fallback_speed_mps):
+    """Move only the request start upstream by a fixed free-flow time.
+
+    This does not change the decision rule, participants, trajectories, or
+    agreement lifetime.  A zero lead preserves the archived 200 m trigger.
+    """
+    if MERGE_NEGOTIATION_LEAD_S <= 0:
+        return float(legacy_start_m)
+    speed = getattr(vehicle, "allowed_speed_mps", None)
+    if speed is None or not math.isfinite(float(speed)) or float(speed) <= 0:
+        speed = fallback_speed_mps
+    start = float(lane_end_m) - float(speed) * MERGE_NEGOTIATION_LEAD_S
+    return max(0.0, min(float(legacy_start_m), start))
+
 # Kept opt-in and deliberately narrow: the oracle runner supplies one
 # deterministic event ordinal and one forced action.  No priority-hold or
 # global policy switch is involved.  The ordinary code path remains byte-for-

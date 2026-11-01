@@ -53,6 +53,7 @@
 | completed | 2026-10-31 | 反復拒否の実測待ち時間を加えた300秒交通性能試験 | [記録](2026-10-31-repeated-rejection-wait-development.md) |
 | completed | 2026-11-01 | Eval.7の合流側交通量を見直す比率試験 | [記録](2026-11-01-eval7-flow-ratio-sweep.md) |
 | completed | 2026-11-01 | 1秒の承諾信号再利用による交渉取消・車線端停止の診断 | [記録](2026-11-01-agreement-lease-pilot.md) |
+| planned | 2026-11-01 | 合流交渉を車線端の10秒前から始める独立診断 | [記録](2026-11-01-maneuver-deadline-pilot.md) |
 
 ## 研究判断の系譜
 

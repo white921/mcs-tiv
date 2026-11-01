@@ -50,6 +50,7 @@ CONTROLLED_MCS_ENV = {
     "MCS_DECELERATION_LOSS_LAMBDA",
     "MCS_DECELERATION_TIME_HALF_LIFE_S",
     "MCS_AGREEMENT_LEASE_S",
+    "MCS_MERGE_NEGOTIATION_LEAD_S",
     "MCS_REJECTION_WAIT_CAP_S",
     "MCS_EVALUATION_AUDIT",
     "MCS_FCD_OUTPUT",
@@ -322,6 +323,8 @@ def run_task(task, args):
                MCS_REJECTION_WAIT_CAP_S=str(
                    args.rejection_wait_cap if args.deceleration_active else 0.0),
                MCS_AGREEMENT_LEASE_S=str(args.agreement_lease_seconds),
+               MCS_MERGE_NEGOTIATION_LEAD_S=str(
+                   args.merge_negotiation_lead_seconds),
                MCS_TIV_AUDIT=str(destination / "tiv-audit.json"),
                MCS_EVALUATION_AUDIT=str(destination / "evaluation-metrics.json"),
                MCS_PHYSICAL_COLLISION_AUDIT=str(
@@ -406,6 +409,14 @@ def run_task(task, args):
             "scope": "accept-signal-only",
             "conflict_region_tolerance_m": 2.0,
             "retains_priority_or_trajectory": False,
+        },
+        "merge_negotiation_lead": {
+            "enabled": args.merge_negotiation_lead_seconds > 0,
+            "free_flow_lead_s": args.merge_negotiation_lead_seconds,
+            "lane_end_m": 300.0,
+            "legacy_start_m": 200.0,
+            "scope": "desired-path-generation-start-only",
+            "changes_decision_or_agreement_rule": False,
         },
         "deceleration_prediction": deceleration_prediction_manifest(args),
         "diagnostic_traces_requested": args.diagnostic_traces,
@@ -518,6 +529,9 @@ def main():
     parser.add_argument(
         "--agreement-lease-seconds", type=float, default=0.0,
         help="reuse a feasible Accept for the same sender/conflict region; 0 disables it")
+    parser.add_argument(
+        "--merge-negotiation-lead-seconds", type=float, default=0.0,
+        help="start merge requests this many free-flow seconds before lane end; 0 keeps 200 m")
     parser.add_argument("--diagnostic-traces", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="write replay/FCD/negotiation diagnostics (default: enabled)")
@@ -552,6 +566,14 @@ def main():
     if (not math.isfinite(args.agreement_lease_seconds) or
             args.agreement_lease_seconds < 0):
         parser.error("--agreement-lease-seconds must be finite and non-negative")
+    if (not math.isfinite(args.merge_negotiation_lead_seconds) or
+            args.merge_negotiation_lead_seconds < 0):
+        parser.error(
+            "--merge-negotiation-lead-seconds must be finite and non-negative")
+    if (args.agreement_lease_seconds > 0
+            and args.merge_negotiation_lead_seconds > 0):
+        parser.error(
+            "agreement lease and early merge negotiation cannot be combined")
     if min(args.deceleration_time_half_life, args.checkpoint_interval) < 0:
         parser.error("prediction and checkpoint limits must be non-negative")
     if args.deceleration_time_half_life > 0 and not args.deceleration_active:
@@ -611,6 +633,8 @@ def main():
         "rejection_wait_cap_s": (
             args.rejection_wait_cap if args.deceleration_active else None),
         "agreement_lease_seconds": args.agreement_lease_seconds,
+        "merge_negotiation_lead_seconds": (
+            args.merge_negotiation_lead_seconds),
         "cases": list(args.cases),
         "eval7_flows_vph": ({
             "requesting": args.eval7_flows[0],
