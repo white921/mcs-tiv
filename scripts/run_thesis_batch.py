@@ -49,6 +49,7 @@ CONTROLLED_MCS_ENV = {
     "MCS_DECELERATION_MODE",
     "MCS_DECELERATION_LOSS_LAMBDA",
     "MCS_DECELERATION_TIME_HALF_LIFE_S",
+    "MCS_AGREEMENT_LEASE_S",
     "MCS_REJECTION_WAIT_CAP_S",
     "MCS_EVALUATION_AUDIT",
     "MCS_FCD_OUTPUT",
@@ -320,6 +321,7 @@ def run_task(task, args):
                    args.deceleration_loss_lambda if args.deceleration_active else 1.0),
                MCS_REJECTION_WAIT_CAP_S=str(
                    args.rejection_wait_cap if args.deceleration_active else 0.0),
+               MCS_AGREEMENT_LEASE_S=str(args.agreement_lease_seconds),
                MCS_TIV_AUDIT=str(destination / "tiv-audit.json"),
                MCS_EVALUATION_AUDIT=str(destination / "evaluation-metrics.json"),
                MCS_PHYSICAL_COLLISION_AUDIT=str(
@@ -398,6 +400,13 @@ def run_task(task, args):
             else "deceleration-propagation" if args.deceleration_active
             else "thesis-tiv"),
         "priority_hold": dict(PRIORITY_HOLD_MANIFEST),
+        "agreement_lease": {
+            "enabled": args.agreement_lease_seconds > 0,
+            "duration_s": args.agreement_lease_seconds,
+            "scope": "accept-signal-only",
+            "conflict_region_tolerance_m": 2.0,
+            "retains_priority_or_trajectory": False,
+        },
         "deceleration_prediction": deceleration_prediction_manifest(args),
         "diagnostic_traces_requested": args.diagnostic_traces,
         "diagnostic_traces_enabled": bool(args.diagnostic_traces),
@@ -506,6 +515,9 @@ def main():
     parser.add_argument(
         "--rejection-wait-cap", type=float, default=0.0,
         help="maximum observed repeated-rejection wait credit in seconds; 0 disables it")
+    parser.add_argument(
+        "--agreement-lease-seconds", type=float, default=0.0,
+        help="reuse a feasible Accept for the same sender/conflict region; 0 disables it")
     parser.add_argument("--diagnostic-traces", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="write replay/FCD/negotiation diagnostics (default: enabled)")
@@ -537,6 +549,9 @@ def main():
     if (not math.isfinite(args.rejection_wait_cap) or
             args.rejection_wait_cap < 0):
         parser.error("--rejection-wait-cap must be finite and non-negative")
+    if (not math.isfinite(args.agreement_lease_seconds) or
+            args.agreement_lease_seconds < 0):
+        parser.error("--agreement-lease-seconds must be finite and non-negative")
     if min(args.deceleration_time_half_life, args.checkpoint_interval) < 0:
         parser.error("prediction and checkpoint limits must be non-negative")
     if args.deceleration_time_half_life > 0 and not args.deceleration_active:
@@ -595,6 +610,7 @@ def main():
             args.deceleration_loss_lambda if args.deceleration_active else None),
         "rejection_wait_cap_s": (
             args.rejection_wait_cap if args.deceleration_active else None),
+        "agreement_lease_seconds": args.agreement_lease_seconds,
         "cases": list(args.cases),
         "eval7_flows_vph": ({
             "requesting": args.eval7_flows[0],

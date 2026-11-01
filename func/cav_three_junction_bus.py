@@ -290,6 +290,7 @@ class CAV_bus:
                 self.waitAgreeID = []
                 self.receiveAgreeID = []
                 self.waitPath = None
+                thesis_tiv.clear_agreement_lease(self, "agreement_completed")
                 diagnostic_trace.record_negotiation(
                     self, agreed_path, "applied", accept=True,
                     reason="all_agreements_received")
@@ -305,6 +306,7 @@ class CAV_bus:
             self.waitAgreeID = []
             self.receiveAgreeID = []
             self.waitPath = None
+            thesis_tiv.clear_agreement_lease(self, "alternative_expired")
 
         # 新しい経路を生成
         if not self.plannedPath or round(self.simTime - self.plannedPath.t[0], 2) >= thesis_tiv.planned_update_interval(self, pathValidTime) or self.isPathValid == False:

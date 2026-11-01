@@ -244,6 +244,57 @@ class ThesisTIVTests(unittest.TestCase):
         v.waitAgreeID.append("new")
         self.assertEqual(desired.negotiationID, ["2"])
 
+    def test_agreement_lease_reuses_accept_for_same_physical_conflict(self):
+        v, desired, collisions = self.decision()
+        v.WithAgreementPhase = True
+        collisions[0].update(collide_x=20, collide_y=0)
+        with patch.object(tiv, "AGREEMENT_LEASE_S", 1.0):
+            tiv.judge_yield(v, collisions, [], traci())
+            self.assertTrue(v.isWaitAgree)
+            original_expiry = v._mcs_agreement_lease["expires_at"]
+
+            refreshed = copy.deepcopy(desired)
+            refreshed.pathID = "1_2"
+            refreshed.tiv_by_receiver = {}
+            v.simTime = 0.9
+            tiv.judge_yield(
+                v, [{"path": refreshed, "collide_x": 20.5, "collide_y": 0}],
+                [], traci())
+
+        self.assertTrue(v.isWaitAgree)
+        self.assertIs(v.waitPath, refreshed)
+        self.assertEqual(v._mcs_agreement_lease["expires_at"], original_expiry)
+        self.assertEqual(v.count_accept_utility, 2)
+
+    def test_agreement_lease_does_not_cross_conflict_region(self):
+        v, desired, collisions = self.decision()
+        collisions[0].update(collide_x=20, collide_y=0)
+        v._mcs_agreement_lease = {
+            "sender": desired.vehID,
+            "point": (20.0, 0.0),
+            "accepted_at": 0.0,
+            "expires_at": 1.0,
+        }
+        with patch.object(tiv, "AGREEMENT_LEASE_S", 1.0):
+            self.assertFalse(tiv.agreement_lease_accepts(
+                v, desired,
+                {"path": desired, "collide_x": 23.0, "collide_y": 0}))
+
+    def test_agreement_lease_expires_without_extension(self):
+        v, desired, _ = self.decision()
+        v.simTime = 1.1
+        v._mcs_agreement_lease = {
+            "sender": desired.vehID,
+            "point": (20.0, 0.0),
+            "accepted_at": 0.0,
+            "expires_at": 1.0,
+        }
+        with patch.object(tiv, "AGREEMENT_LEASE_S", 1.0):
+            self.assertFalse(tiv.agreement_lease_accepts(
+                v, desired,
+                {"path": desired, "collide_x": 20.0, "collide_y": 0}))
+        self.assertIsNone(v._mcs_agreement_lease)
+
     def test_two_unreachable_paths_not_accepted(self):
         v, _, collisions = self.decision(math.inf)
         v.plannedPath = path("2", speed=0)

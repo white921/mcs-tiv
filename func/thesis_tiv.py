@@ -17,6 +17,17 @@ IMPLEMENTATION = os.environ.get("MCS_TIV_IMPLEMENTATION", "thesis")
 if IMPLEMENTATION not in ("thesis", "legacy-local"):
     raise ValueError("invalid MCS_TIV_IMPLEMENTATION")
 
+
+def _agreement_lease_seconds_from_environment():
+    value = float(os.environ.get("MCS_AGREEMENT_LEASE_S", "0"))
+    if not math.isfinite(value) or value < 0:
+        raise ValueError("MCS_AGREEMENT_LEASE_S must be finite and non-negative")
+    return value
+
+
+AGREEMENT_LEASE_S = _agreement_lease_seconds_from_environment()
+AGREEMENT_LEASE_REGION_TOLERANCE_M = 2.0
+
 # Kept opt-in and deliberately narrow: the oracle runner supplies one
 # deterministic event ordinal and one forced action.  No priority-hold or
 # global policy switch is involved.  The ordinary code path remains byte-for-
@@ -87,6 +98,75 @@ def apply_decision(request, choice):
     return choice
 
 
+def _collision_point(collision):
+    try:
+        point = (float(collision["collide_x"]), float(collision["collide_y"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+    return point if all(math.isfinite(value) for value in point) else None
+
+
+def _record_agreement_lease(vehicle, desired, collision, prediction_method):
+    """Remember only a recent Accept signal, never a yielding trajectory."""
+    if (AGREEMENT_LEASE_S <= 0 or not vehicle.WithAgreementPhase
+            or prediction_method == "agreement-lease"):
+        return
+    point = _collision_point(collision)
+    if point is None:
+        return
+    vehicle._mcs_agreement_lease = {
+        "sender": str(desired.vehID),
+        "point": point,
+        "accepted_at": float(vehicle.simTime),
+        "expires_at": float(vehicle.simTime) + AGREEMENT_LEASE_S,
+    }
+    COUNTS["agreement_lease_created"] += 1
+
+
+def agreement_lease_accepts(vehicle, desired, collision):
+    """Reuse a recent Accept for the same physical conflict after revalidation.
+
+    The caller has already regenerated a feasible alternative trajectory.  The
+    lease therefore retains no old path, priority relation, or speed command.
+    New participants still come from the refreshed desired path's negotiation
+    IDs and must provide their own agreement.
+    """
+    if AGREEMENT_LEASE_S <= 0:
+        return False
+    lease = getattr(vehicle, "_mcs_agreement_lease", None)
+    if not lease:
+        return False
+    now = float(vehicle.simTime)
+    if now > lease["expires_at"] + 1e-9:
+        vehicle._mcs_agreement_lease = None
+        COUNTS["agreement_lease_expired"] += 1
+        return False
+    if str(desired.vehID) != lease["sender"]:
+        return False
+    point = _collision_point(collision)
+    if point is None or math.hypot(
+            point[0] - lease["point"][0], point[1] - lease["point"][1]
+    ) > AGREEMENT_LEASE_REGION_TOLERANCE_M:
+        return False
+    COUNTS["agreement_lease_reused"] += 1
+    diagnostic_trace.record_negotiation(
+        vehicle, desired, "agreement_lease_reused", accept=True,
+        reason="same_sender_and_conflict_region", collision=collision,
+        details={
+            "accepted_at": lease["accepted_at"],
+            "expires_at": lease["expires_at"],
+            "region_tolerance_m": AGREEMENT_LEASE_REGION_TOLERANCE_M,
+        })
+    return True
+
+
+def clear_agreement_lease(vehicle, reason):
+    if getattr(vehicle, "_mcs_agreement_lease", None) is None:
+        return
+    vehicle._mcs_agreement_lease = None
+    COUNTS["agreement_lease_cleared_" + reason] += 1
+
+
 def apply_negotiation_request(request, choice):
     """Apply the sole mutable half of a prepared negotiation request."""
     choice = apply_decision(request, choice)
@@ -113,6 +193,8 @@ def apply_negotiation_request(request, choice):
         vehicle.yetJudgedList.append(desired.pathID)
         vehicle.count_refuse_utility += 1
         return "rejected"
+    _record_agreement_lease(
+        vehicle, desired, collision, prediction_method)
     vehicle.count_accept_utility += 1
     vehicle.pathID += 1
     vehicle.alter_straight_path.pathID = vehicle.id + "_" + str(vehicle.pathID)
@@ -395,11 +477,17 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
         deceleration_prediction.record_shadow(
             vehicle, desired, vehicle.alter_straight_path, vehicle.simTime,
             point)
-        accept = deceleration_prediction.active_decision(
-            vehicle, desired, vehicle.alter_straight_path, vehicle.simTime,
-            point)
+        lease_accept = agreement_lease_accepts(vehicle, desired, collision)
+        accept = (True if lease_accept else
+                  deceleration_prediction.active_decision(
+                      vehicle, desired, vehicle.alter_straight_path,
+                      vehicle.simTime, point))
         yamashita_accept = None
-        if accept is None:
+        if lease_accept:
+            planned = {"value": None, "source": "agreement-lease"}
+            received = {"value": None, "source": "agreement-lease"}
+            prediction_method = "agreement-lease"
+        elif accept is None:
             received = getattr(desired, "tiv_by_receiver", {}).get(vehicle.id)
             if received is None:
                 # No receiver-side fallback; retry on the next MCM.
