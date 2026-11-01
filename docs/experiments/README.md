@@ -56,6 +56,7 @@
 | completed | 2026-11-01 | 合流交渉を車線端の10秒前から始める独立診断 | [記録](2026-11-01-maneuver-deadline-pilot.md) |
 | completed | 2026-11-01 | 合流交渉10秒前開始の5-seed検証 | [記録](2026-11-01-maneuver-deadline-5seed-validation.md) |
 | incomplete | 2026-11-01 | 合流交渉開始8秒・9秒の探索比較 | [記録](2026-11-01-maneuver-deadline-start-sweep-8-9.md) |
+| planned | 2026-11-02 | 早期判断と200 m実行を分ける2段階合流交渉 | [記録](2026-11-02-two-stage-merge-negotiation.md) |
 
 ## 研究判断の系譜
 

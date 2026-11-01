@@ -69,6 +69,109 @@ class ThesisTIVTests(unittest.TestCase):
                     NS(allowed_speed_mps=None), 200, 300, 10.0),
                 200.0)
 
+    def test_two_stage_blocks_merge_execution_before_legacy_trigger(self):
+        merging = NS(lane=0, pos_x=199.9)
+        with patch.object(tiv, "TWO_STAGE_MERGE_NEGOTIATION", True):
+            self.assertFalse(tiv.two_stage_merge_execution_allowed(merging))
+            merging.pos_x = 200.0
+            self.assertTrue(tiv.two_stage_merge_execution_allowed(merging))
+
+    def test_two_stage_reserves_without_yield_then_activates_fresh_path(self):
+        v, desired, collisions = self.decision()
+        v.WithAgreementPhase = True
+        v.lane = 0
+        desired.lane_position = 160.0
+        desired.negotiationID = ["2", "4"]
+        collisions[0].update(collide_x=250.0, collide_y=-4.8)
+        v.selectBestPath = lambda values: (None, values[0])
+
+        with patch.object(tiv, "TWO_STAGE_MERGE_NEGOTIATION", True):
+            tiv.judge_yield(v, collisions, [], traci(), merge=True)
+
+            reservation = v._mcs_two_stage_merge_reservation
+            self.assertEqual(reservation["sender"], "1")
+            self.assertEqual(reservation["participants"], ("2", "4"))
+            self.assertIsNone(v.alter_straight_path)
+            self.assertFalse(v.isWaitAgree)
+            self.assertNotEqual(v.status, "yield")
+
+            refreshed = copy.deepcopy(desired)
+            refreshed.pathID = "1_2"
+            refreshed.lane_position = 199.9
+            v.generateAlterPath.reset_mock()
+            tiv.judge_yield(
+                v, [{**collisions[0], "path": refreshed}], [], traci(),
+                merge=True)
+            v.generateAlterPath.assert_not_called()
+
+            refreshed.pathID = "1_3"
+            refreshed.lane_position = 200.0
+            v.generateAlterPath.return_value = [path("2", "alter")]
+            tiv.judge_yield(
+                v, [{**collisions[0], "path": refreshed}], [], traci(),
+                merge=True)
+
+        self.assertIsNone(v._mcs_two_stage_merge_reservation)
+        self.assertTrue(v.isWaitAgree)
+        self.assertEqual(v.alter_straight_path.type, "alter")
+        self.assertIs(v.waitPath, refreshed)
+
+    def test_two_stage_releases_on_participant_change(self):
+        v, desired, collisions = self.decision()
+        v.WithAgreementPhase = True
+        v.lane = 0
+        desired.lane_position = 160.0
+        desired.negotiationID = ["2"]
+        v.selectBestPath = lambda values: (None, values[0])
+
+        with patch.object(tiv, "TWO_STAGE_MERGE_NEGOTIATION", True):
+            tiv.judge_yield(v, collisions, [], traci(), merge=True)
+            changed = copy.deepcopy(desired)
+            changed.pathID = "1_2"
+            changed.negotiationID = ["2", "4"]
+            result = tiv.reconcile_two_stage_merge_reservation(
+                v, [{"path": changed}])
+
+        self.assertIsNone(result)
+        self.assertIsNone(v._mcs_two_stage_merge_reservation)
+
+    def test_two_stage_releases_when_another_sender_conflicts(self):
+        v, desired, collisions = self.decision()
+        v.WithAgreementPhase = True
+        v.lane = 0
+        desired.lane_position = 160.0
+        v.selectBestPath = lambda values: (None, values[0])
+
+        with patch.object(tiv, "TWO_STAGE_MERGE_NEGOTIATION", True):
+            tiv.judge_yield(v, collisions, [], traci(), merge=True)
+            another = copy.deepcopy(desired)
+            another.vehID = "3"
+            another.pathID = "3_1"
+            result = tiv.reconcile_two_stage_merge_reservation(
+                v, [{"path": desired}, {"path": another}])
+
+        self.assertIsNone(result)
+        self.assertIsNone(v._mcs_two_stage_merge_reservation)
+
+    def test_two_stage_releases_when_fresh_alternative_is_infeasible(self):
+        v, desired, collisions = self.decision()
+        v.WithAgreementPhase = True
+        v.lane = 0
+        desired.lane_position = 160.0
+        v.selectBestPath = lambda values: (None, values[0])
+
+        with patch.object(tiv, "TWO_STAGE_MERGE_NEGOTIATION", True):
+            tiv.judge_yield(v, collisions, [], traci(), merge=True)
+            refreshed = copy.deepcopy(desired)
+            refreshed.pathID = "1_2"
+            refreshed.lane_position = 200.0
+            v.generateAlterPath.return_value = []
+            tiv.judge_yield(
+                v, [{"path": refreshed}], [], traci(), merge=True)
+
+        self.assertIsNone(v._mcs_two_stage_merge_reservation)
+        self.assertFalse(v.isWaitAgree)
+
     def test_vertical_opposing_lanes_are_not_treated_as_same_corridor(self):
         self.assertFalse(tiv.trajectories_are_too_close(
             148.4, 32, 151.6, 32,

@@ -23,6 +23,7 @@ class ResultLayoutTests(unittest.TestCase):
             "rejection_wait_cap": 0.0,
             "agreement_lease_seconds": 0.0,
             "merge_negotiation_lead_seconds": 0.0,
+            "two_stage_merge_negotiation": False,
             "cases": ["eval3"],
             "seeds": [1, 2, 3, 4, 5],
             "seeds_per_case": None,
@@ -78,6 +79,7 @@ class ResultLayoutTests(unittest.TestCase):
             "MCS_REJECTION_WAIT_CAP_S": "99",
             "MCS_AGREEMENT_LEASE_S": "99",
             "MCS_MERGE_NEGOTIATION_LEAD_S": "99",
+            "MCS_TWO_STAGE_MERGE_NEGOTIATION": "1",
             "MCS_FCD_OUTPUT": "/tmp/old-fcd.xml",
             "MCS_CHECKPOINT_DIR": "/tmp/old-checkpoint",
         }

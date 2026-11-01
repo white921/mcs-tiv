@@ -51,6 +51,7 @@ CONTROLLED_MCS_ENV = {
     "MCS_DECELERATION_TIME_HALF_LIFE_S",
     "MCS_AGREEMENT_LEASE_S",
     "MCS_MERGE_NEGOTIATION_LEAD_S",
+    "MCS_TWO_STAGE_MERGE_NEGOTIATION",
     "MCS_REJECTION_WAIT_CAP_S",
     "MCS_EVALUATION_AUDIT",
     "MCS_FCD_OUTPUT",
@@ -325,6 +326,8 @@ def run_task(task, args):
                MCS_AGREEMENT_LEASE_S=str(args.agreement_lease_seconds),
                MCS_MERGE_NEGOTIATION_LEAD_S=str(
                    args.merge_negotiation_lead_seconds),
+               MCS_TWO_STAGE_MERGE_NEGOTIATION=(
+                   "1" if args.two_stage_merge_negotiation else "0"),
                MCS_TIV_AUDIT=str(destination / "tiv-audit.json"),
                MCS_EVALUATION_AUDIT=str(destination / "evaluation-metrics.json"),
                MCS_PHYSICAL_COLLISION_AUDIT=str(
@@ -417,6 +420,19 @@ def run_task(task, args):
             "legacy_start_m": 200.0,
             "scope": "desired-path-generation-start-only",
             "changes_decision_or_agreement_rule": False,
+        },
+        "two_stage_merge_negotiation": {
+            "enabled": args.two_stage_merge_negotiation,
+            "preparation_lead_s": args.merge_negotiation_lead_seconds,
+            "execution_start_m": 200.0,
+            "reservation_contents": [
+                "sender_id", "participant_vehicle_ids",
+                "acceptance_time", "decision_method"],
+            "retains_trajectory": False,
+            "retains_speed_command": False,
+            "release_on": [
+                "desired_path_disappeared", "participant_set_changed",
+                "new_conflicting_sender", "fresh_alternative_infeasible"],
         },
         "deceleration_prediction": deceleration_prediction_manifest(args),
         "diagnostic_traces_requested": args.diagnostic_traces,
@@ -532,6 +548,9 @@ def main():
     parser.add_argument(
         "--merge-negotiation-lead-seconds", type=float, default=0.0,
         help="start merge requests this many free-flow seconds before lane end; 0 keeps 200 m")
+    parser.add_argument(
+        "--two-stage-merge-negotiation", action="store_true",
+        help="decide early but defer yielding and lane change until the legacy 200 m trigger")
     parser.add_argument("--diagnostic-traces", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="write replay/FCD/negotiation diagnostics (default: enabled)")
@@ -574,6 +593,16 @@ def main():
             and args.merge_negotiation_lead_seconds > 0):
         parser.error(
             "agreement lease and early merge negotiation cannot be combined")
+    if (args.two_stage_merge_negotiation
+            and args.merge_negotiation_lead_seconds <= 0):
+        parser.error(
+            "--two-stage-merge-negotiation requires a positive "
+            "--merge-negotiation-lead-seconds")
+    if (args.two_stage_merge_negotiation
+            and args.agreement_lease_seconds > 0):
+        parser.error(
+            "two-stage merge negotiation cannot be combined with an "
+            "agreement lease")
     if min(args.deceleration_time_half_life, args.checkpoint_interval) < 0:
         parser.error("prediction and checkpoint limits must be non-negative")
     if args.deceleration_time_half_life > 0 and not args.deceleration_active:
@@ -635,6 +664,7 @@ def main():
         "agreement_lease_seconds": args.agreement_lease_seconds,
         "merge_negotiation_lead_seconds": (
             args.merge_negotiation_lead_seconds),
+        "two_stage_merge_negotiation": args.two_stage_merge_negotiation,
         "cases": list(args.cases),
         "eval7_flows_vph": ({
             "requesting": args.eval7_flows[0],

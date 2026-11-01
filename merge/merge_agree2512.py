@@ -426,7 +426,9 @@ def run(alpha='0.0', inflow_0=750, inflow_1=750, quiet=False, save_statistics=Tr
                         ins.status = None
                         
                 # 衝突しない場合は希望経路を通る
-                elif (len(collision_list_desired) == 0 and ins.status != "lanechange") or (ins.status == "lanechange"):
+                elif (((len(collision_list_desired) == 0 and ins.status != "lanechange")
+                       or (ins.status == "lanechange"))
+                      and thesis_tiv.two_stage_merge_execution_allowed(ins)):
                     ins.plannedPath = ins.desiredPaths[0]
                     ins.plannedPath.type = "planned"
                     ins.desiredPaths = None

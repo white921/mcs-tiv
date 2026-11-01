@@ -41,6 +41,18 @@ MERGE_NEGOTIATION_LEAD_S = (
     _merge_negotiation_lead_seconds_from_environment())
 
 
+def _two_stage_merge_from_environment():
+    value = os.environ.get("MCS_TWO_STAGE_MERGE_NEGOTIATION", "0")
+    if value not in ("0", "1"):
+        raise ValueError(
+            "MCS_TWO_STAGE_MERGE_NEGOTIATION must be 0 or 1")
+    return value == "1"
+
+
+TWO_STAGE_MERGE_NEGOTIATION = _two_stage_merge_from_environment()
+TWO_STAGE_MERGE_EXECUTION_START_M = 200.0
+
+
 def merge_negotiation_start_position(
         vehicle, legacy_start_m, lane_end_m, fallback_speed_mps):
     """Move only the request start upstream by a fixed free-flow time.
@@ -55,6 +67,163 @@ def merge_negotiation_start_position(
         speed = fallback_speed_mps
     start = float(lane_end_m) - float(speed) * MERGE_NEGOTIATION_LEAD_S
     return max(0.0, min(float(legacy_start_m), start))
+
+
+def two_stage_merge_execution_allowed(vehicle):
+    """Keep an early desired path informational until the legacy trigger."""
+    if not TWO_STAGE_MERGE_NEGOTIATION:
+        return True
+    if getattr(vehicle, "lane", None) != 0:
+        return True
+    return float(vehicle.pos_x) >= TWO_STAGE_MERGE_EXECUTION_START_M
+
+
+def _two_stage_participants(desired):
+    return tuple(sorted(
+        str(vehicle_id)
+        for vehicle_id in (getattr(desired, "negotiationID", None) or [])
+    ))
+
+
+def _two_stage_sender_position(desired):
+    position = getattr(desired, "lane_position", None)
+    if position is None and getattr(desired, "x", None):
+        position = desired.x[0]
+    try:
+        position = float(position)
+    except (TypeError, ValueError):
+        return None
+    return position if math.isfinite(position) else None
+
+
+def _two_stage_reservation(vehicle):
+    return getattr(vehicle, "_mcs_two_stage_merge_reservation", None)
+
+
+def _release_two_stage_reservation(
+        vehicle, desired, reason, collision=None, details=None):
+    reservation = _two_stage_reservation(vehicle)
+    if reservation is None:
+        return False
+    vehicle._mcs_two_stage_merge_reservation = None
+    COUNTS["two_stage_reservation_released"] += 1
+    COUNTS["two_stage_reservation_released_" + reason] += 1
+    diagnostic_trace.record_negotiation(
+        vehicle, desired, "two_stage_reservation_released", accept=None,
+        reason=reason, collision=collision,
+        details={
+            "reserved_sender": reservation["sender"],
+            "reserved_participants": list(reservation["participants"]),
+            **(details or {}),
+        })
+    return True
+
+
+def reconcile_two_stage_merge_reservation(vehicle, collisions):
+    """Release a reservation when the current conflict set no longer matches.
+
+    The reservation contains identifiers and the original decision metadata
+    only. It deliberately contains no trajectory or speed command.
+    """
+    if not TWO_STAGE_MERGE_NEGOTIATION:
+        return None
+    reservation = _two_stage_reservation(vehicle)
+    if reservation is None:
+        return None
+    matching = [
+        collision for collision in collisions
+        if str(collision["path"].vehID) == reservation["sender"]
+    ]
+    other_senders = sorted({
+        str(collision["path"].vehID) for collision in collisions
+        if str(collision["path"].vehID) != reservation["sender"]
+    })
+    if other_senders:
+        _release_two_stage_reservation(
+            vehicle, collisions[0]["path"], "new_conflicting_sender",
+            collisions[0], details={"new_senders": other_senders})
+        return None
+    if not matching:
+        _release_two_stage_reservation(
+            vehicle, None, "desired_path_disappeared")
+        return None
+    collision = matching[0]
+    desired = collision["path"]
+    current = _two_stage_participants(desired)
+    if current != reservation["participants"]:
+        _release_two_stage_reservation(
+            vehicle, desired, "participant_set_changed", collision,
+            details={"current_participants": list(current)})
+        return None
+    return reservation
+
+
+def _reserve_two_stage_merge(vehicle, desired, collision, prediction_method):
+    participants = _two_stage_participants(desired)
+    vehicle._mcs_two_stage_merge_reservation = {
+        "sender": str(desired.vehID),
+        "participants": participants,
+        "accepted_at": float(vehicle.simTime),
+        "prediction_method": prediction_method,
+    }
+    # The early phase retains no alternative trajectory, agreement packet, or
+    # speed command. All execution state is rebuilt at the 200 m trigger.
+    vehicle.alter_straight_path = None
+    vehicle.alter_change_path = None
+    vehicle.isWaitAgree = False
+    vehicle.waitAgreeID = []
+    vehicle.receiveAgreeID = []
+    vehicle.waitPath = None
+    COUNTS["two_stage_reservation_created"] += 1
+    diagnostic_trace.record_negotiation(
+        vehicle, desired, "two_stage_reserved", accept=True,
+        reason=prediction_method, collision=collision,
+        details={
+            "participants": list(participants),
+            "execution_start_m": TWO_STAGE_MERGE_EXECUTION_START_M,
+            "retains_trajectory": False,
+            "retains_speed_command": False,
+        })
+
+
+def _activate_two_stage_merge(vehicle, desired, collision):
+    """Start the ordinary fresh-path agreement handshake at 200 m."""
+    reservation = _two_stage_reservation(vehicle)
+    if reservation is None:
+        raise RuntimeError("two-stage activation requires a reservation")
+    vehicle._mcs_two_stage_merge_reservation = None
+    vehicle.pathID += 1
+    vehicle.alter_straight_path.pathID = vehicle.id + "_" + str(vehicle.pathID)
+    vehicle.alter_straight_path.vehID = vehicle.id
+    if vehicle.WithAgreementPhase:
+        vehicle.alter_straight_path.type = "alter"
+        vehicle.alter_straight_path.yieldTo = desired.vehID
+        vehicle.waitAgreeID = list(desired.negotiationID)
+        vehicle.receiveAgreeID = [vehicle.id]
+        vehicle.isWaitAgree = True
+        vehicle.waitPath = desired
+        outcome = "waiting_for_agreement"
+    else:
+        vehicle.alter_straight_path.type = "planned"
+        vehicle.plannedPath = vehicle.alter_straight_path
+        vehicle.alter_straight_path = None
+        vehicle.status = "yield"
+        vehicle.leader = desired.vehID
+        vehicle.leadPath = desired
+        vehicle.isPathValid = True
+        outcome = "applied"
+    COUNTS["two_stage_reservation_activated"] += 1
+    diagnostic_trace.record_negotiation(
+        vehicle, desired, "two_stage_activated", accept=True,
+        reason="same_participants_and_fresh_feasible_alternative",
+        collision=collision,
+        details={
+            "accepted_at": reservation["accepted_at"],
+            "original_prediction_method": reservation["prediction_method"],
+            "participants": list(reservation["participants"]),
+            "fresh_alternative": True,
+        })
+    return outcome
 
 # Kept opt-in and deliberately narrow: the oracle runner supplies one
 # deterministic event ordinal and one forced action.  No priority-hold or
@@ -221,6 +390,11 @@ def apply_negotiation_request(request, choice):
         vehicle.yetJudgedList.append(desired.pathID)
         vehicle.count_refuse_utility += 1
         return "rejected"
+    if request.get("two_stage_reservation"):
+        vehicle.count_accept_utility += 1
+        _reserve_two_stage_merge(
+            vehicle, desired, collision, prediction_method)
+        return "reserved"
     _record_agreement_lease(
         vehicle, desired, collision, prediction_method)
     vehicle.count_accept_utility += 1
@@ -440,6 +614,8 @@ def send_mcm(vehicle, server, traci):
 
 def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
     global ORACLE_EVENT_COUNT
+    if merge:
+        reconcile_two_stage_merge_reservation(vehicle, collisions)
     desired_ids = [entry["path"].pathID for entry in collisions]
     if vehicle.WithAgreementPhase and vehicle.isWaitAgree:
         if vehicle.waitPath.pathID in desired_ids:
@@ -462,6 +638,21 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             continue
         if desired.pathID in vehicle.yetJudgedList:
             continue
+        reservation = (
+            _two_stage_reservation(vehicle)
+            if merge and TWO_STAGE_MERGE_NEGOTIATION else None)
+        sender_position = _two_stage_sender_position(desired)
+        reservation_activation = bool(
+            reservation
+            and str(desired.vehID) == reservation["sender"]
+            and sender_position is not None
+            and sender_position >= TWO_STAGE_MERGE_EXECUTION_START_M)
+        if reservation and not reservation_activation:
+            # The early decision remains an identifier-only reservation. Do
+            # not regenerate or retain a yielding path before execution.
+            vehicle.alter_straight_path = None
+            vehicle.alter_change_path = None
+            continue
         # The live simulator advances at 0.1 s, but a CAV desired path is
         # valid for one second.  Do not re-negotiate an already decided path
         # during that interval; a new path ID remains immediately eligible.
@@ -475,6 +666,11 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             vehicle, desired, "started", collision=collision)
         alternatives = vehicle.generateAlterPath(collision, obstacles)
         if not alternatives:
+            if reservation_activation:
+                _release_two_stage_reservation(
+                    vehicle, desired, "execution_infeasible", collision)
+                COUNTS["no_feasible_alternative_at_two_stage_activation"] += 1
+                continue
             diagnostic_trace.record_negotiation(
                 vehicle, desired, "decision", accept=False,
                 reason="no_feasible_alternative", collision=collision)
@@ -488,9 +684,19 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
         else:
             vehicle.alter_straight_path = selected
         if not vehicle.alter_straight_path:
+            if reservation_activation:
+                _release_two_stage_reservation(
+                    vehicle, desired, "execution_infeasible", collision)
+                COUNTS["no_selected_alternative_at_two_stage_activation"] += 1
+                continue
             diagnostic_trace.record_negotiation(
                 vehicle, desired, "deferred", reason="no_selected_alternative",
                 collision=collision)
+            continue
+        if reservation_activation:
+            outcome = _activate_two_stage_merge(vehicle, desired, collision)
+            if outcome == "waiting_for_agreement":
+                return
             continue
         # Shadow mode is intentionally read-only: it observes the same
         # physically feasible alternative considered by the baseline TIV
@@ -613,6 +819,10 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             "proposal_choice": proposal_choice,
             "proposal_evaluation": proposal_evaluation,
             "applied": False,
+            "two_stage_reservation": bool(
+                merge and TWO_STAGE_MERGE_NEGOTIATION
+                and sender_position is not None
+                and sender_position < TWO_STAGE_MERGE_EXECUTION_START_M),
         }
         request["manifest"] = {
             key: request[key] for key in (
@@ -631,6 +841,8 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
         if outcome == "rejected":
             continue
         if outcome == "waiting_for_agreement":
+            return
+        if outcome == "reserved":
             return
 
 

@@ -216,6 +216,8 @@ class CAV_bus:
             
             # check collision among own planned path and other DESIRED paths
             collision_list_desired, _ = self.checkPathCollision(self.plannedPath, self.receivedPaths, s_type="desired")
+            thesis_tiv.reconcile_two_stage_merge_reservation(
+                self, collision_list_desired)
             # 他車両の希望経路と重複している場合には、代替経路を生成
             if len(collision_list_desired) > 0 and self.status != "lanechange":
                 self.judgeYield(collision_list_desired, ob)
