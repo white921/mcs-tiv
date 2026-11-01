@@ -295,6 +295,66 @@ class ThesisTIVTests(unittest.TestCase):
                 {"path": desired, "collide_x": 20.0, "collide_y": 0}))
         self.assertIsNone(v._mcs_agreement_lease)
 
+    def test_participant_set_stability_refreshes_path_and_keeps_group(self):
+        v, desired, collisions = self.decision()
+        v.WithAgreementPhase = True
+        collisions[0].update(collide_x=20, collide_y=0)
+        desired.negotiationID = ["2", "3"]
+        with patch.object(tiv, "PARTICIPANT_SET_STABILITY_S", 1.0):
+            tiv.judge_yield(v, collisions, [], traci())
+            self.assertTrue(v.isWaitAgree)
+            original_expiry = v._mcs_participant_set_stability["expires_at"]
+
+            refreshed = copy.deepcopy(desired)
+            refreshed.pathID = "1_2"
+            refreshed.negotiationID = ["2", "4"]
+            v.receiveAgreeID.append("3")
+            v.simTime = 0.8
+            tiv.judge_yield(
+                v, [{"path": refreshed, "collide_x": 20.5,
+                     "collide_y": 0}], [], traci())
+
+        self.assertTrue(v.isWaitAgree)
+        self.assertIs(v.waitPath, refreshed)
+        self.assertEqual(v.waitAgreeID, ["2", "3", "4"])
+        self.assertEqual(v.receiveAgreeID, ["2", "3"])
+        self.assertEqual(
+            v._mcs_participant_set_stability["expires_at"], original_expiry)
+        self.assertEqual(v.alter_straight_path.yieldTo, "1")
+
+    def test_participant_set_stability_does_not_reuse_old_trajectory(self):
+        v, desired, collisions = self.decision()
+        v.WithAgreementPhase = True
+        collisions[0].update(collide_x=20, collide_y=0)
+        first_alternative = path("2", "alter")
+        second_alternative = path("2", "alter", speed=7)
+        v.generateAlterPath.side_effect = [
+            [first_alternative], [second_alternative]]
+        with patch.object(tiv, "PARTICIPANT_SET_STABILITY_S", 1.0):
+            tiv.judge_yield(v, collisions, [], traci())
+            refreshed = copy.deepcopy(desired)
+            refreshed.pathID = "1_2"
+            v.simTime = 0.5
+            tiv.judge_yield(
+                v, [{"path": refreshed, "collide_x": 20,
+                     "collide_y": 0}], [], traci())
+        self.assertIs(v.alter_straight_path, second_alternative)
+
+    def test_participant_set_stability_expires_and_cancels(self):
+        v, desired, collisions = self.decision()
+        v.WithAgreementPhase = True
+        collisions[0].update(collide_x=20, collide_y=0)
+        with patch.object(tiv, "PARTICIPANT_SET_STABILITY_S", 1.0):
+            tiv.judge_yield(v, collisions, [], traci())
+            refreshed = copy.deepcopy(desired)
+            refreshed.pathID = "1_2"
+            v.simTime = 1.1
+            v.generateAlterPath.return_value = []
+            tiv.judge_yield(
+                v, [{"path": refreshed, "collide_x": 20,
+                     "collide_y": 0}], [], traci())
+        self.assertIsNone(v._mcs_participant_set_stability)
+
     def test_two_unreachable_paths_not_accepted(self):
         v, _, collisions = self.decision(math.inf)
         v.plannedPath = path("2", speed=0)

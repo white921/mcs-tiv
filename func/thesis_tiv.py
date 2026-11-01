@@ -28,6 +28,19 @@ def _agreement_lease_seconds_from_environment():
 AGREEMENT_LEASE_S = _agreement_lease_seconds_from_environment()
 AGREEMENT_LEASE_REGION_TOLERANCE_M = 2.0
 
+
+def _participant_set_stability_seconds_from_environment():
+    value = float(os.environ.get("MCS_PARTICIPANT_SET_STABILITY_S", "0"))
+    if not math.isfinite(value) or value < 0:
+        raise ValueError(
+            "MCS_PARTICIPANT_SET_STABILITY_S must be finite and non-negative")
+    return value
+
+
+PARTICIPANT_SET_STABILITY_S = (
+    _participant_set_stability_seconds_from_environment())
+PARTICIPANT_SET_REGION_TOLERANCE_M = 2.0
+
 # Kept opt-in and deliberately narrow: the oracle runner supplies one
 # deterministic event ordinal and one forced action.  No priority-hold or
 # global policy switch is involved.  The ordinary code path remains byte-for-
@@ -167,6 +180,109 @@ def clear_agreement_lease(vehicle, reason):
     COUNTS["agreement_lease_cleared_" + reason] += 1
 
 
+def _record_participant_set_stability(vehicle, desired, collision):
+    """Start one short negotiation transaction without retaining a path."""
+    if PARTICIPANT_SET_STABILITY_S <= 0 or not vehicle.WithAgreementPhase:
+        return
+    point = _collision_point(collision)
+    if point is None:
+        return
+    participants = sorted({str(value) for value in desired.negotiationID})
+    vehicle._mcs_participant_set_stability = {
+        "sender": str(desired.vehID),
+        "point": point,
+        "participant_ids": participants,
+        "started_at": float(vehicle.simTime),
+        "expires_at": float(vehicle.simTime) + PARTICIPANT_SET_STABILITY_S,
+    }
+    COUNTS["participant_set_stability_created"] += 1
+
+
+def clear_participant_set_stability(vehicle, reason):
+    if getattr(vehicle, "_mcs_participant_set_stability", None) is None:
+        return
+    vehicle._mcs_participant_set_stability = None
+    COUNTS["participant_set_stability_cleared_" + reason] += 1
+
+
+def _continue_stable_participant_set(
+        vehicle, collisions, obstacles, merge=False):
+    """Refresh feasibility while continuing the same short group transaction.
+
+    The old trajectory is never reused.  Participants found by the refreshed
+    desired path are added to the original set; an existing participant is not
+    removed until this short transaction expires.
+    """
+    if PARTICIPANT_SET_STABILITY_S <= 0:
+        return False
+    state = getattr(vehicle, "_mcs_participant_set_stability", None)
+    if not state:
+        return False
+    now = float(vehicle.simTime)
+    if now > state["expires_at"] + 1e-9:
+        clear_participant_set_stability(vehicle, "expired")
+        COUNTS["participant_set_stability_expired"] += 1
+        return False
+    refreshed = None
+    for collision in collisions:
+        desired = collision["path"]
+        if str(desired.vehID) != state["sender"]:
+            continue
+        point = _collision_point(collision)
+        if point is None or math.hypot(
+                point[0] - state["point"][0],
+                point[1] - state["point"][1]
+        ) > PARTICIPANT_SET_REGION_TOLERANCE_M:
+            continue
+        refreshed = collision
+        break
+    if refreshed is None:
+        return False
+
+    desired = refreshed["path"]
+    alternatives = vehicle.generateAlterPath(refreshed, obstacles)
+    if not alternatives:
+        COUNTS["participant_set_stability_infeasible"] += 1
+        return False
+    selected = vehicle.selectBestPath(alternatives)
+    if merge:
+        vehicle.alter_change_path, vehicle.alter_straight_path = selected
+    else:
+        vehicle.alter_straight_path = selected
+    if not vehicle.alter_straight_path:
+        COUNTS["participant_set_stability_no_selected_alternative"] += 1
+        return False
+
+    vehicle.pathID += 1
+    vehicle.alter_straight_path.pathID = (
+        vehicle.id + "_" + str(vehicle.pathID))
+    vehicle.alter_straight_path.vehID = vehicle.id
+    vehicle.alter_straight_path.type = "alter"
+    vehicle.alter_straight_path.yieldTo = desired.vehID
+
+    expected = set(state["participant_ids"])
+    expected.update(str(value) for value in desired.negotiationID)
+    state["participant_ids"] = sorted(expected)
+    vehicle.waitAgreeID = sorted(expected)
+    vehicle.receiveAgreeID = sorted(
+        ({str(value) for value in vehicle.receiveAgreeID} & expected)
+        | {str(vehicle.id)})
+    vehicle.waitPath = desired
+    vehicle.isWaitAgree = True
+    COUNTS["participant_set_stability_continued"] += 1
+    diagnostic_trace.record_negotiation(
+        vehicle, desired, "participant_set_stability_continued", accept=True,
+        reason="same_sender_conflict_and_group_transaction",
+        collision=refreshed,
+        details={
+            "started_at": state["started_at"],
+            "expires_at": state["expires_at"],
+            "participant_ids": state["participant_ids"],
+            "retains_trajectory": False,
+        })
+    return True
+
+
 def apply_negotiation_request(request, choice):
     """Apply the sole mutable half of a prepared negotiation request."""
     choice = apply_decision(request, choice)
@@ -193,6 +309,8 @@ def apply_negotiation_request(request, choice):
         vehicle.yetJudgedList.append(desired.pathID)
         vehicle.count_refuse_utility += 1
         return "rejected"
+    _record_participant_set_stability(
+        vehicle, desired, collision)
     _record_agreement_lease(
         vehicle, desired, collision, prediction_method)
     vehicle.count_accept_utility += 1
@@ -416,9 +534,14 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
     if vehicle.WithAgreementPhase and vehicle.isWaitAgree:
         if vehicle.waitPath.pathID in desired_ids:
             return
+        if _continue_stable_participant_set(
+                vehicle, collisions, obstacles, merge=merge):
+            return
         diagnostic_trace.record_negotiation(
             vehicle, vehicle.waitPath, "cancelled",
             reason="desired_path_disappeared")
+        clear_participant_set_stability(
+            vehicle, "desired_path_disappeared")
         vehicle.isWaitAgree = False
         vehicle.waitAgreeID = []
         vehicle.receiveAgreeID = []

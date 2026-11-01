@@ -22,6 +22,7 @@ class ResultLayoutTests(unittest.TestCase):
             "deceleration_loss_lambda": 1.0,
             "rejection_wait_cap": 0.0,
             "agreement_lease_seconds": 0.0,
+            "participant_set_stability_seconds": 0.0,
             "cases": ["eval3"],
             "seeds": [1, 2, 3, 4, 5],
             "seeds_per_case": None,
@@ -76,6 +77,7 @@ class ResultLayoutTests(unittest.TestCase):
             "MCS_DECELERATION_LOSS_LAMBDA": "99",
             "MCS_REJECTION_WAIT_CAP_S": "99",
             "MCS_AGREEMENT_LEASE_S": "99",
+            "MCS_PARTICIPANT_SET_STABILITY_S": "99",
             "MCS_FCD_OUTPUT": "/tmp/old-fcd.xml",
             "MCS_CHECKPOINT_DIR": "/tmp/old-checkpoint",
         }

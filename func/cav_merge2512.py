@@ -240,6 +240,8 @@ class CAV:
                 self.receiveAgreeID = []
                 self.waitPath = None
                 thesis_tiv.clear_agreement_lease(self, "agreement_completed")
+                thesis_tiv.clear_participant_set_stability(
+                    self, "agreement_completed")
 
         # 期限切れの代替経路を削除
         if self.alter_straight_path and round(self.simTime - self.alter_straight_path.t[0], 2) >= pathValidTime:
@@ -249,6 +251,8 @@ class CAV:
             self.receiveAgreeID = []
             self.waitPath = None
             thesis_tiv.clear_agreement_lease(self, "alternative_expired")
+            thesis_tiv.clear_participant_set_stability(
+                self, "alternative_expired")
 
         # 新しい経路を生成
         if not self.plannedPath or round(self.simTime - self.plannedPath.t[0], 2) >= thesis_tiv.planned_update_interval(self, pathValidTime) or self.isPathValid == False:
