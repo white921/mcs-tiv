@@ -54,7 +54,7 @@
 | completed | 2026-11-01 | Eval.7の合流側交通量を見直す比率試験 | [記録](2026-11-01-eval7-flow-ratio-sweep.md) |
 | completed | 2026-11-01 | 1秒の承諾信号再利用による交渉取消・車線端停止の診断 | [記録](2026-11-01-agreement-lease-pilot.md) |
 | completed | 2026-11-01 | 合流交渉を車線端の10秒前から始める独立診断 | [記録](2026-11-01-maneuver-deadline-pilot.md) |
-| planned | 2026-11-01 | 合流交渉10秒前開始の5-seed検証 | [記録](2026-11-01-maneuver-deadline-5seed-validation.md) |
+| running | 2026-11-01 | 合流交渉10秒前開始の5-seed検証 | [記録](2026-11-01-maneuver-deadline-5seed-validation.md) |
 
 ## 研究判断の系譜
 

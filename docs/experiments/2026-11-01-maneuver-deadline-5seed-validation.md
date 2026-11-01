@@ -1,9 +1,9 @@
 # 合流交渉10秒前開始の5-seed検証
 
 - 台帳ID: `2026-11-01-maneuver-deadline-5seed-validation`
-- 状態: `planned`
+- 状態: `running`
 - 位置づけ: `development`
-- 開始日時: 未開始
+- 開始日時: 2026-11-01 20:01:40 JST
 - 終了日時: 未完了
 - 実験ディレクトリ:
   - `results/runs/maneuver-deadline10-validation5-eval7-r300-a1000-yamashita-seeds6-8-9-10-12-300s-20261101T`
@@ -59,11 +59,19 @@ seed 6/8は2-seed診断で使用済み、seed 9/10/12はこの機能では未使
 | 項目 | 値 |
 | --- | --- |
 | ブランチ | `codex/maneuver-deadline-5seed-validation` |
-| 実行ソースcommit | 実行開始時manifestで確定 |
-| 実行開始時dirty | cleanを必須とする |
+| 実行ソースcommit | `10593e21c4de6db10c7722dfdf5446639cb47313` |
+| 実行開始時dirty | 山下・提案とも`false` |
 | 結果commit | 未完了 |
 | 記録commit | 未完了 |
-| 実行コマンド | 実行開始後に記録 |
+| 実行コマンド | 下記。山下・提案の2 batchを同時実行 |
+
+共通部分は`--cases eval7 --workers 5 --seeds 6 8 9 10 12 --duration 300
+--eval7-flows 300 1000 --bus-allocation fixed --merge-negotiation-lead-seconds 10
+--diagnostic-traces --checkpoint-interval 60`である。提案batchだけ
+`--deceleration-active --deceleration-time-half-life 0 --deceleration-loss-lambda 2`を追加した。
+起動直後に両experiment manifestの`running`、各`workers=5`、source commit、dirty
+false、10秒前倒し、承諾リース無効を確認し、実SUMO 10プロセスを確認した。
+監視automationは`mcs-10-5-seed`である。
 
 ## 完了・完全性確認
 
