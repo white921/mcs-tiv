@@ -121,6 +121,45 @@ class FixedVehicleInputTests(unittest.TestCase):
         self.assertIsNone(fixed_input_details("eval3", 1, 600, "paper-random25"))
         self.assertIsNone(fixed_input_details("eval4", 1, 600, "fixed"))
 
+    def test_eval7_signal_release_inputs_keep_natural_counts_and_vary_platoons(self):
+        root = ROOT / "fixed_inputs" / "experiments" / "eval7-signal-release"
+        conditions = ("red-08", "red-12", "red-16", "red-20", "red-24")
+        seeds = (1, 2, 3, 7, 11)
+        accepting_prefix_counts = []
+        for condition in conditions:
+            for seed in seeds:
+                path = root / condition / f"seed-{seed}.jsonl"
+                schedule = load_fixed_vehicle_input(
+                    path, expected_case="eval7", expected_seed=seed,
+                    expected_flows_vph={
+                        "requesting": 1000, "accepting": 1000},
+                    expected_bus_share=0.25, prefix_duration_s=300.0)
+                self.assertTrue(schedule.events)
+                departures = schedule.departure_times("accepting")
+                self.assertTrue(all(
+                    right > left
+                    for left, right in zip(departures, departures[1:])))
+                if seed == 1:
+                    accepting_prefix_counts.append(len(departures))
+        self.assertGreater(len(set(accepting_prefix_counts)), 1)
+
+    def test_signal_release_override_template_selects_each_seed(self):
+        template = (
+            "fixed_inputs/experiments/eval7-signal-release/"
+            "red-08/seed-{seed}.jsonl"
+        )
+        for seed in (1, 2, 3, 7, 11):
+            with self.subTest(seed=seed):
+                details = fixed_input_details(
+                    "eval7", seed, 300, "fixed",
+                    relative_path_override=template,
+                )
+                self.assertEqual(
+                    details["relative_path"],
+                    template.format(seed=seed),
+                )
+                self.assertEqual(details["prefix_duration_s"], 300.0)
+                self.assertGreater(details["prefix_event_count"], 0)
     def test_prefix_is_stable_and_uses_strictly_earlier_events(self):
         path = ROOT / "fixed_inputs" / "thesis" / "eval3" / "seed-1.jsonl"
         empty = load_fixed_vehicle_input(path, prefix_duration_s=0.1)

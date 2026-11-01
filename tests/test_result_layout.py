@@ -24,6 +24,7 @@ class ResultLayoutTests(unittest.TestCase):
             "agreement_lease_seconds": 0.0,
             "merge_negotiation_lead_seconds": 0.0,
             "two_stage_merge_negotiation": False,
+            "deceleration_loss_mode": "integrated",
             "cases": ["eval3"],
             "seeds": [1, 2, 3, 4, 5],
             "seeds_per_case": None,
@@ -61,6 +62,11 @@ class ResultLayoutTests(unittest.TestCase):
 
         self.assertIn("proposal-weighted-3s", path.name)
 
+    def test_terminal_loss_ablation_is_named(self):
+        path = RUNNER.default_run_directory(
+            self.args(deceleration_loss_mode="terminal-held"))
+        self.assertIn("proposal-terminal-held", path.name)
+
     def test_write_json_has_stable_trailing_newline(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "manifest.json"
@@ -80,6 +86,7 @@ class ResultLayoutTests(unittest.TestCase):
             "MCS_AGREEMENT_LEASE_S": "99",
             "MCS_MERGE_NEGOTIATION_LEAD_S": "99",
             "MCS_TWO_STAGE_MERGE_NEGOTIATION": "1",
+            "MCS_DECELERATION_LOSS_MODE": "terminal-held",
             "MCS_FCD_OUTPUT": "/tmp/old-fcd.xml",
             "MCS_CHECKPOINT_DIR": "/tmp/old-checkpoint",
         }
@@ -98,6 +105,7 @@ class ResultLayoutTests(unittest.TestCase):
             self.args(deceleration_loss_lambda=1.25))
 
         self.assertEqual(manifest["loss_lambda"], 1.25)
+        self.assertEqual(manifest["loss_mode"], "integrated")
         self.assertIn("accept iff M<=0", manifest["decision_formula"])
         self.assertEqual(
             manifest["loss_scope"],

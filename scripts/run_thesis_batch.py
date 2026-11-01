@@ -48,6 +48,7 @@ CONTROLLED_MCS_ENV = {
     "MCS_DECELERATION_AUDIT",
     "MCS_DECELERATION_MODE",
     "MCS_DECELERATION_LOSS_LAMBDA",
+    "MCS_DECELERATION_LOSS_MODE",
     "MCS_DECELERATION_TIME_HALF_LIFE_S",
     "MCS_AGREEMENT_LEASE_S",
     "MCS_MERGE_NEGOTIATION_LEAD_S",
@@ -144,6 +145,9 @@ def default_run_directory(args, now=None):
         half_life = getattr(args, "deceleration_time_half_life", 0)
         if args.deceleration_active and half_life > 0:
             method += f"-weighted-{duration_label(half_life)}s"
+        loss_mode = getattr(args, "deceleration_loss_mode", "integrated")
+        if args.deceleration_active and loss_mode != "integrated":
+            method += f"-{loss_mode}"
         cases = "-".join(args.cases)
         if args.seeds is not None:
             seeds = "seeds-" + "-".join(str(seed) for seed in args.seeds)
@@ -192,6 +196,7 @@ def deceleration_prediction_manifest(args):
         "loss_lambda": args.deceleration_loss_lambda,
         "rejection_wait_cap_s": wait_cap,
         "rejection_wait_reset_gap_s": 2.0 if wait_cap > 0 else None,
+        "loss_mode": args.deceleration_loss_mode,
         "loss_scope": "detected followers excluding request and receiver vehicles",
         "excluded_loss_roles": ["request_vehicle", "receiver_vehicle"],
         "distance_to_time_speed": "per-vehicle allowed speed at negotiation",
@@ -200,11 +205,11 @@ def deceleration_prediction_manifest(args):
 
 def fixed_input_details(
     name, seed, duration, bus_allocation, prefix_duration=None, source_root=ROOT,
-    flows=None,
+    flows=None, relative_path_override=None,
 ):
     """Return the committed 600-second input selected for a batch task."""
     pattern = CASES[name].get("fixed_input")
-    if pattern is None or bus_allocation != "fixed":
+    if (pattern is None and relative_path_override is None) or bus_allocation != "fixed":
         return None
     selected_flows = tuple(str(flow) for flow in (flows or CASES[name]["flows"]))
     if name == "eval7" and selected_flows != tuple(CASES[name]["flows"]):
@@ -219,7 +224,13 @@ def fixed_input_details(
         prefix_duration = duration
     if not 0 < prefix_duration <= duration:
         raise ValueError("fixed vehicle input prefix must be in (0, duration]")
-    relative_path = Path(pattern.format(seed=seed))
+    relative_path = (
+        Path(str(relative_path_override).format(seed=seed))
+        if relative_path_override is not None
+        else Path(pattern.format(seed=seed))
+    )
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        raise ValueError("fixed input override must be repository-relative")
     path = source_root / relative_path
     expected_flows = None
     if name == "eval7":
@@ -328,6 +339,9 @@ def run_task(task, args):
                    args.merge_negotiation_lead_seconds),
                MCS_TWO_STAGE_MERGE_NEGOTIATION=(
                    "1" if args.two_stage_merge_negotiation else "0"),
+               MCS_DECELERATION_LOSS_MODE=(
+                   args.deceleration_loss_mode if args.deceleration_active
+                   else "integrated"),
                MCS_TIV_AUDIT=str(destination / "tiv-audit.json"),
                MCS_EVALUATION_AUDIT=str(destination / "evaluation-metrics.json"),
                MCS_PHYSICAL_COLLISION_AUDIT=str(
@@ -366,6 +380,7 @@ def run_task(task, args):
         prefix_duration=args.duration,
         source_root=source,
         flows=flows,
+        relative_path_override=args.fixed_input_override,
     )
     if fixed_input is not None:
         command += ["--fixed-input", fixed_input["runtime_path"]]
@@ -531,6 +546,10 @@ def main():
     parser.add_argument("--bus-allocation", choices=("fixed", "paper-random25"), default="fixed",
                         help="fixed composition for method comparison (default); "
                              "paper-random25 only for original-artifact reproduction")
+    parser.add_argument(
+        "--fixed-input-override",
+        help=("repository-relative fixed input path; {seed} may be used for "
+              "a multi-seed controlled scenario"))
     parser.add_argument("--deceleration-active", action="store_true",
                         help="use the proposed deceleration-propagation rule")
     parser.add_argument(
@@ -551,6 +570,11 @@ def main():
     parser.add_argument(
         "--two-stage-merge-negotiation", action="store_true",
         help="decide early but defer yielding and lane change until the legacy 200 m trigger")
+    parser.add_argument(
+        "--deceleration-loss-mode", choices=("integrated", "terminal-held"),
+        default="integrated",
+        help=("integrate the full 10 s speed deficit, or use only the 10 s "
+              "terminal deficit held across the horizon for an ablation"))
     parser.add_argument("--diagnostic-traces", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="write replay/FCD/negotiation diagnostics (default: enabled)")
@@ -609,6 +633,27 @@ def main():
         parser.error("--deceleration-time-half-life requires --deceleration-active")
     if args.rejection_wait_cap > 0 and not args.deceleration_active:
         parser.error("--rejection-wait-cap requires --deceleration-active")
+    if (args.deceleration_loss_mode != "integrated" and
+            not args.deceleration_active):
+        parser.error("--deceleration-loss-mode requires --deceleration-active")
+    if (args.deceleration_loss_mode == "terminal-held" and
+            args.deceleration_time_half_life > 0):
+        parser.error("terminal-held loss cannot use --deceleration-time-half-life")
+    if args.fixed_input_override is not None:
+        if len(args.cases) != 1 or args.seeds is None:
+            parser.error("--fixed-input-override requires one --cases value and explicit --seeds")
+        if args.bus_allocation != "fixed":
+            parser.error("--fixed-input-override requires --bus-allocation fixed")
+        override = Path(args.fixed_input_override)
+        if override.is_absolute() or ".." in override.parts:
+            parser.error("--fixed-input-override must be repository-relative")
+        missing = [
+            str(override).format(seed=seed)
+            for seed in args.seeds
+            if not (ROOT / str(override).format(seed=seed)).is_file()
+        ]
+        if missing:
+            parser.error("--fixed-input-override does not exist for: " + ", ".join(missing))
     if not (args.sumo_home / "bin" / "sumo").is_file() or not (args.sumo_home / "tools" / "traci").is_dir():
         parser.error("--sumo-home must contain bin/sumo and tools/traci")
     if args.paper is not None and not args.paper.is_file():
@@ -665,6 +710,8 @@ def main():
         "merge_negotiation_lead_seconds": (
             args.merge_negotiation_lead_seconds),
         "two_stage_merge_negotiation": args.two_stage_merge_negotiation,
+        "deceleration_loss_mode": (
+            args.deceleration_loss_mode if args.deceleration_active else None),
         "cases": list(args.cases),
         "eval7_flows_vph": ({
             "requesting": args.eval7_flows[0],

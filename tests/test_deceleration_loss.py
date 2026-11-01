@@ -18,6 +18,21 @@ class DecelerationLossTests(unittest.TestCase):
         reference = self.profile((10, 10, 10))
         slow_middle = self.profile((10, 0, 10))
         self.assertAlmostEqual(loss.distance_loss(reference, slow_middle), 1.0)
+        self.assertAlmostEqual(loss.distance_loss(
+            reference, slow_middle, loss_mode="terminal-held"), 0.0)
+
+    def test_terminal_held_loss_uses_only_endpoint_on_horizon_scale(self):
+        reference = self.profile((10, 10, 10))
+        slower = self.profile((9, 9, 9))
+        self.assertAlmostEqual(loss.distance_loss(
+            reference, slower, loss_mode="terminal-held"), .2)
+        with self.assertRaisesRegex(ValueError, "loss mode"):
+            loss.distance_loss(reference, slower, loss_mode="unknown")
+        decision = loss.time_equivalent_decision(
+            {"v": reference}, {"v": slower}, {"v": reference}, {"v": 10},
+            request_arrival_s=1, receiver_arrival_s=1,
+            loss_mode="terminal-held")
+        self.assertEqual(decision["loss_mode"], "terminal-held")
 
     def test_keeps_signed_speed_gain_visible(self):
         reference = self.profile((5, 5, 5))
