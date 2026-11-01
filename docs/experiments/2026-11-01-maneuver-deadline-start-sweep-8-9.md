@@ -1,9 +1,9 @@
 # 合流交渉開始8秒・9秒の探索比較
 
 - 台帳ID: `2026-11-01-maneuver-deadline-start-sweep-8-9`
-- 状態: `planned`
+- 状態: `running`
 - 位置づけ: `exploratory`
-- 開始日時: 未開始
+- 開始日時: `2026-11-01T21:23:53+09:00`
 - 終了日時: 未完了
 - 実験ディレクトリ:
   - `results/runs/maneuver-deadline8-sweep5-eval7-r300-a1000-yamashita-seeds6-8-9-10-12-300s-20261101T`
@@ -62,7 +62,11 @@
 | 実行開始時dirty | cleanを必須とする |
 | 結果commit | 未完了 |
 | 記録commit | 未完了 |
-| 実行コマンド | 開始後に記録 |
+| 実行コマンド | `scripts/run_thesis_batch.py --cases eval7 --workers 5 --seeds 6 8 9 10 12 --duration 300 --eval7-flows 300 1000 --bus-allocation fixed --merge-negotiation-lead-seconds {8,9} --diagnostic-traces --checkpoint-interval 60`（提案方式は加えて`--deceleration-active --deceleration-time-half-life 0 --deceleration-loss-lambda 2`） |
+
+Ubuntu上で山下方式・提案方式ごとにsystemd user serviceを1本ずつ起動した。
+各serviceは8秒batchが正常終了した場合にだけ9秒batchへ進む。これにより同時SUMO数を
+最大10に固定し、8秒で失敗した方式を勝手に再実行・続行しない。
 
 ## 完了・完全性確認
 
@@ -76,7 +80,9 @@
 
 ## 結果
 
-未実行。
+実行中。開始時に両worktreeのsource commit一致、Git clean、固定入力20ファイルの
+SHA-256、Python 3.15.1、SUMO 1.28.0、135 tests成功、未使用の4出力先を確認した。
+起動直後は8秒の両batchが`running`、各`workers=5`、実SUMOは計10プロセスである。
 
 ## 結論
 
