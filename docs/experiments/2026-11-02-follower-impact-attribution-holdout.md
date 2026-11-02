@@ -1,11 +1,26 @@
 # 後続車影響項の寄与を確認する独立holdout
 
 - 台帳ID: `2026-11-02-follower-impact-attribution-holdout`
-- 状態: `planned`
+- 状態: `running`
 - 位置づけ: `confirmatory independent holdout`
 - 比較対象: 到着時間項のみ、提案方式`lambda=2`、山下方式
 - 使用seed: `13, 14, 15, 16, 17, 18, 19, 20, 21, 22`
 - 予定出力: `results/runs/follower-impact-attribution-holdout-*`
+
+## 実行状況
+
+- source commit: `f56fd4bcfd68330399a9b0e6c870b9126f4447ed`
+- Ubuntu test: Python 3.15.1 / SUMO 1.28.0で120件すべて成功。
+- smoke: Eval.3 seed 13、20秒で山下方式・提案方式とも`exit_code: 0`。先行smoke出力により
+  提案方式smokeの開始時Gitがdirtyになったため、smoke結果は正式結果に使用しない。
+- 自然走行開始: `2026-11-02T14:27:21+09:00`
+- 山下方式出力:
+  `results/runs/follower-impact-attribution-yamashita-300s-seeds13-22-f56fd4bc`
+- 提案方式出力:
+  `results/runs/follower-impact-attribution-proposal-harm-lambda2-300s-seeds13-22-f56fd4bc`
+
+正式自然走行は方式ごとのclean detached worktreeで各30 run、各4 workerとして同時に
+開始した。結果完了後に全manifestとログを検証し、正常な場合だけ場面計画へ進む。
 
 ## 目的
 
