@@ -66,6 +66,11 @@ Accept/Reject 1,920分岐となる。各planを10 workerで逐次実行し、1 p
 - 一次cohortを明示的に`actors-followers`として保存し、全観測車両の結果も二次指標に残す。
 - 旧先頭4件planと不完全出力は正式結果に混ぜない。
 
+Ubuntuで全123 test成功後、最初の単一場面smokeはPython実行ファイルの絶対化に
+`Path.resolve()`を使ったため、venvのsymlinkがsystem Pythonへ解決され、NumPyを
+読み込めずcapture開始前に停止した。分岐結果はなく、`source_unchanged: true`だった。
+venvのsymlinkを保持する絶対パスへ修正し、同じ条件の新しい出力先で再検証する。
+
 ## 実行順
 
 1. 時間層別plan生成・cohort・絶対パス処理を実装し、テストする。

@@ -122,7 +122,9 @@ def main():
     args = parser.parse_args()
     args.plan = args.plan.resolve()
     args.sumo_home = args.sumo_home.resolve()
-    args.python = args.python.resolve()
+    # Preserve virtualenv interpreter symlinks while making the child command
+    # independent of its working directory.
+    args.python = args.python.absolute()
     args.output = args.output.resolve()
     if args.output.exists():
         parser.error("output directory already exists")

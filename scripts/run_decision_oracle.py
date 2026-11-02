@@ -231,7 +231,9 @@ def main():
     args = parser.parse_args()
     args.output = args.output.resolve()
     args.sumo_home = args.sumo_home.resolve()
-    args.python = str(Path(args.python).resolve())
+    # Keep a virtualenv's interpreter symlink intact.  ``resolve()`` would
+    # replace it with the system interpreter and lose the venv site-packages.
+    args.python = str(Path(args.python).absolute())
     if args.source is not None:
         args.source = args.source.resolve()
     if args.git_metadata_json is not None:
