@@ -24,6 +24,22 @@
 本バッチは開始済みworker poolを変更できないため合計8並列のまま完走させる。以後の
 MCS/SUMOバッチは原則10並列とし、本実験の反実仮corpusも10 workerで実行する。
 
+自然走行は提案方式が`2026-11-02T23:33:11+09:00`、山下方式が
+`2026-11-02T23:47:32+09:00`に完了した。全60 runで`exit_code: 0`、
+`source_unchanged: true`、必須artifactあり、3000 step観測、物理衝突0、
+Traceback等の重大ログ0を確認した。
+
+反実仮計画は次の2群に固定した。各群120場面で、各ケース40、各origin 60、
+各ケース×origin×seedから4場面である。
+
+- seed 13〜17 plan SHA-256:
+  `96d221ae82a25108e057fee4c27b959ee677a47ce4509e87e3b5a0f56e3f8189`
+- seed 18〜22 plan SHA-256:
+  `4242aa3437c5e07977778ca07aa128cb1d737fb3b659d76150977e8ae1a08159`
+
+`2026-11-03T00:48+09:00`にseed 13〜17の120場面を10 workerで開始した。
+正常終了した場合だけ、seed 18〜22の120場面を同じ10 workerで逐次実行する。
+
 ## 目的
 
 既存holdoutでは提案方式全体の山下方式に対する判断後悔量低減は頑健だったが、正式な
@@ -77,7 +93,7 @@ MCS/SUMOバッチは原則10並列とし、本実験の反実仮corpusも10 work
 
 ## 完了条件
 
-- [ ] 全自然走行runが`exit_code: 0`かつ`source_unchanged: true`。
+- [x] 全自然走行runが`exit_code: 0`かつ`source_unchanged: true`。
 - [ ] 240場面のAccept/Reject両分岐が正常終了している。
 - [ ] 計画と結果のevent IDが一致している。
 - [ ] 必須artifact、ログ、trace、物理衝突を検証している。
