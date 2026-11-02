@@ -94,6 +94,21 @@ Eval.3 seed 13の単一場面smokeは、capture、Accept、Rejectがすべてexi
 一次cohortはactor 2台と後続影響車6台の計8台、二次の全観測cohortは15台だった。
 正式corpusはsmoke出力を持たない別のclean detached worktreeから開始する。
 
+## 正式corpus開始
+
+2026-11-03 05:22:28 JSTにUbuntu上で正式corpusを開始した。8 planごとに
+`f8412b94`のclean detached worktreeを1つ割り当て、最初の
+`13–17 / [0,100)`から10 workerで逐次実行している。planは一時領域ではなく
+`/media/yamada/UbuntuData/ドキュメント/卒論研究/follower-impact-time-stratified-plans/`
+へ固定し、開始直前に上表のSHA-256との一致を再確認した。
+
+各corpusの出力先は、対応するworktree内の
+`results/runs/follower-impact-time-stratified-<seed群>-t<時間帯>-f8412b94/`
+である。corpusがexit 0、`status: completed`、120/120場面完了、失敗0、
+`source_unchanged: true`、plan SHA-256一致の場合だけ次のplanへ進む。条件を満たさない
+場合は後続planを開始せず停止する。開始後の初回監査では、orchestratorと最初の10場面の
+capture processが稼働し、完了済み場面はまだ0件だった。
+
 ## 実行順
 
 1. 時間層別plan生成・cohort・絶対パス処理を実装し、テストする。
