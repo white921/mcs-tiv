@@ -43,6 +43,47 @@ class DecisionOracleCorpusTests(unittest.TestCase):
             self.assertEqual([item["ordinal"] for item in selected], [1, 3])
             self.assertEqual(selected[1]["receiver_id"], "4")
 
+    def test_time_stratified_selection_is_deterministic_and_bounded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            trace = Path(directory) / "negotiations.jsonl"
+            records = [
+                {"event": "decision", "sim_time": float(moment),
+                 "reason": "deceleration-propagation",
+                 "receiver_id": str(moment), "sender_id": "1",
+                 "desired_path_id": f"1_{moment}"}
+                for moment in range(95, 116)
+            ]
+            trace.write_text("".join(json.dumps(item) + "\n" for item in records))
+            first = planner.selected_events(
+                trace, 4, time_start_s=100.0, time_end_s=110.0,
+                sampling_seed=20261103, selection_key="proposal:eval3:13")
+            second = planner.selected_events(
+                trace, 4, time_start_s=100.0, time_end_s=110.0,
+                sampling_seed=20261103, selection_key="proposal:eval3:13")
+            self.assertEqual(first, second)
+            self.assertEqual(len(first), 4)
+            self.assertTrue(all(100.0 <= item["sim_time_s"] < 110.0
+                                for item in first))
+            self.assertEqual(
+                [item["ordinal"] for item in first],
+                sorted(item["ordinal"] for item in first))
+
+    def test_time_stratified_selection_rejects_short_window(self):
+        with tempfile.TemporaryDirectory() as directory:
+            trace = Path(directory) / "negotiations.jsonl"
+            records = [
+                {"event": "decision", "sim_time": float(moment),
+                 "reason": "thesis-tiv-fallback",
+                 "receiver_id": str(moment), "sender_id": "1",
+                 "desired_path_id": f"1_{moment}"}
+                for moment in (120, 121, 122)
+            ]
+            trace.write_text("".join(json.dumps(item) + "\n" for item in records))
+            with self.assertRaisesRegex(ValueError, "only 3 unique decisions"):
+                planner.selected_events(
+                    trace, 4, time_start_s=120.0, time_end_s=180.0,
+                    sampling_seed=20261103, selection_key="yamashita:eval5:18")
+
     def test_macro_regret_equal_weights_cases(self):
         summaries = {
             "eval3": {"policies": {"proposal": {"mean_regret_m": 1.0}}},
@@ -70,6 +111,30 @@ class DecisionOracleCorpusTests(unittest.TestCase):
             env = run_decision_oracle.common_env(args, ROOT)
 
         self.assertEqual(env["MCS_DECELERATION_LOSS_LAMBDA"], "2.0")
+
+    def test_corpus_command_passes_explicit_cohort_mode(self):
+        args = NS(
+            python=Path("/tmp/python"), sumo_home=Path("/tmp/sumo"),
+            duration=300.0, deceleration_loss_lambda=2.0,
+            cohort_mode="actors-followers")
+        event = {
+            "case": "eval3", "origin_policy": "proposal", "seed": 13,
+            "ordinal": 1, "sim_time_s": 100.0,
+            "receiver_id": "1", "sender_id": "2",
+            "desired_path_id": "2_3",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "runner-logs").mkdir()
+            with mock.patch.object(corpus.subprocess, "run") as run:
+                run.return_value.returncode = 1
+                corpus.run_event(
+                    args, root / "source", root / "git.json",
+                    root, 1, event)
+            command = run.call_args.args[0]
+        self.assertIn("--cohort-mode", command)
+        self.assertEqual(
+            command[command.index("--cohort-mode") + 1], "actors-followers")
 
     def test_boundary_identity_uses_boundary_request_field_names(self):
         request = {

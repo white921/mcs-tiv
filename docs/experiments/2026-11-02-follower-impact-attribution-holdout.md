@@ -1,7 +1,7 @@
 # 後続車影響項の寄与を確認する独立holdout
 
 - 台帳ID: `2026-11-02-follower-impact-attribution-holdout`
-- 状態: `running`
+- 状態: `incomplete`（時間偏りを確認して時間層別holdoutへ置換）
 - 位置づけ: `confirmatory independent holdout`
 - 比較対象: 到着時間項のみ、提案方式`lambda=2`、山下方式
 - 使用seed: `13, 14, 15, 16, 17, 18, 19, 20, 21, 22`
@@ -39,6 +39,18 @@ Traceback等の重大ログ0を確認した。
 
 `2026-11-03T00:48+09:00`にseed 13〜17の120場面を10 workerで開始した。
 正常終了した場合だけ、seed 18〜22の120場面を同じ10 workerで逐次実行する。
+
+この初回corpusは、出力ディレクトリを相対パスで渡したため、子プロセスの作業
+ディレクトリを基準にcheckpointと監査ログが共有source snapshot内へ書き込まれた。
+全120件がcapture終了時の`source_unchanged: false`で停止し、Accept/Reject分岐は
+1件も実行されていない。結果は`status: incomplete`、完了0、失敗120であり、正式結果、
+解析、commit、pushには使用しない。不完全出力は失敗原因の監査用にUbuntu上で保全する。
+
+さらに、固定済みplanの選択時刻はEval.3が21.7〜91.8秒、Eval.5が17.4〜83.4秒、
+Eval.7が21.3〜47.2秒であり、300秒走行の中盤・後半を含まなかった。オラクル結果を
+1件も観測する前にこの時間偏りを確認したため、本実験の先頭4件計画は再実行せず、
+[`2026-11-03-follower-impact-time-stratified-holdout.md`](2026-11-03-follower-impact-time-stratified-holdout.md)
+へ置換する。旧planとSHA-256は監査用に残すが、主要結果には用いない。
 
 ## 目的
 
@@ -94,7 +106,7 @@ Traceback等の重大ログ0を確認した。
 ## 完了条件
 
 - [x] 全自然走行runが`exit_code: 0`かつ`source_unchanged: true`。
-- [ ] 240場面のAccept/Reject両分岐が正常終了している。
+- [ ] 240場面のAccept/Reject両分岐が正常終了している（置換のため未達）。
 - [ ] 計画と結果のevent IDが一致している。
 - [ ] 必須artifact、ログ、trace、物理衝突を検証している。
 - [ ] 主比較と95%区間を記録している。

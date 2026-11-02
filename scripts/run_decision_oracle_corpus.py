@@ -55,6 +55,7 @@ def run_event(args, source, git_metadata_path, output_root, index, event):
         "--seed", str(event["seed"]),
         "--duration", str(args.duration),
         "--deceleration-loss-lambda", str(args.deceleration_loss_lambda),
+        "--cohort-mode", args.cohort_mode,
         "--event-ordinal", str(event["ordinal"]),
         "--event-time", str(event["sim_time_s"]),
         "--receiver-id", str(event["receiver_id"]),
@@ -115,7 +116,14 @@ def main():
         "--deceleration-loss-lambda", type=float, default=1.0,
         help="proposal-origin loss weight used by the discovery batch")
     parser.add_argument("--workers", type=int, default=10)
+    parser.add_argument(
+        "--cohort-mode", choices=("all-observed", "actors-followers"),
+        default="all-observed")
     args = parser.parse_args()
+    args.plan = args.plan.resolve()
+    args.sumo_home = args.sumo_home.resolve()
+    args.python = args.python.resolve()
+    args.output = args.output.resolve()
     if args.output.exists():
         parser.error("output directory already exists")
     if args.workers < 1:
@@ -179,6 +187,7 @@ def main():
         "sumo_home": str(args.sumo_home),
         "duration_s": args.duration,
         "deceleration_loss_lambda": args.deceleration_loss_lambda,
+        "cohort_mode": args.cohort_mode,
         "workers": args.workers,
         "started_epoch": started,
         "ended_epoch": time.time(),

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 import json
+import math
+import random
 from pathlib import Path
 
 
@@ -51,8 +54,9 @@ def negotiation_path(run_dir):
     return existing[0]
 
 
-def selected_events(trace, count):
-    selected = []
+def forceable_events(trace):
+    """Return the first record for every forceable negotiation identity."""
+    events = []
     seen = set()
     decision_ordinal = 0
     for record in read_jsonl(trace):
@@ -75,19 +79,48 @@ def selected_events(trace, count):
         if identity in seen:
             continue
         seen.add(identity)
-        selected.append({
+        events.append({
             "ordinal": decision_ordinal,
             "sim_time_s": float(record["sim_time"]),
             "receiver_id": identity[0],
             "sender_id": identity[1],
             "desired_path_id": identity[2],
         })
-        if len(selected) == count:
-            return selected
-    raise ValueError(f"only {len(selected)} unique decisions in {trace}; need {count}")
+    return events
 
 
-def build_plan(discoveries, events_per_run=4, cases=CASES):
+def selected_events(trace, count, *, time_start_s=None, time_end_s=None,
+                    include_time_end=False, sampling_seed=None,
+                    selection_key=""):
+    candidates = forceable_events(trace)
+    if time_start_s is not None:
+        candidates = [
+            event for event in candidates
+            if float(event["sim_time_s"]) >= time_start_s
+            and (float(event["sim_time_s"]) <= time_end_s
+                 if include_time_end
+                 else float(event["sim_time_s"]) < time_end_s)
+        ]
+    if len(candidates) < count:
+        window = ("all times" if time_start_s is None else
+                  f"{time_start_s}..{time_end_s} s")
+        raise ValueError(
+            f"only {len(candidates)} unique decisions in {trace} "
+            f"for {window}; need {count}")
+    if sampling_seed is None:
+        return candidates[:count]
+    seed_material = (
+        f"{sampling_seed}|{selection_key}|{time_start_s}|{time_end_s}|"
+        f"{int(include_time_end)}").encode("utf-8")
+    stable_seed = int.from_bytes(
+        hashlib.sha256(seed_material).digest()[:16], "big")
+    selected = random.Random(stable_seed).sample(candidates, count)
+    return sorted(selected, key=lambda event: event["ordinal"])
+
+
+def build_plan(discoveries, events_per_run=4, cases=CASES, *,
+               time_start_s=None, time_end_s=None, include_time_end=False,
+               sampling_seed=None):
     events = []
     sources = {}
     for origin in ("yamashita", "proposal"):
@@ -106,19 +139,45 @@ def build_plan(discoveries, events_per_run=4, cases=CASES):
                     "git": manifest.get("git"),
                     "fixed_vehicle_input": manifest.get("fixed_vehicle_input"),
                 }
-                for event in selected_events(trace, events_per_run):
+                selection_key = f"{origin}:{case}:{seed}"
+                for event in selected_events(
+                        trace, events_per_run,
+                        time_start_s=time_start_s,
+                        time_end_s=time_end_s,
+                        include_time_end=include_time_end,
+                        sampling_seed=sampling_seed,
+                        selection_key=selection_key):
                     events.append({
                         "case": case,
                         "seed": seed,
                         "origin_policy": origin,
                         **event,
                     })
+    stratified = time_start_s is not None
+    if stratified:
+        end_operator = "<=" if include_time_end else "<"
+        selection_rule = (
+            f"four unique forceable TIV/proposal Accept/Reject decisions "
+            f"sampled without replacement per case/origin/seed from "
+            f"{time_start_s} <= sim_time {end_operator} {time_end_s} s "
+            f"using deterministic seed {sampling_seed}; physics-only refusals "
+            "are excluded and invalid selected events are not replaced")
+    else:
+        selection_rule = (
+            "first four unique forceable TIV/proposal Accept/Reject decisions in "
+            "natural-log order for each case/origin/seed; physics-only refusals "
+            "are excluded and invalid selected events are not replaced")
     return {
         "schema": "decision-oracle-plan-v1",
-        "selection_rule": (
-            "first four unique forceable TIV/proposal Accept/Reject decisions in "
-            "natural-log order for each case/origin/seed; physics-only refusals are "
-            "excluded and invalid selected events are not replaced"),
+        "selection_rule": selection_rule,
+        "selection": {
+            "method": ("deterministic_random_without_replacement"
+                       if stratified else "first_unique_in_natural_order"),
+            "time_start_s": time_start_s,
+            "time_end_s": time_end_s,
+            "include_time_end": bool(include_time_end),
+            "sampling_seed": sampling_seed,
+        },
         "events_per_run": events_per_run,
         "event_count": len(events),
         "events": events,
@@ -135,6 +194,10 @@ def main():
     parser.add_argument(
         "--seeds", type=int, nargs=5,
         help="five preregistered seeds shared by Eval.3/5/7")
+    parser.add_argument("--time-start", type=float)
+    parser.add_argument("--time-end", type=float)
+    parser.add_argument("--include-time-end", action="store_true")
+    parser.add_argument("--sampling-seed", type=int)
     args = parser.parse_args()
     if args.output.exists():
         parser.error("output already exists")
@@ -143,12 +206,29 @@ def main():
     if args.seeds is not None and (
             len(set(args.seeds)) != 5 or any(seed < 0 for seed in args.seeds)):
         parser.error("--seeds must contain five unique non-negative integers")
+    has_start, has_end = args.time_start is not None, args.time_end is not None
+    if has_start != has_end:
+        parser.error("--time-start and --time-end must be provided together")
+    if has_start:
+        if (not math.isfinite(args.time_start)
+                or not math.isfinite(args.time_end)
+                or args.time_start < 0
+                or args.time_end <= args.time_start):
+            parser.error("time window must be finite, non-negative, and increasing")
+        if args.sampling_seed is None:
+            parser.error("--sampling-seed is required for a time window")
+    elif args.include_time_end or args.sampling_seed is not None:
+        parser.error("time-window options require --time-start and --time-end")
     cases = (CASES if args.seeds is None else
              {case: tuple(args.seeds) for case in CASES})
     plan = build_plan({
         "yamashita": args.yamashita_discovery.resolve(),
         "proposal": args.proposal_discovery.resolve(),
-    }, args.events_per_run, cases)
+    }, args.events_per_run, cases,
+        time_start_s=args.time_start,
+        time_end_s=args.time_end,
+        include_time_end=args.include_time_end,
+        sampling_seed=args.sampling_seed)
     args.output.write_text(
         json.dumps(plan, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     print(json.dumps({"event_count": plan["event_count"],

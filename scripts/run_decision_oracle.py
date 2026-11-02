@@ -225,7 +225,17 @@ def main():
     parser.add_argument("--receiver-id")
     parser.add_argument("--sender-id")
     parser.add_argument("--desired-path-id")
+    parser.add_argument(
+        "--cohort-mode", choices=("all-observed", "actors-followers"),
+        default="all-observed")
     args = parser.parse_args()
+    args.output = args.output.resolve()
+    args.sumo_home = args.sumo_home.resolve()
+    args.python = str(Path(args.python).resolve())
+    if args.source is not None:
+        args.source = args.source.resolve()
+    if args.git_metadata_json is not None:
+        args.git_metadata_json = args.git_metadata_json.resolve()
     if args.output.exists():
         parser.error("output directory already exists")
     if args.event_ordinal < 1:
@@ -272,10 +282,17 @@ def main():
     actor_ids = {str(request["sender"]), str(request["receiver"])}
     follower_ids = set(map(str, proposal_evaluation.get(
         "union_follower_ids", ())))
-    cohort = decision_oracle.primary_cohort_ids(
+    all_observed_cohort = decision_oracle.primary_cohort_ids(
         accept_samples, reject_samples, actor_ids)
+    cohort = (actor_ids | follower_ids
+              if args.cohort_mode == "actors-followers"
+              else all_observed_cohort)
     accept_metrics = decision_oracle.realised_metrics(accept_samples, cohort)
     reject_metrics = decision_oracle.realised_metrics(reject_samples, cohort)
+    accept_all_observed_metrics = decision_oracle.realised_metrics(
+        accept_samples, all_observed_cohort)
+    reject_all_observed_metrics = decision_oracle.realised_metrics(
+        reject_samples, all_observed_cohort)
     accept_follower_metrics = decision_oracle.realised_metrics(
         accept_samples, follower_ids)
     reject_follower_metrics = decision_oracle.realised_metrics(
@@ -301,6 +318,7 @@ def main():
         "boundary_fingerprint": fingerprint,
         "policy_choices": policy_choices, "oracle": oracle,
         "policy_scores": policy_scores,
+        "cohort_mode": args.cohort_mode,
         "cohort_vehicle_ids": sorted(cohort),
         "actor_vehicle_ids": sorted(actor_ids),
         "follower_vehicle_ids": sorted(follower_ids),
@@ -310,6 +328,14 @@ def main():
             "accept_minus_reject_distance_m": (
                 accept_follower_metrics["distance_m"]
                 - reject_follower_metrics["distance_m"]),
+        },
+        "secondary_all_observed": {
+            "vehicle_ids": sorted(all_observed_cohort),
+            "accept": accept_all_observed_metrics,
+            "reject": reject_all_observed_metrics,
+            "accept_minus_reject_distance_m": (
+                accept_all_observed_metrics["distance_m"]
+                - reject_all_observed_metrics["distance_m"]),
         },
     }
     write_json(event_dir / "manifest.json", manifest)
