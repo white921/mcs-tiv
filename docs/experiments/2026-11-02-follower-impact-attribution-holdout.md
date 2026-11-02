@@ -21,6 +21,8 @@
 
 正式自然走行は方式ごとのclean detached worktreeで各30 run、各4 workerとして同時に
 開始した。結果完了後に全manifestとログを検証し、正常な場合だけ場面計画へ進む。
+本バッチは開始済みworker poolを変更できないため合計8並列のまま完走させる。以後の
+MCS/SUMOバッチは原則10並列とし、本実験の反実仮corpusも10 workerで実行する。
 
 ## 目的
 

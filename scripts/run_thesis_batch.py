@@ -440,8 +440,12 @@ def main():
         "--run-name",
         help="readable experiment directory name created under results/runs")
     parser.add_argument("--cases", choices=CASES, nargs="+", default=list(CASES))
-    parser.add_argument("--workers", type=int, default=3,
-                        help="independent SUMO tasks; use 3-4, not all CPU threads")
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=10,
+        help="independent SUMO tasks; default 10 on the 12-core Ubuntu host",
+    )
     parser.add_argument("--seeds-per-case", type=int,
                         help="run only this many leading documented seeds per case (smoke tests)")
     parser.add_argument("--seeds", type=int, nargs="+",
