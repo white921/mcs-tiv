@@ -6,7 +6,7 @@
 - 比較対象: 到着時間項のみ、提案方式`lambda=2`、山下方式
 - 使用seed: `13, 14, 15, 16, 17, 18, 19, 20, 21, 22`
 - 自然走行source: `f56fd4bcfd68330399a9b0e6c870b9126f4447ed`
-- 反実仮source: 実装・テスト完了後に固定する
+- 反実仮source: `f8412b944a4dcdaf42df8b556bebbc825572f6f8`
 - 予定出力: `results/runs/follower-impact-time-stratified-*`
 
 ## 目的
@@ -58,6 +58,23 @@ seed 13〜22の山下方式・提案方式の自然走行60 runは完了済み�
 Accept/Reject 1,920分岐となる。各planを10 workerで逐次実行し、1 planが正常終了した
 場合だけ次へ進む。
 
+## plan固定結果
+
+全planは固定乱数seed`20261103`で生成した。各planは120場面、各case 40場面、
+各origin 60場面、各case × origin × seed × 時間帯から4場面である。選択IDの重複、
+時間範囲、件数を検証した。
+
+| seed群 | 時間帯 [s] | 実際の選択時刻 [s] | plan SHA-256 |
+| --- | --- | --- | --- |
+| 13–17 | `[0,100)` | 20.4–99.9 | `3da2c236ad273ee73603504046f8051ad7b60cf9918e52f8b6d7cc24f2f3a01c` |
+| 13–17 | `[100,160)` | 100.2–159.6 | `c5d6599267f0a0fcc6b80e5dc1a080a652ac8fe49997eeac5a3530fb2b30aa96` |
+| 13–17 | `[160,220)` | 160.4–219.5 | `313a3b236f845133d3aefcdf2a3da844521b2e00ccf79feaa0cc4af6509ba59e` |
+| 13–17 | `[220,290]` | 220.0–290.0 | `297bc4d5dd8557a12001fac768f525f28b288d94edd7e91070e7e6196306edd3` |
+| 18–22 | `[0,100)` | 23.6–99.5 | `232444c4052bd421bda2077077e92da8488ab79acc8f000ff5ba6cd3800ca749` |
+| 18–22 | `[100,160)` | 100.1–159.9 | `1de633272a8dd794afd68f9f4edaaa87d96177081761aa99b168505cced9fbc5` |
+| 18–22 | `[160,220)` | 160.3–219.1 | `c5ecbd97871bdbe71e20f55df327b88275b83b534a8c8ca915496a18adf18034` |
+| 18–22 | `[220,290]` | 220.1–289.8 | `c0d1d07afda5e21ba28319bec36acdaa13705aadd467d4497c55b5ad00870ab6` |
+
 ## 実装修正
 
 - plan生成器に時間範囲と固定乱数による非復元抽出を追加する。
@@ -71,6 +88,12 @@ Ubuntuで全123 test成功後、最初の単一場面smokeはPython実行ファ�
 読み込めずcapture開始前に停止した。分岐結果はなく、`source_unchanged: true`だった。
 venvのsymlinkを保持する絶対パスへ修正し、同じ条件の新しい出力先で再検証する。
 
+修正後はUbuntuのPython 3.15.1 / SUMO 1.28.0で123 testが再度すべて成功した。
+Eval.3 seed 13の単一場面smokeは、capture、Accept、Rejectがすべてexit 0、
+`source_unchanged: true`、境界fingerprint一致、物理衝突0、オラクル有効で完了した。
+一次cohortはactor 2台と後続影響車6台の計8台、二次の全観測cohortは15台だった。
+正式corpusはsmoke出力を持たない別のclean detached worktreeから開始する。
+
 ## 実行順
 
 1. 時間層別plan生成・cohort・絶対パス処理を実装し、テストする。
@@ -82,8 +105,8 @@ venvのsymlinkを保持する絶対パスへ修正し、同じ条件の新しい
 
 ## 完了条件
 
-- [ ] 実装テストとUbuntu smokeが成功している。
-- [ ] 8 planのSHA-256と時間帯が固定されている。
+- [x] 実装テストとUbuntu smokeが成功している。
+- [x] 8 planのSHA-256と時間帯が固定されている。
 - [ ] 960場面のAccept/Reject両分岐が正常終了している。
 - [ ] 全manifestが`source_unchanged: true`で、境界fingerprintが一致している。
 - [ ] 必須artifact、物理衝突、runner/stdout/stderrを検証している。
