@@ -83,6 +83,7 @@ CASES = {
         "flows": ["400", "400", "400"], "bus_share": "0.25",
         "seeds": [1, 2, 3, 4, 5], "reference": 7.4159,
         "holdout_seeds": [6, 8, 9, 10, 12],
+        "attribution_holdout_seeds": list(range(13, 23)),
         "fixed_input": "fixed_inputs/thesis/eval3/seed-{seed}.jsonl",
     },
     "eval4": {
@@ -95,6 +96,7 @@ CASES = {
         "flows": ["300", "300", "300", "300"], "bus_share": "0.25",
         "seeds": [1, 2, 3, 4, 5], "reference": 6.4420,
         "holdout_seeds": [6, 8, 9, 10, 12],
+        "attribution_holdout_seeds": list(range(13, 23)),
         "fixed_input": "fixed_inputs/thesis/eval5/seed-{seed}.jsonl",
     },
     "eval6": {
@@ -107,6 +109,7 @@ CASES = {
         "flows": ["1000", "1000"], "bus_share": "0.25",
         "seeds": [1, 2, 3, 7, 11], "reference": 4.2084,
         "holdout_seeds": [6, 8, 9, 10, 12],
+        "attribution_holdout_seeds": list(range(13, 23)),
         "fixed_input": "fixed_inputs/thesis/eval7/seed-{seed}.jsonl",
     },
 }
@@ -221,7 +224,11 @@ def build_tasks(case_names, seeds_per_case=None, seeds=None):
     for name in case_names:
         documented = CASES[name]["seeds"]
         if seeds is not None:
-            allowed = set(documented) | set(CASES[name].get("holdout_seeds", ()))
+            allowed = (
+                set(documented)
+                | set(CASES[name].get("holdout_seeds", ()))
+                | set(CASES[name].get("attribution_holdout_seeds", ()))
+            )
             unknown = [seed for seed in seeds if seed not in allowed]
             if unknown:
                 raise ValueError(f"{name} does not document seeds: {unknown}")

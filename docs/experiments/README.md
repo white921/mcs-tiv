@@ -18,3 +18,5 @@
 | --- | --- | --- | --- |
 | completed | 2026-10-30 | Eval.3/5/7・交渉単位Accept/Reject反実仮ベンチマーク | [記録](2026-10-30-decision-oracle-benchmark.md) |
 | completed | 2026-10-31 | 後続車害のみ合成・未使用seed独立holdout | [記録](2026-10-31-decision-oracle-harm-only-holdout.md) |
+| completed | 2026-11-02 | 判断後悔量の評価窓・評価量に対する頑健性確認 | [記録](2026-11-02-decision-regret-robustness.md) |
+| planned | 2026-11-02 | 後続車影響項の寄与を確認する独立holdout | [記録](2026-11-02-follower-impact-attribution-holdout.md) |
