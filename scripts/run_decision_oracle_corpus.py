@@ -46,7 +46,8 @@ def validate_checkpoint_batch(root, origin_policy, duration):
     method = str(manifest.get("method", ""))
     if origin_policy == "yamashita" and not method.startswith("yamashita"):
         failures.append(f"method={method}")
-    if origin_policy == "proposal" and not method.startswith("proposal"):
+    if (origin_policy == "proposal"
+            and method != "deceleration-propagation"):
         failures.append(f"method={method}")
     if failures:
         raise ValueError(
