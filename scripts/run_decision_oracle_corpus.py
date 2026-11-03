@@ -22,6 +22,39 @@ from run_thesis_batch import (  # noqa: E402
 )
 
 
+def validate_checkpoint_batch(root, origin_policy, duration):
+    """Validate the natural-run batch that owns reusable checkpoints."""
+    if root is None:
+        return None
+    path = root / "experiment-manifest.json"
+    if not path.is_file():
+        raise ValueError(f"checkpoint batch manifest does not exist: {path}")
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    failures = []
+    if manifest.get("status") != "completed":
+        failures.append(f"status={manifest.get('status')}")
+    if manifest.get("completed_simulations") != 30:
+        failures.append(
+            f"completed_simulations={manifest.get('completed_simulations')}")
+    if manifest.get("failed_simulations") != 0:
+        failures.append(f"failed_simulations={manifest.get('failed_simulations')}")
+    if float(manifest.get("duration_s", -1)) != float(duration):
+        failures.append(f"duration_s={manifest.get('duration_s')}")
+    if float(manifest.get("checkpoint_interval_s", 0)) <= 0:
+        failures.append(
+            f"checkpoint_interval_s={manifest.get('checkpoint_interval_s')}")
+    method = str(manifest.get("method", ""))
+    if origin_policy == "yamashita" and not method.startswith("yamashita"):
+        failures.append(f"method={method}")
+    if origin_policy == "proposal" and not method.startswith("proposal"):
+        failures.append(f"method={method}")
+    if failures:
+        raise ValueError(
+            f"invalid {origin_policy} checkpoint batch {path}: "
+            + ", ".join(failures))
+    return {"path": str(path), "manifest": manifest}
+
+
 def event_slug(index, event):
     return (
         f"{index:03d}-{event['case']}-{event['origin_policy']}-"
@@ -39,7 +72,48 @@ def event_manifest(output):
     return matches[0]
 
 
-def run_event(args, source, git_metadata_path, output_root, index, event):
+def capture_checkpoint_for_event(args, event):
+    """Choose the latest complete natural-run checkpoint before an event."""
+    root = args.checkpoint_roots.get(event["origin_policy"])
+    if root is None:
+        return None
+    run_root = root / event["case"] / f"seed-{event['seed']}"
+    run_manifest_path = run_root / "manifest.json"
+    if not run_manifest_path.is_file():
+        raise ValueError(
+            f"checkpoint source run manifest does not exist: {run_manifest_path}")
+    run_manifest = json.loads(run_manifest_path.read_text(encoding="utf-8"))
+    if (run_manifest.get("exit_code") != 0
+            or run_manifest.get("source_unchanged") is not True):
+        raise ValueError(
+            f"checkpoint source run is invalid: {run_manifest_path}; "
+            f"exit_code={run_manifest.get('exit_code')}, "
+            f"source_unchanged={run_manifest.get('source_unchanged')}")
+    checkpoint_root = run_root / "checkpoints"
+    if not checkpoint_root.is_dir():
+        raise ValueError(f"checkpoint directory does not exist: {checkpoint_root}")
+    event_checkpoint_time = round(float(event["sim_time_s"]) - 0.1, 1)
+    candidates = []
+    for path in checkpoint_root.iterdir():
+        metadata_path = path / "checkpoint.json"
+        if not path.is_dir() or not metadata_path.is_file():
+            continue
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        required = ("checkpoint.json", "mcs-state.pkl", "sumo-state.xml.gz")
+        if not all((path / name).is_file() for name in required):
+            continue
+        if metadata.get("case") != event["case"]:
+            continue
+        if int(metadata.get("seed", -1)) != int(event["seed"]):
+            continue
+        moment = float(metadata.get("simulation_time_s", math.inf))
+        if 0 < moment < event_checkpoint_time:
+            candidates.append((moment, path))
+    return max(candidates, key=lambda item: item[0], default=(None, None))[1]
+
+
+def run_event(args, source, git_metadata_path, output_root, index, event,
+              capture_checkpoint=None):
     slug = event_slug(index, event)
     output = output_root / "events" / slug
     log_dir = output_root / "runner-logs"
@@ -62,6 +136,8 @@ def run_event(args, source, git_metadata_path, output_root, index, event):
         "--sender-id", str(event["sender_id"]),
         "--desired-path-id", str(event["desired_path_id"]),
     ]
+    if capture_checkpoint is not None:
+        command += ["--capture-resume-checkpoint", str(capture_checkpoint)]
     started = time.monotonic()
     with (log_dir / f"{slug}.stdout.log").open("w", encoding="utf-8") as stdout, \
             (log_dir / f"{slug}.stderr.log").open("w", encoding="utf-8") as stderr:
@@ -70,6 +146,8 @@ def run_event(args, source, git_metadata_path, output_root, index, event):
         "index": index, "slug": slug, "event": event, "command": command,
         "exit_code": completed.returncode,
         "elapsed_seconds": time.monotonic() - started,
+        "capture_resume_checkpoint": (str(capture_checkpoint)
+                                      if capture_checkpoint is not None else None),
     }
     if completed.returncode == 0:
         path, manifest = event_manifest(output)
@@ -119,6 +197,12 @@ def main():
     parser.add_argument(
         "--cohort-mode", choices=("all-observed", "actors-followers"),
         default="all-observed")
+    parser.add_argument(
+        "--checkpoint-root-yamashita", type=Path,
+        help="natural-run batch root containing case/seed/checkpoints")
+    parser.add_argument(
+        "--checkpoint-root-proposal", type=Path,
+        help="natural-run batch root containing case/seed/checkpoints")
     args = parser.parse_args()
     args.plan = args.plan.resolve()
     args.sumo_home = args.sumo_home.resolve()
@@ -126,6 +210,15 @@ def main():
     # independent of its working directory.
     args.python = args.python.absolute()
     args.output = args.output.resolve()
+    if ((args.checkpoint_root_yamashita is None)
+            != (args.checkpoint_root_proposal is None)):
+        parser.error("both natural-run checkpoint roots must be supplied together")
+    args.checkpoint_roots = {
+        "yamashita": (args.checkpoint_root_yamashita.resolve()
+                      if args.checkpoint_root_yamashita is not None else None),
+        "proposal": (args.checkpoint_root_proposal.resolve()
+                     if args.checkpoint_root_proposal is not None else None),
+    }
     if args.output.exists():
         parser.error("output directory already exists")
     if args.workers < 1:
@@ -139,6 +232,17 @@ def main():
         parser.error("unsupported plan schema")
     if plan.get("event_count") != 120 or len(plan.get("events", ())) != 120:
         parser.error("the preregistered plan must contain exactly 120 events")
+    try:
+        checkpoint_batches = {
+            name: validate_checkpoint_batch(root, name, args.duration)
+            for name, root in args.checkpoint_roots.items()
+        }
+        capture_checkpoints = [
+            capture_checkpoint_for_event(args, event)
+            for event in plan["events"]
+        ]
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        parser.error(str(error))
 
     run_git = git_metadata()
     if run_git.get("dirty") is not False:
@@ -156,8 +260,9 @@ def main():
         futures = [
             pool.submit(
                 run_event, args, source, git_metadata_path,
-                args.output, index, event)
-            for index, event in enumerate(plan["events"], 1)
+                args.output, index, event, capture_checkpoint)
+            for index, (event, capture_checkpoint) in enumerate(
+                zip(plan["events"], capture_checkpoints), 1)
         ]
         for future in concurrent.futures.as_completed(futures):
             results.append(future.result())
@@ -191,6 +296,13 @@ def main():
         "deceleration_loss_lambda": args.deceleration_loss_lambda,
         "cohort_mode": args.cohort_mode,
         "workers": args.workers,
+        "capture_checkpoint_roots": {
+            name: (str(path) if path is not None else None)
+            for name, path in args.checkpoint_roots.items()
+        },
+        "capture_checkpoint_batches": checkpoint_batches,
+        "capture_resume_event_count": sum(
+            checkpoint is not None for checkpoint in capture_checkpoints),
         "started_epoch": started,
         "ended_epoch": time.time(),
         "overall": decision_oracle.summarize(completed_events),

@@ -101,6 +101,37 @@ def scenario_command(args, source, stop_time, resume=None):
     return command, fixed
 
 
+def capture_resume_metadata(path, args, checkpoint_time):
+    """Validate one external checkpoint used to shorten event capture."""
+    if path is None:
+        return None
+    required = ("checkpoint.json", "mcs-state.pkl", "sumo-state.xml.gz")
+    missing = [name for name in required if not (path / name).is_file()]
+    if missing:
+        raise ValueError(
+            f"capture resume checkpoint is incomplete: {path}; missing {missing}")
+    metadata = json.loads((path / "checkpoint.json").read_text(encoding="utf-8"))
+    if metadata.get("schema_version") != mcs_checkpoint.SCHEMA_VERSION:
+        raise ValueError(
+            "capture resume checkpoint schema mismatch: "
+            f"expected {mcs_checkpoint.SCHEMA_VERSION}, "
+            f"got {metadata.get('schema_version')}")
+    if metadata.get("case") != args.case:
+        raise ValueError(
+            f"capture resume checkpoint case mismatch: expected {args.case}, "
+            f"got {metadata.get('case')}")
+    if int(metadata.get("seed", -1)) != args.seed:
+        raise ValueError(
+            f"capture resume checkpoint seed mismatch: expected {args.seed}, "
+            f"got {metadata.get('seed')}")
+    resume_time = float(metadata.get("simulation_time_s", math.inf))
+    if not 0 < resume_time < checkpoint_time:
+        raise ValueError(
+            "capture resume checkpoint must precede the event checkpoint: "
+            f"resume={resume_time}, event checkpoint={checkpoint_time}")
+    return metadata
+
+
 def run_capture(args, event, source, event_dir, initial_hashes):
     capture_dir = event_dir / "capture"
     capture_dir.mkdir()
@@ -113,7 +144,10 @@ def run_capture(args, event, source, event_dir, initial_hashes):
         MCS_CHECKPOINT_AT=str(checkpoint_time),
         MCS_NEGOTIATION_AUDIT=str(capture_dir / "negotiations.jsonl"),
     )
-    command, fixed = scenario_command(args, source, checkpoint_time)
+    resume_metadata = capture_resume_metadata(
+        args.capture_resume_checkpoint, args, checkpoint_time)
+    command, fixed = scenario_command(
+        args, source, checkpoint_time, args.capture_resume_checkpoint)
     code, elapsed = run_process(
         command, source / CASES[args.case]["folder"], env,
         capture_dir / "stdout.log", capture_dir / "stderr.log")
@@ -123,6 +157,11 @@ def run_capture(args, event, source, event_dir, initial_hashes):
         "command": command, "exit_code": code, "elapsed_seconds": elapsed,
         "checkpoint_time_s": checkpoint_time,
         "checkpoint": str(checkpoint),
+        "capture_start": (
+            {"mode": "checkpoint", "path": str(args.capture_resume_checkpoint),
+             "metadata": resume_metadata}
+            if args.capture_resume_checkpoint is not None
+            else {"mode": "simulation-start"}),
         "checkpoint_complete": all((checkpoint / name).is_file() for name in (
             "checkpoint.json", "mcs-state.pkl", "sumo-state.xml.gz")),
         "source_unchanged": source_hashes(source) == initial_hashes,
@@ -211,6 +250,9 @@ def main():
     parser.add_argument(
         "--git-metadata-json", type=Path,
         help="start-of-batch Git metadata supplied by a corpus runner")
+    parser.add_argument(
+        "--capture-resume-checkpoint", type=Path,
+        help="validated earlier checkpoint used only to shorten capture")
     parser.add_argument("--case", choices=("eval3", "eval5", "eval7"),
                         default="eval3")
     parser.add_argument("--origin-policy", choices=("yamashita", "proposal"),
@@ -238,6 +280,8 @@ def main():
         args.source = args.source.resolve()
     if args.git_metadata_json is not None:
         args.git_metadata_json = args.git_metadata_json.resolve()
+    if args.capture_resume_checkpoint is not None:
+        args.capture_resume_checkpoint = args.capture_resume_checkpoint.resolve()
     if args.output.exists():
         parser.error("output directory already exists")
     if args.event_ordinal < 1:
@@ -245,6 +289,12 @@ def main():
     if (not math.isfinite(args.deceleration_loss_lambda) or
             args.deceleration_loss_lambda < 0):
         parser.error("--deceleration-loss-lambda must be finite and non-negative")
+    checkpoint_time = round(float(args.event_time) - 0.1, 1)
+    try:
+        capture_resume_metadata(
+            args.capture_resume_checkpoint, args, checkpoint_time)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        parser.error(str(error))
     run_git = (json.loads(args.git_metadata_json.read_text(encoding="utf-8"))
                if args.git_metadata_json is not None else git_metadata())
 

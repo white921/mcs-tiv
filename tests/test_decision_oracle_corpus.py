@@ -116,7 +116,8 @@ class DecisionOracleCorpusTests(unittest.TestCase):
         args = NS(
             python=Path("/tmp/python"), sumo_home=Path("/tmp/sumo"),
             duration=300.0, deceleration_loss_lambda=2.0,
-            cohort_mode="actors-followers")
+            cohort_mode="actors-followers", checkpoint_roots={
+                "yamashita": None, "proposal": None})
         event = {
             "case": "eval3", "origin_policy": "proposal", "seed": 13,
             "ordinal": 1, "sim_time_s": 100.0,
@@ -135,6 +136,75 @@ class DecisionOracleCorpusTests(unittest.TestCase):
         self.assertIn("--cohort-mode", command)
         self.assertEqual(
             command[command.index("--cohort-mode") + 1], "actors-followers")
+
+    def test_corpus_chooses_latest_complete_checkpoint_before_event(self):
+        event = {
+            "case": "eval3", "origin_policy": "proposal", "seed": 13,
+            "ordinal": 1, "sim_time_s": 220.0,
+            "receiver_id": "1", "sender_id": "2",
+            "desired_path_id": "2_3",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_root = root / "eval3" / "seed-13"
+            run_root.mkdir(parents=True)
+            (run_root / "manifest.json").write_text(json.dumps({
+                "exit_code": 0, "source_unchanged": True,
+            }))
+            checkpoint_root = run_root / "checkpoints"
+            for moment in (60.0, 120.0, 180.0, 240.0):
+                path = checkpoint_root / f"t{moment:09.1f}"
+                path.mkdir(parents=True)
+                (path / "checkpoint.json").write_text(json.dumps({
+                    "schema_version": 1, "case": "eval3", "seed": 13,
+                    "simulation_time_s": moment,
+                }))
+                (path / "mcs-state.pkl").touch()
+                (path / "sumo-state.xml.gz").touch()
+            args = NS(checkpoint_roots={"yamashita": None, "proposal": root})
+            selected = corpus.capture_checkpoint_for_event(args, event)
+            self.assertEqual(selected.name, "t0000180.0")
+
+    def test_event_runner_passes_capture_resume_checkpoint(self):
+        args = NS(
+            python=Path("/tmp/python"), sumo_home=Path("/tmp/sumo"),
+            duration=300.0, deceleration_loss_lambda=2.0,
+            cohort_mode="actors-followers")
+        event = {
+            "case": "eval3", "origin_policy": "proposal", "seed": 13,
+            "ordinal": 1, "sim_time_s": 100.0,
+            "receiver_id": "1", "sender_id": "2",
+            "desired_path_id": "2_3",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            checkpoint = root / "checkpoint"
+            checkpoint.mkdir()
+            (root / "runner-logs").mkdir()
+            with mock.patch.object(corpus.subprocess, "run") as run:
+                run.return_value.returncode = 1
+                corpus.run_event(
+                    args, root / "source", root / "git.json",
+                    root, 1, event, checkpoint)
+            command = run.call_args.args[0]
+        self.assertIn("--capture-resume-checkpoint", command)
+        self.assertEqual(
+            command[command.index("--capture-resume-checkpoint") + 1],
+            str(checkpoint))
+
+    def test_capture_resume_metadata_rejects_wrong_seed(self):
+        args = NS(case="eval3", seed=14)
+        with tempfile.TemporaryDirectory() as directory:
+            checkpoint = Path(directory)
+            (checkpoint / "checkpoint.json").write_text(json.dumps({
+                "schema_version": 1, "case": "eval3", "seed": 13,
+                "simulation_time_s": 60.0,
+            }))
+            (checkpoint / "mcs-state.pkl").touch()
+            (checkpoint / "sumo-state.xml.gz").touch()
+            with self.assertRaisesRegex(ValueError, "seed mismatch"):
+                run_decision_oracle.capture_resume_metadata(
+                    checkpoint, args, 99.9)
 
     def test_boundary_identity_uses_boundary_request_field_names(self):
         request = {

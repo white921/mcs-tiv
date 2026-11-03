@@ -109,6 +109,24 @@ Eval.3 seed 13の単一場面smokeは、capture、Accept、Rejectがすべてexi
 場合は後続planを開始せず停止する。開始後の初回監査では、orchestratorと最初の10場面の
 capture processが稼働し、完了済み場面はまだ0件だった。
 
+## capture効率の実行中修正
+
+正式corpusの実行中、各場面の専用checkpointを作るcaptureが、自然走行で保存済みの
+60秒間隔checkpointを利用せず、0秒から`event_time - 0.1`秒まで毎回再現していることを
+確認した。Accept/Reject分岐自体は同一の専用checkpointから開始しており、問題はその
+専用checkpointを作るcaptureの重複にある。
+
+完了済み結果を破棄しないため、`13–17 / [160,220)`corpusは従来runnerで120/120場面まで
+完了させる。親orchestratorだけを停止状態にし、実行中のcorpus子processは継続させた。
+これにより現在のcorpus完了後に`13–17 / [220,290]`が自動開始されない。
+
+残り5 corpusは、同一case・origin・seedの自然走行が保存した最新の60秒間隔checkpointから
+captureを再開し、そこから従来と同じ`event_time - 0.1`秒の専用checkpointを作る。plan、
+強制選択、10秒評価、cohort、指標は変更しない。開始前に同一場面を従来captureと
+checkpoint再開captureの両方で実行し、判断境界fingerprint、対象交渉ID、Accept/Reject指標、
+oracle、policy score、物理衝突が一致することを必須とする。一致しなければ残りcorpusは
+開始しない。
+
 ## 実行順
 
 1. 時間層別plan生成・cohort・絶対パス処理を実装し、テストする。
