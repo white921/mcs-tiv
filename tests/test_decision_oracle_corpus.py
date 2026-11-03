@@ -192,6 +192,17 @@ class DecisionOracleCorpusTests(unittest.TestCase):
             command[command.index("--capture-resume-checkpoint") + 1],
             str(checkpoint))
 
+    def test_eval7_checkpoint_reuse_is_excluded_after_failed_equivalence(self):
+        args = NS(checkpoint_roots={
+            "yamashita": Path("/unused"), "proposal": Path("/unused")})
+        for origin in ("yamashita", "proposal"):
+            event = {
+                "case": "eval7", "origin_policy": origin, "seed": 13,
+                "ordinal": 1, "sim_time_s": 200.0,
+            }
+            self.assertIsNone(
+                corpus.capture_checkpoint_for_event(args, event))
+
     def test_capture_resume_metadata_rejects_wrong_seed(self):
         args = NS(case="eval3", seed=14)
         with tempfile.TemporaryDirectory() as directory:

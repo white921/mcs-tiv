@@ -22,6 +22,15 @@ from run_thesis_batch import (  # noqa: E402
 )
 
 
+# Eval.7 checkpoint continuation did not reproduce the from-start controller
+# and oracle state in the six-stratum equivalence smoke.  Keep its capture on
+# the validated from-start path; Eval.3 and Eval.5 may reuse natural checkpoints.
+CAPTURE_RESUME_EXCLUDED_STRATA = {
+    ("eval7", "yamashita"),
+    ("eval7", "proposal"),
+}
+
+
 def validate_checkpoint_batch(root, origin_policy, duration):
     """Validate the natural-run batch that owns reusable checkpoints."""
     if root is None:
@@ -75,6 +84,8 @@ def event_manifest(output):
 
 def capture_checkpoint_for_event(args, event):
     """Choose the latest complete natural-run checkpoint before an event."""
+    if (event["case"], event["origin_policy"]) in CAPTURE_RESUME_EXCLUDED_STRATA:
+        return None
     root = args.checkpoint_roots.get(event["origin_policy"])
     if root is None:
         return None
@@ -304,6 +315,10 @@ def main():
         "capture_checkpoint_batches": checkpoint_batches,
         "capture_resume_event_count": sum(
             checkpoint is not None for checkpoint in capture_checkpoints),
+        "capture_resume_excluded_strata": [
+            {"case": case, "origin_policy": origin}
+            for case, origin in sorted(CAPTURE_RESUME_EXCLUDED_STRATA)
+        ],
         "started_epoch": started,
         "ended_epoch": time.time(),
         "overall": decision_oracle.summarize(completed_events),

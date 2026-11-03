@@ -127,6 +127,22 @@ checkpoint再開captureの両方で実行し、判断境界fingerprint、対象�
 oracle、policy score、物理衝突が一致することを必須とする。一致しなければ残りcorpusは
 開始しない。
 
+2026-11-03 21:31:10 JSTに`13–17 / [160,220)`が120/120場面、失敗0、
+`source_unchanged: true`で完了し、従来方式の3 corpus、360場面を区切りとして保存した。
+親orchestratorは次のcorpusを開始せず終了した。
+
+その後の6条件一致smokeでは、Eval.3とEval.5の山下方式・提案方式の4条件がexit 0となり、
+交渉境界内容、後続影響車、Accept/Reject指標、oracle、policy scoreが従来captureと一致した。
+独立process間の境界fingerprintだけは一致しなかった。固定車両入力時は走行用乱数を使わない一方、
+process開始時のPython乱数状態をseed固定せずfingerprintに含めていたためである。各場面内の
+Accept/Reject間ではfingerprintが一致した。
+
+Eval.7は再開checkpointから従来と同じ状態を再現できなかった。山下方式は後続影響車と
+評価指標が異なり、提案方式は対象交渉境界を再現できず停止した。したがってEval.7は
+checkpoint再利用の対象から除外し、従来どおり0秒からcaptureする。残り5 corpusは
+Eval.3/5だけ自然走行checkpointを再利用するhybrid実行とし、再度6条件smokeに合格した場合だけ
+開始する。
+
 ## 実行順
 
 1. 時間層別plan生成・cohort・絶対パス処理を実装し、テストする。
