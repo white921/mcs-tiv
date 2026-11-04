@@ -1,0 +1,425 @@
+{
+  "schema": "decision-oracle-event-v2",
+  "event": {
+    "case": "eval3",
+    "seed": 21,
+    "origin_policy": "yamashita",
+    "ordinal": 2,
+    "sim_time_s": 23.6,
+    "receiver_id": "13",
+    "sender_id": "5",
+    "desired_path_id": "5_18"
+  },
+  "git": {
+    "commit": "3862a8771044c7ed6807f9da1b2587926aba3ef3",
+    "branch": null,
+    "dirty": false
+  },
+  "checkpoint": "/media/yamada/UbuntuData/\u30c9\u30ad\u30e5\u30e1\u30f3\u30c8/\u5352\u8ad6\u7814\u7a76/mcs-tiv-follower-impact-ts-hybrid-18-22-t000-100/results/runs/follower-impact-time-stratified-18-22-t000-100-checkpoint-hybrid-3862a877/events/013-eval3-yamashita-seed-21-event-0002/eval3-yamashita-seed-21-event-0002/capture/checkpoints/t0000023.5",
+  "branches": {
+    "accept": {
+      "record_type": "decision-oracle-branch",
+      "event": {
+        "case": "eval3",
+        "seed": 21,
+        "origin_policy": "yamashita",
+        "ordinal": 2,
+        "sim_time_s": 23.6,
+        "receiver_id": "13",
+        "sender_id": "5",
+        "desired_path_id": "5_18"
+      },
+      "choice": "accept",
+      "command": [
+        "/media/yamada/UbuntuData/home-yamada/Documents/\u5352\u696d\u7814\u7a76/mcs-tiv/.venv-py315-sumo128/bin/python",
+        "-u",
+        "junction_three_agree.py",
+        "7",
+        "21",
+        "400",
+        "400",
+        "400",
+        "--nogui",
+        "--quiet",
+        "--duration",
+        "300.0",
+        "--stop-time",
+        "33.6",
+        "--bus-allocation",
+        "fixed",
+        "--fixed-input",
+        "../fixed_inputs/thesis/eval3/seed-21.jsonl",
+        "--no-save",
+        "--resume-checkpoint",
+        "/media/yamada/UbuntuData/\u30c9\u30ad\u30e5\u30e1\u30f3\u30c8/\u5352\u8ad6\u7814\u7a76/mcs-tiv-follower-impact-ts-hybrid-18-22-t000-100/results/runs/follower-impact-time-stratified-18-22-t000-100-checkpoint-hybrid-3862a877/events/013-eval3-yamashita-seed-21-event-0002/eval3-yamashita-seed-21-event-0002/capture/checkpoints/t0000023.5"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 62.25800252985209,
+      "boundary": {
+        "fingerprint": "f2225370da9371b048d81a1986d89b38fb172cbffad7750f95fc5447cfab9680",
+        "forced_choice": "accept",
+        "proposal_choice": "reject",
+        "proposal_evaluation": {
+          "accept_follower_ids": [
+            "7"
+          ],
+          "accept_loss_m": -0.08805000000000525,
+          "accept_time_equivalent_loss_s": -0.006339092872570572,
+          "arrival_margin_s": 1.5,
+          "arrival_status": "both_reached",
+          "decision": "reject",
+          "decision_basis": "combined_margin",
+          "effective_loss_margin_s": 0.0,
+          "excluded_loss_vehicle_ids": [
+            "13",
+            "5"
+          ],
+          "final_margin_s": 1.5,
+          "follower_count": 1,
+          "follower_replans": 10,
+          "loss_lambda": 2.0,
+          "loss_margin_s": -0.41875536357091464,
+          "loss_vehicle_ids": [
+            "7"
+          ],
+          "negative_loss_credit_s": -0.41875536357091464,
+          "receiver_arrival_reached": true,
+          "receiver_arrival_s": 7.0,
+          "reject_follower_ids": [
+            "7"
+          ],
+          "reject_loss_m": 5.7284619999999995,
+          "reject_minus_accept_m": 5.816512000000005,
+          "reject_time_equivalent_loss_s": 0.4124162706983441,
+          "replan_interval_s": 1.0,
+          "request_arrival_reached": true,
+          "request_arrival_s": 8.5,
+          "time_half_life_s": null,
+          "time_weighting": "uniform",
+          "union_follower_ids": [
+            "7"
+          ],
+          "vehicle_ids": [
+            "13",
+            "5",
+            "7"
+          ],
+          "vehicle_loss_details": {
+            "7": {
+              "accept_loss_m": -0.08805000000000525,
+              "accept_loss_s": -0.006339092872570572,
+              "allowed_speed_mps": 13.89,
+              "reject_loss_m": 5.7284619999999995,
+              "reject_loss_s": 0.4124162706983441
+            }
+          },
+          "weighted_loss_margin_s": 0.0
+        },
+        "request": {
+          "alternative_path_id": "",
+          "desired_path_id": "5_18",
+          "ordinal": 2,
+          "receiver": "13",
+          "sender": "5",
+          "time": 23.6
+        },
+        "schema": "decision-oracle-boundary-v1",
+        "yamashita_choice": "reject"
+      },
+      "completed": true,
+      "source_unchanged": true,
+      "restore_fingerprint_match": true,
+      "safety": {
+        "valid": true,
+        "physical_collision_records": 0
+      },
+      "sample_vehicle_count": 12,
+      "sample_count": 937,
+      "metrics": {
+        "distance_m": 139.88003816191477,
+        "delay_s": 19.929442896910388,
+        "lost_distance_m": 276.81996183808553,
+        "speed_sum_mps": 1398.8003816191458,
+        "speed_samples": 300,
+        "stop_time_s": 0.0,
+        "hard_brake_time_s": 0.0,
+        "arrived_vehicle_ids": [],
+        "invalid_reason": null,
+        "mean_speed_mps": 4.662667938730486,
+        "safety": {
+          "valid": true,
+          "physical_collision_records": 0
+        }
+      }
+    },
+    "reject": {
+      "record_type": "decision-oracle-branch",
+      "event": {
+        "case": "eval3",
+        "seed": 21,
+        "origin_policy": "yamashita",
+        "ordinal": 2,
+        "sim_time_s": 23.6,
+        "receiver_id": "13",
+        "sender_id": "5",
+        "desired_path_id": "5_18"
+      },
+      "choice": "reject",
+      "command": [
+        "/media/yamada/UbuntuData/home-yamada/Documents/\u5352\u696d\u7814\u7a76/mcs-tiv/.venv-py315-sumo128/bin/python",
+        "-u",
+        "junction_three_agree.py",
+        "7",
+        "21",
+        "400",
+        "400",
+        "400",
+        "--nogui",
+        "--quiet",
+        "--duration",
+        "300.0",
+        "--stop-time",
+        "33.6",
+        "--bus-allocation",
+        "fixed",
+        "--fixed-input",
+        "../fixed_inputs/thesis/eval3/seed-21.jsonl",
+        "--no-save",
+        "--resume-checkpoint",
+        "/media/yamada/UbuntuData/\u30c9\u30ad\u30e5\u30e1\u30f3\u30c8/\u5352\u8ad6\u7814\u7a76/mcs-tiv-follower-impact-ts-hybrid-18-22-t000-100/results/runs/follower-impact-time-stratified-18-22-t000-100-checkpoint-hybrid-3862a877/events/013-eval3-yamashita-seed-21-event-0002/eval3-yamashita-seed-21-event-0002/capture/checkpoints/t0000023.5"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 61.7410325082019,
+      "boundary": {
+        "fingerprint": "f2225370da9371b048d81a1986d89b38fb172cbffad7750f95fc5447cfab9680",
+        "forced_choice": "reject",
+        "proposal_choice": "reject",
+        "proposal_evaluation": {
+          "accept_follower_ids": [
+            "7"
+          ],
+          "accept_loss_m": -0.08805000000000525,
+          "accept_time_equivalent_loss_s": -0.006339092872570572,
+          "arrival_margin_s": 1.5,
+          "arrival_status": "both_reached",
+          "decision": "reject",
+          "decision_basis": "combined_margin",
+          "effective_loss_margin_s": 0.0,
+          "excluded_loss_vehicle_ids": [
+            "13",
+            "5"
+          ],
+          "final_margin_s": 1.5,
+          "follower_count": 1,
+          "follower_replans": 10,
+          "loss_lambda": 2.0,
+          "loss_margin_s": -0.41875536357091464,
+          "loss_vehicle_ids": [
+            "7"
+          ],
+          "negative_loss_credit_s": -0.41875536357091464,
+          "receiver_arrival_reached": true,
+          "receiver_arrival_s": 7.0,
+          "reject_follower_ids": [
+            "7"
+          ],
+          "reject_loss_m": 5.7284619999999995,
+          "reject_minus_accept_m": 5.816512000000005,
+          "reject_time_equivalent_loss_s": 0.4124162706983441,
+          "replan_interval_s": 1.0,
+          "request_arrival_reached": true,
+          "request_arrival_s": 8.5,
+          "time_half_life_s": null,
+          "time_weighting": "uniform",
+          "union_follower_ids": [
+            "7"
+          ],
+          "vehicle_ids": [
+            "13",
+            "5",
+            "7"
+          ],
+          "vehicle_loss_details": {
+            "7": {
+              "accept_loss_m": -0.08805000000000525,
+              "accept_loss_s": -0.006339092872570572,
+              "allowed_speed_mps": 13.89,
+              "reject_loss_m": 5.7284619999999995,
+              "reject_loss_s": 0.4124162706983441
+            }
+          },
+          "weighted_loss_margin_s": 0.0
+        },
+        "request": {
+          "alternative_path_id": "",
+          "desired_path_id": "5_18",
+          "ordinal": 2,
+          "receiver": "13",
+          "sender": "5",
+          "time": 23.6
+        },
+        "schema": "decision-oracle-boundary-v1",
+        "yamashita_choice": "reject"
+      },
+      "completed": true,
+      "source_unchanged": true,
+      "restore_fingerprint_match": true,
+      "safety": {
+        "valid": true,
+        "physical_collision_records": 0
+      },
+      "sample_vehicle_count": 12,
+      "sample_count": 937,
+      "metrics": {
+        "distance_m": 212.90912845685216,
+        "delay_s": 14.671769009585882,
+        "lost_distance_m": 203.79087154314786,
+        "speed_sum_mps": 2129.0912845685234,
+        "speed_samples": 300,
+        "stop_time_s": 0.0,
+        "hard_brake_time_s": 0.0,
+        "arrived_vehicle_ids": [],
+        "invalid_reason": null,
+        "mean_speed_mps": 7.0969709485617445,
+        "safety": {
+          "valid": true,
+          "physical_collision_records": 0
+        }
+      }
+    }
+  },
+  "boundary_fingerprint": "f2225370da9371b048d81a1986d89b38fb172cbffad7750f95fc5447cfab9680",
+  "policy_choices": {
+    "yamashita": "reject",
+    "arrival_only": "reject",
+    "proposal_lambda_0.25": "reject",
+    "proposal_lambda_0.5": "reject",
+    "proposal_lambda_0.75": "reject",
+    "proposal_lambda_1": "reject",
+    "proposal_lambda_2": "reject"
+  },
+  "oracle": {
+    "valid": true,
+    "choice": "reject",
+    "accept_minus_reject_distance_m": -73.02909029493739,
+    "tie_tolerance_m": 1.0
+  },
+  "policy_scores": {
+    "yamashita": {
+      "scored": true,
+      "correct": true,
+      "regret_m": 0.0
+    },
+    "arrival_only": {
+      "scored": true,
+      "correct": true,
+      "regret_m": 0.0
+    },
+    "proposal_lambda_0.25": {
+      "scored": true,
+      "correct": true,
+      "regret_m": 0.0
+    },
+    "proposal_lambda_0.5": {
+      "scored": true,
+      "correct": true,
+      "regret_m": 0.0
+    },
+    "proposal_lambda_0.75": {
+      "scored": true,
+      "correct": true,
+      "regret_m": 0.0
+    },
+    "proposal_lambda_1": {
+      "scored": true,
+      "correct": true,
+      "regret_m": 0.0
+    },
+    "proposal_lambda_2": {
+      "scored": true,
+      "correct": true,
+      "regret_m": 0.0
+    }
+  },
+  "cohort_mode": "actors-followers",
+  "cohort_vehicle_ids": [
+    "13",
+    "5",
+    "7"
+  ],
+  "actor_vehicle_ids": [
+    "13",
+    "5"
+  ],
+  "follower_vehicle_ids": [
+    "7"
+  ],
+  "secondary_follower_only": {
+    "accept": {
+      "distance_m": 35.57704543101198,
+      "delay_s": 7.438657636356231,
+      "lost_distance_m": 103.32295456898798,
+      "speed_sum_mps": 355.7704543101199,
+      "speed_samples": 100,
+      "stop_time_s": 0.0,
+      "hard_brake_time_s": 0.0,
+      "arrived_vehicle_ids": [],
+      "invalid_reason": null,
+      "mean_speed_mps": 3.557704543101199
+    },
+    "reject": {
+      "distance_m": 40.41723800791014,
+      "delay_s": 7.090191648098622,
+      "lost_distance_m": 98.4827619920899,
+      "speed_sum_mps": 404.1723800791017,
+      "speed_samples": 100,
+      "stop_time_s": 0.0,
+      "hard_brake_time_s": 0.0,
+      "arrived_vehicle_ids": [],
+      "invalid_reason": null,
+      "mean_speed_mps": 4.041723800791017
+    },
+    "accept_minus_reject_distance_m": -4.840192576898161
+  },
+  "secondary_all_observed": {
+    "vehicle_ids": [
+      "0",
+      "1",
+      "11",
+      "13",
+      "15",
+      "17",
+      "19",
+      "2",
+      "3",
+      "5",
+      "7",
+      "9"
+    ],
+    "accept": {
+      "distance_m": 808.0834530975269,
+      "delay_s": 32.28140891301715,
+      "lost_distance_m": 439.199546902473,
+      "speed_sum_mps": 8080.834530975266,
+      "speed_samples": 937,
+      "stop_time_s": 0.0,
+      "hard_brake_time_s": 0.0,
+      "arrived_vehicle_ids": [],
+      "invalid_reason": null,
+      "mean_speed_mps": 8.624156383111277
+    },
+    "reject": {
+      "distance_m": 882.7115575003029,
+      "delay_s": 26.908615219512924,
+      "lost_distance_m": 364.5714424996987,
+      "speed_sum_mps": 8827.115575002983,
+      "speed_samples": 937,
+      "stop_time_s": 0.0,
+      "hard_brake_time_s": 0.0,
+      "arrived_vehicle_ids": [],
+      "invalid_reason": null,
+      "mean_speed_mps": 9.4206142742828
+    },
+    "accept_minus_reject_distance_m": -74.62810440277599
+  }
+}
