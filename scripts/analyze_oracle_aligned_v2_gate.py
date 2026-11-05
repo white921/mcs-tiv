@@ -53,6 +53,7 @@ def load_rows(path: Path) -> list[dict]:
                 "actual_m": float(actual),
                 "baseline_choice": baseline,
                 "oracle_choice": oracle,
+                "yamashita_choice": source["yamashita_choice"],
             })
     return rows
 
@@ -131,6 +132,51 @@ def fixed_gate_analysis(rows: list[dict], threshold_m: float) -> dict:
     return output
 
 
+def fixed_gate_vs_yamashita(rows: list[dict], threshold_m: float) -> dict:
+    evaluated = []
+    for source in rows:
+        if source.get("yamashita_choice") not in ("accept", "reject"):
+            continue
+        row = dict(source)
+        gated = gated_choice(row, threshold_m, "accept_to_reject")
+        row["yamashita_regret_m"] = regret(row, row["yamashita_choice"])
+        row["gated_regret_m"] = regret(row, gated)
+        row["difference_m"] = (
+            row["gated_regret_m"] - row["yamashita_regret_m"])
+        evaluated.append(row)
+    draws = cluster_bootstrap(
+        evaluated, "difference_m", BOOTSTRAP_REPETITIONS, BOOTSTRAP_SEED)
+
+    def summary(subset: list[dict]) -> dict:
+        return {
+            "common_events": len(subset),
+            "yamashita_macro_regret_m": macro_cell_mean(
+                subset, "yamashita_regret_m"),
+            "gated_macro_regret_m": macro_cell_mean(
+                subset, "gated_regret_m"),
+            "gated_minus_yamashita_macro_regret_m": macro_cell_mean(
+                subset, "difference_m"),
+        }
+
+    output = summary(evaluated)
+    output["cluster_bootstrap_95pct_m"] = [
+        percentile(draws, 0.025), percentile(draws, 0.975)]
+    output["by_case"] = {
+        case: summary([row for row in evaluated if row["case"] == case])
+        for case in CASES
+    }
+    output["by_window"] = {
+        window: summary([row for row in evaluated if row["window"] == window])
+        for window in WINDOWS
+    }
+    output["by_origin"] = {
+        origin: summary([
+            row for row in evaluated if row["origin_policy"] == origin])
+        for origin in ("yamashita", "proposal")
+    }
+    return output
+
+
 def leave_one_cluster_out(rows: list[dict]) -> dict:
     clusters = sorted({
         (row["case"], row["origin_policy"], row["seed"]) for row in rows
@@ -185,6 +231,8 @@ def analyze(rows: list[dict]) -> dict:
         },
         "leave_one_case_origin_seed_cluster_out": leave_one_cluster_out(rows),
         "fixed_accept_to_reject_10m": fixed_gate_analysis(rows, 10),
+        "fixed_accept_to_reject_10m_vs_yamashita": (
+            fixed_gate_vs_yamashita(rows, 10)),
     }
 
 

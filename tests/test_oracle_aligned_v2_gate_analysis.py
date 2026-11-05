@@ -19,6 +19,7 @@ class OracleAlignedV2GateAnalysisTest(unittest.TestCase):
             "predicted_m": predicted, "actual_m": actual,
             "baseline_choice": baseline,
             "oracle_choice": "accept" if actual > 0 else "reject",
+            "yamashita_choice": "accept",
         }
 
     def test_accept_to_reject_gate_requires_strict_threshold(self):
