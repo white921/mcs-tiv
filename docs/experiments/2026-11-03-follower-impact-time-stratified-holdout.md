@@ -1,13 +1,17 @@
 # 後続車影響項の寄与を確認する時間層別独立holdout
 
 - 台帳ID: `2026-11-03-follower-impact-time-stratified-holdout`
-- 状態: `running`
+- 状態: `completed`
 - 位置づけ: `confirmatory independent holdout; amended before oracle outcomes`
 - 比較対象: 到着時間項のみ、提案方式`lambda=2`、山下方式
 - 使用seed: `13, 14, 15, 16, 17, 18, 19, 20, 21, 22`
 - 自然走行source: `f56fd4bcfd68330399a9b0e6c870b9126f4447ed`
-- 反実仮source: `f8412b944a4dcdaf42df8b556bebbc825572f6f8`
-- 予定出力: `results/runs/follower-impact-time-stratified-*`
+- 反実仮source: 従来capture
+  `f8412b944a4dcdaf42df8b556bebbc825572f6f8`、hybrid capture
+  `3862a8771044c7ed6807f9da1b2587926aba3ef3`
+- 解析source: `6fbe7352251c02f85bf25fdda8c5277c730901c5`
+- 結果branch: `codex/follower-attribution-time-stratified-results`
+- 解析結果: `results/runs/follower-impact-time-stratified-analysis-20261105`
 
 ## 目的
 
@@ -143,6 +147,94 @@ checkpoint再利用の対象から除外し、従来どおり0秒からcapture�
 Eval.3/5だけ自然走行checkpointを再利用するhybrid実行とし、再度6条件smokeに合格した場合だけ
 開始する。
 
+## 正式corpus完了と完全性監査
+
+hybridの6条件smokeは合格した。2026-11-04 00:30:28 JSTから残り5 corpusを
+10 workerで逐次実行し、2026-11-05 06:20:23 JSTに完了した。従来captureで完了済みの
+3 corpus、360場面を保持し、hybridで残り5 corpus、600場面を追加した。hybrid内では
+Eval.3/5の380場面が自然走行checkpointからcaptureを再開し、Eval.7全場面と60秒以前に
+再開可能checkpointがない場面を含む220場面は0秒からcaptureした。
+
+`scripts/analyze_time_stratified_decision_oracle.py`でpush前後に8 corpusを再監査した。
+8 planすべてで事前固定SHA-256が一致し、全960場面、Accept/Reject 1,920分岐が正常終了した。
+全場面でplanとevent IDが一致し、Accept/Rejectの判断境界fingerprintが一致した。
+corpus、場面、capture、分岐のmanifestはすべて`exit_code: 0`相当、
+`source_unchanged: true`で、必須artifact、1,920本のrunner stderr/stdout、物理衝突ログを
+確認した。Traceback等の重大ログはなく、TraCIで記録した物理衝突は0件だった。
+
+## 主比較の結果
+
+到着時間項のみと提案方式lambda=2の両方を採点できた908場面を対にして比較した。
+選択済み場面の差し替えは行っていない。ケース×時間帯を等重みにしたmacro平均後悔量は、
+到着時間項のみ2.7263 m、提案方式2.4932 mで、`提案−到着時間項のみ`は
+`-0.2330 m`だった。公称値では提案方式が0.2330 m（8.5%）低い。
+
+case内の自然走行origin×seedをclusterとして100,000回再標本化した95%区間は
+`[-1.0272, +0.5846] m`で0をまたいだ。bootstrapの固定乱数seedは再現用に
+`20261103`とした。反復数、cluster、集約方法は事前固定済みだったが、この計算用乱数seed
+自体は事前記録に明記されていなかった。乱数seedは点推定を変えず、区間端のMonte Carlo誤差
+だけに影響する。
+
+| 区分 | 共通場面 | 到着時間項のみ [m] | 提案lambda=2 [m] | 提案−到着時間項 [m] |
+| --- | ---: | ---: | ---: | ---: |
+| 全体macro | 908 | 2.7263 | 2.4932 | -0.2330 |
+| `[0,100)` | 229 | 2.5010 | 2.9605 | +0.4596 |
+| `[100,160)` | 231 | 3.6221 | 2.6353 | -0.9868 |
+| `[160,220)` | 220 | 2.5365 | 2.9476 | +0.4110 |
+| `[220,290]` | 228 | 2.2454 | 1.4296 | -0.8159 |
+| Eval.3 | 305 | 3.7922 | 2.7104 | -1.0818 |
+| Eval.5 | 298 | 2.3907 | 2.6428 | +0.2521 |
+| Eval.7 | 305 | 1.9959 | 2.1265 | +0.1306 |
+| 山下方式由来 | 459 | 3.2850 | 2.4276 | -0.8574 |
+| 提案方式由来 | 449 | 2.1431 | 2.5551 | +0.4120 |
+
+時間帯では2区分で改善、2区分で悪化し、ケースではEval.3だけ改善、Eval.5/7は悪化した。
+自然走行originでも山下方式由来では改善したが、提案方式由来では悪化した。したがって、
+公称macro平均の小ささだけを後続車影響項の頑健な寄与とは解釈しない。
+
+採点可能908場面における正解率は到着時間項のみ87.4%（794/908）、提案lambda=2は
+88.5%（804/908）だった。中央値はいずれも0 m、p95後悔量は到着時間項のみ16.6935 m、
+提案13.4081 mだった。これらは補助指標であり、0をまたぐ主比較の区間を置き換えない。
+
+## 山下方式との副比較
+
+山下方式と提案lambda=2の両方を採点できた861場面では、macro平均後悔量は山下方式
+2.4204 m、提案2.6232 m、`提案−山下`は`+0.2027 m`だった。cluster bootstrap
+95%区間は`[-0.4420, +0.9543] m`で0をまたいだ。この時間層別corpusから、提案方式全体の
+山下方式に対する優位性も主張しない。
+
+## 結論と限界
+
+事前固定した確認基準「主比較の点推定が0未満、かつ95%区間上限が0未満」のうち、
+点推定だけが成立し、区間条件は成立しなかった。さらに時間帯、ケース、自然走行originで
+差の符号が反転した。よって、この時間層別独立holdoutは、到着時間項へ後続車影響項を
+追加することが300秒走行全体のさまざまな時点で判断後悔量を頑健に低減する、という仮説を
+確認しなかった。
+
+旧先頭4交渉holdoutで見られた改善は、早い時間帯に偏った120場面の結果として扱い、
+300秒全体へ一般化しない。本実験も個々の交渉直後10秒の局所判断を評価したものであり、
+300秒の平均速度、安全性、ネットワーク全体の交通効率の優位性を示すものではない。
+
+## 結果Git系譜
+
+各corpusは1結果ディレクトリだけを含む専用コミットとして、次の順でpushした。
+
+| seed群 | 時間帯 | 結果commit |
+| --- | --- | --- |
+| 13–17 | `[0,100)` | `69f2cdf1326df7f64287cff5119de343a1889a63` |
+| 13–17 | `[100,160)` | `1c34a3353444e2bc8d9157e4a4652de4afb08145` |
+| 13–17 | `[160,220)` | `f9ab396cd42e7edbb439c3e1495e502acfae8c53` |
+| 13–17 | `[220,290]` | `3f5c05db3ec80898f6514d7f56daee07af19c8dc` |
+| 18–22 | `[0,100)` | `2ea187e6ae2261edf661d95788cae997c2e218b0` |
+| 18–22 | `[100,160)` | `1dd78f088d41e24568337df60549a8148b9cc9eb` |
+| 18–22 | `[160,220)` | `fb19097731c7233e005f1868b46bee47cc817965` |
+| 18–22 | `[220,290]` | `2a7bd901975cf4110273c5fd2ed762407a561983` |
+
+統合監査、100,000回bootstrap、event CSVは解析結果commit
+`7cc697dcec55d82d6a0bf8ee83f82ff1495db52a`に保存した。機械可読な数値の正本は
+`results/runs/follower-impact-time-stratified-analysis-20261105/`の`audit.json`、
+`summary.json`、`events.csv`である。
+
 ## 実行順
 
 1. 時間層別plan生成・cohort・絶対パス処理を実装し、テストする。
@@ -156,8 +248,8 @@ Eval.3/5だけ自然走行checkpointを再利用するhybrid実行とし、再�
 
 - [x] 実装テストとUbuntu smokeが成功している。
 - [x] 8 planのSHA-256と時間帯が固定されている。
-- [ ] 960場面のAccept/Reject両分岐が正常終了している。
-- [ ] 全manifestが`source_unchanged: true`で、境界fingerprintが一致している。
-- [ ] 必須artifact、物理衝突、runner/stdout/stderrを検証している。
-- [ ] 主比較、時間帯別結果、cluster bootstrap区間を記録している。
-- [ ] 正常結果だけを専用commitでpushしている。
+- [x] 960場面のAccept/Reject両分岐が正常終了している。
+- [x] 全manifestが`source_unchanged: true`で、境界fingerprintが一致している。
+- [x] 必須artifact、物理衝突、runner/stdout/stderrを検証している。
+- [x] 主比較、時間帯別結果、cluster bootstrap区間を記録している。
+- [x] 正常結果だけを専用commitでpushしている。
