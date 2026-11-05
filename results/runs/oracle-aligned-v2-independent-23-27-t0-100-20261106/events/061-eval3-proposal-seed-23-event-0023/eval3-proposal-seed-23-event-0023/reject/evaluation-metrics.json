@@ -1,0 +1,195 @@
+{
+  "thresholds": {
+    "hard_brake_mps2": -3.0,
+    "stop_speed_mps": 0.1,
+    "free_flow_reference": "SUMO allowed speed per vehicle and time step",
+    "fallback_car_mps": 13.89,
+    "fallback_bus_mps": 11.11
+  },
+  "counts": {
+    "sumo_safety_steps_observed": 101,
+    "sumo_safety_last_time_s": 70.2,
+    "prediction_windows": 8,
+    "prediction_windows_partial_at_simulation_end": 7
+  },
+  "physical_safety": {
+    "measurement_source": "SUMO TraCI simulation.getCollisions and simulation.getCollidingVehiclesIDList",
+    "controller_conflicts_are_excluded": true,
+    "steps_observed": 101,
+    "last_observed_time_s": 70.2,
+    "steps_with_collisions": 0,
+    "unique_collision_episodes": 0,
+    "collision_pair_time_s": 0.0,
+    "colliding_vehicle_time_s": 0.0,
+    "collision_frames_written": 0,
+    "physical_collision_free": true
+  },
+  "groups": {
+    "car": {
+      "samples": 752,
+      "speed_sum": 5366.145032836568,
+      "distance_m": 536.6145032836562,
+      "hard_brake_time_s": 2.0000000000000004,
+      "stop_time_s": 2.1000000000000005,
+      "reference_speed_sum": 10445.27999999999,
+      "free_flow_shortfall_m": 507.91349671634543,
+      "net_free_flow_distance_delta_m": -507.91349671634543,
+      "mean_speed_mps": 7.135831160686926,
+      "mean_reference_speed_mps": 13.889999999999986
+    },
+    "bus": {
+      "samples": 101,
+      "speed_sum": 986.0091703476048,
+      "distance_m": 98.6009170347605,
+      "hard_brake_time_s": 0,
+      "stop_time_s": 0,
+      "reference_speed_sum": 1122.1100000000001,
+      "free_flow_shortfall_m": 13.610082965239606,
+      "net_free_flow_distance_delta_m": -13.610082965239606,
+      "mean_speed_mps": 9.762467033144603,
+      "mean_reference_speed_mps": 11.110000000000001
+    }
+  },
+  "vehicle_free_flow_shortfall_m": {
+    "car": {
+      "count": 9,
+      "mean": 56.43483296848265,
+      "median": 67.49084900150862,
+      "p95": 103.05964555915125,
+      "max": 103.05964555915125
+    },
+    "bus": {
+      "count": 1,
+      "mean": 13.610082965239606,
+      "median": 13.610082965239606,
+      "p95": 13.610082965239606,
+      "max": 13.610082965239606
+    }
+  },
+  "vehicle_free_flow_shortfall_samples_m": {
+    "car": [
+      8.73967564984923e-13,
+      20.012518668046148,
+      103.05964555915125,
+      99.20131852065057,
+      84.1657129355506,
+      77.68853586962882,
+      67.49084900150862,
+      55.405916161806985,
+      0.8890000000000001
+    ],
+    "bus": [
+      13.610082965239606
+    ]
+  },
+  "vehicle_net_free_flow_distance_delta_m": {
+    "car": {
+      "count": 9,
+      "mean": -56.43483296848265,
+      "median": -67.49084900150862,
+      "p95": -8.73967564984923e-13,
+      "max": -8.73967564984923e-13
+    },
+    "bus": {
+      "count": 1,
+      "mean": -13.610082965239606,
+      "median": -13.610082965239606,
+      "p95": -13.610082965239606,
+      "max": -13.610082965239606
+    }
+  },
+  "vehicle_net_free_flow_distance_delta_samples_m": {
+    "car": [
+      -8.73967564984923e-13,
+      -20.012518668046148,
+      -103.05964555915125,
+      -99.20131852065057,
+      -84.1657129355506,
+      -77.68853586962882,
+      -67.49084900150862,
+      -55.405916161806985,
+      -0.8890000000000001
+    ],
+    "bus": [
+      -13.610082965239606
+    ]
+  },
+  "following_vehicle_free_flow_shortfall_m": {
+    "car": {
+      "count": 8,
+      "mean": 63.45177744861449,
+      "median": 67.49084900150862,
+      "p95": 103.05964555915125,
+      "max": 103.05964555915125
+    }
+  },
+  "following_vehicle_free_flow_shortfall_samples_m": {
+    "car": [
+      19.713241540619062,
+      103.05964555915125,
+      99.20131852065057,
+      84.1657129355506,
+      77.68853586962882,
+      67.49084900150862,
+      55.405916161806985,
+      0.8890000000000001
+    ]
+  },
+  "following_vehicle_net_free_flow_distance_delta_m": {
+    "car": {
+      "count": 8,
+      "mean": -63.45177744861449,
+      "median": -77.68853586962882,
+      "p95": -0.8890000000000001,
+      "max": -0.8890000000000001
+    }
+  },
+  "following_vehicle_net_free_flow_distance_delta_samples_m": {
+    "car": [
+      -19.713241540619062,
+      -103.05964555915125,
+      -99.20131852065057,
+      -84.1657129355506,
+      -77.68853586962882,
+      -67.49084900150862,
+      -55.405916161806985,
+      -0.8890000000000001
+    ]
+  },
+  "prediction_accuracy": {
+    "all": {
+      "windows": 1,
+      "samples": 303,
+      "speed_mae_mps": 1.5740091710090467,
+      "speed_rmse_mps": 2.4196502861273212,
+      "mean_abs_distance_error_m_per_window": 15.09652701535245,
+      "mean_followers_per_window": 1.0
+    },
+    "reject": {
+      "windows": 1,
+      "samples": 303,
+      "speed_mae_mps": 1.5740091710090467,
+      "speed_rmse_mps": 2.4196502861273212,
+      "mean_abs_distance_error_m_per_window": 15.09652701535245,
+      "mean_followers_per_window": 1.0
+    }
+  },
+  "prediction_accuracy_raw": {
+    "all": {
+      "windows": 1,
+      "samples": 303,
+      "absolute_error": 476.92477881574115,
+      "squared_error": 1773.9763746682763,
+      "distance_error_m": 15.09652701535245,
+      "followers": 1
+    },
+    "reject": {
+      "windows": 1,
+      "samples": 303,
+      "absolute_error": 476.92477881574115,
+      "squared_error": 1773.9763746682763,
+      "distance_error_m": 15.09652701535245,
+      "followers": 1
+    }
+  }
+}
