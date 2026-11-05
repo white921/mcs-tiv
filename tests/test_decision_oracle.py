@@ -93,6 +93,11 @@ class DecisionOracleTests(unittest.TestCase):
             if name.startswith("proposal_lambda_")))
         self.assertIsNone(choices["oracle_aligned_v2"])
 
+    def test_unavailable_prediction_falls_back_to_online_yamashita_choice(self):
+        choices = oracle.policy_choices("reject", None)
+
+        self.assertTrue(all(choice == "reject" for choice in choices.values()))
+
     def test_completed_event_requires_matching_restore(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "events" / "0001"

@@ -223,10 +223,14 @@ def policy_choices(yamashita_choice, proposal_evaluation,
     """Evaluate all planned decision rules on one immutable boundary state."""
     choices = {"yamashita": yamashita_choice}
     if not proposal_evaluation:
-        choices["arrival_only"] = None
-        choices["oracle_aligned_v2"] = None
+        # The online controller does not abstain when the kinematic predictor
+        # is unavailable. ``active_decision`` returns None and thesis_tiv then
+        # applies the original TIV/Yamashita decision. Mirror that deployed
+        # fallback here so benchmark coverage and natural-run behaviour agree.
+        choices["arrival_only"] = yamashita_choice
+        choices["oracle_aligned_v2"] = yamashita_choice
         for value in lambdas:
-            choices[f"proposal_lambda_{value:g}"] = None
+            choices[f"proposal_lambda_{value:g}"] = yamashita_choice
         return choices
     direct_choice = (proposal_evaluation.get("decision")
                      if proposal_evaluation.get("decision_rule") in (

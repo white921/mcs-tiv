@@ -1,7 +1,7 @@
 # オラクル整合v2の未使用seed時間層別独立holdout
 
 - 台帳ID: `2026-11-05-oracle-aligned-v2-independent-holdout`
-- 状態: `planned`
+- 状態: `running`
 - 位置づけ: `confirmatory independent holdout`
 - 実装branch: `codex/oracle-aligned-predictor-v2`
 - 判断規則固定commit: `41b2852bde46d63222e878c9bae2cbe2a3c967de`
@@ -33,6 +33,7 @@
 | 抽出 | 候補から非復元無作為抽出、固定乱数seed `20261105` |
 | 抽出不足 | 別時間帯から補完せず、不足として記録する |
 | 評価不能場面 | 事後に別交渉へ差し替えない |
+| 予測不能時 | オンライン実装と同じく山下方式の判断へフォールバック |
 | 分岐 | 同一判断前checkpointからAccept/Rejectを強制し、直後10秒を0.1秒刻みで記録 |
 | 一次cohort | 交渉2台と予測Accept/Reject後続影響車の和集合 |
 | 主指標 | 10秒cohort総移動距離のCounterfactual Regret |
@@ -60,7 +61,9 @@ Accept/Reject実現指標、oracle、物理衝突が一致しない場合は正�
 
 ## 確認基準
 
-主比較は、次の両方を満たしたときにのみ独立holdoutでの改善を確認したとする。
+主比較は、オラクル自体が物理衝突等で無効な場面を除き、予測不能だけを
+理由に除外しない。次の両方を満たしたときにのみ独立holdoutでの改善を
+確認したとする。
 
 1. `固定v2 - 到着時間項のみ`のmacro平均後悔量が0 m未満。
 2. cluster bootstrap 95%区間の上限が0 m未満。
@@ -81,7 +84,9 @@ Accept/Reject実現指標、oracle、物理衝突が一致しない場合は正�
 
 ## 追加監査
 
-- 開発用960場面で未採点だ43場面がcase、時間帯、origin、seedに偏っていないか記録する。
+- 開発用960場面で従来未採点だった43場面の予測不能率がcase、時間帯、
+  origin、seedに偏っていないか記録する。正式holdoutではこれらを山下方式で
+  フォールバック採点し、予測不能をサンプル除外に使わない。
 - 開発用データから、正しいAccept→Reject修正、誤ったAccept→Reject修正、
   失敗するReject→Acceptの代表事例を固定基準で抽出し、車間、速度、後続数、
   予測距離差、実現距離差を可視化する。

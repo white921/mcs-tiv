@@ -22,4 +22,4 @@
 | incomplete | 2026-11-02 | 後続車影響項の寄与を確認する先頭4交渉holdout | [記録](2026-11-02-follower-impact-attribution-holdout.md) |
 | completed | 2026-11-03 | 後続車影響項の寄与を確認する時間層別holdout | [記録](2026-11-03-follower-impact-time-stratified-holdout.md) |
 | completed | 2026-11-05 | オラクル整合距離予測v2の保存済み960場面開発再採点 | [記録](2026-11-05-oracle-aligned-predictor-v2-development.md) |
-| planned | 2026-11-05 | オラクル整合v2の未使用seed時間層別独立holdout | [記録](2026-11-05-oracle-aligned-v2-independent-holdout.md) |
+| running | 2026-11-05 | オラクル整合v2の未使用seed時間層別独立holdout | [記録](2026-11-05-oracle-aligned-v2-independent-holdout.md) |
