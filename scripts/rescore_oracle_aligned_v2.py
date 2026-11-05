@@ -131,26 +131,36 @@ def run_event(index: int, old_path: Path, args) -> dict:
         "sender_id": event["sender_id"],
         "desired_path_id": event["desired_path_id"],
     })
-    evaluation = boundary.get("proposal_evaluation") or {}
-    if evaluation.get("decision_rule") != "oracle-aligned-direct-distance-v2":
-        raise RuntimeError(f"v2 evaluation is unavailable for {old_path}")
-
+    evaluation = boundary.get("proposal_evaluation")
     actor_ids = {
         str(boundary["request"]["sender"]),
         str(boundary["request"]["receiver"]),
     }
-    follower_ids = set(map(str, evaluation.get("union_follower_ids", ())))
-    cohort = actor_ids | follower_ids
-    start = float(event["sim_time_s"])
-    end = round(start + 10.0, 1)
-    accept = decision_oracle.realised_metrics(
-        branch_samples(event_dir / "accept" / "vehicle-states.jsonl", start, end),
-        cohort)
-    reject = decision_oracle.realised_metrics(
-        branch_samples(event_dir / "reject" / "vehicle-states.jsonl", start, end),
-        cohort)
-    accept["safety"] = old["branches"]["accept"]["safety"]
-    reject["safety"] = old["branches"]["reject"]["safety"]
+    if evaluation is None:
+        # The fixed corpus deliberately retains negotiations for which no
+        # physical alternative path existed.  They are valid benchmark events
+        # but neither the old proposal nor v2 can be scored on them.
+        follower_ids = set(map(str, old.get("follower_vehicle_ids", ())))
+        cohort = set(map(str, old.get("cohort_vehicle_ids", ())))
+        accept = dict(old["branches"]["accept"]["metrics"])
+        reject = dict(old["branches"]["reject"]["metrics"])
+    else:
+        if evaluation.get("decision_rule") != "oracle-aligned-direct-distance-v2":
+            raise RuntimeError(f"unexpected proposal evaluation for {old_path}")
+        follower_ids = set(map(str, evaluation.get("union_follower_ids", ())))
+        cohort = actor_ids | follower_ids
+        start = float(event["sim_time_s"])
+        end = round(start + 10.0, 1)
+        accept = decision_oracle.realised_metrics(
+            branch_samples(
+                event_dir / "accept" / "vehicle-states.jsonl", start, end),
+            cohort)
+        reject = decision_oracle.realised_metrics(
+            branch_samples(
+                event_dir / "reject" / "vehicle-states.jsonl", start, end),
+            cohort)
+        accept["safety"] = old["branches"]["accept"]["safety"]
+        reject["safety"] = old["branches"]["reject"]["safety"]
     oracle = decision_oracle.oracle_choice(accept, reject)
     choices = decision_oracle.policy_choices(
         boundary.get("yamashita_choice"), evaluation)
@@ -183,7 +193,7 @@ def run_event(index: int, old_path: Path, args) -> dict:
 
 def event_row(manifest: dict) -> dict:
     event = manifest["event"]
-    evaluation = manifest["proposal_evaluation"]
+    evaluation = manifest.get("proposal_evaluation") or {}
     row = {
         "case": event["case"],
         "window": window_for(float(event["sim_time_s"])),
@@ -194,10 +204,10 @@ def event_row(manifest: dict) -> dict:
         "oracle_choice": manifest["oracle"]["choice"],
         "actual_accept_minus_reject_m": manifest["oracle"][
             "accept_minus_reject_distance_m"],
-        "predicted_accept_minus_reject_m": evaluation[
-            "direct_accept_minus_reject_m"],
-        "follower_count": evaluation["follower_count"],
-        "v2_decision_basis": evaluation["decision_basis"],
+        "predicted_accept_minus_reject_m": evaluation.get(
+            "direct_accept_minus_reject_m"),
+        "follower_count": evaluation.get("follower_count"),
+        "v2_decision_basis": evaluation.get("decision_basis"),
     }
     for policy in POLICIES:
         score = manifest["policy_scores"].get(policy, {})
@@ -213,7 +223,9 @@ def pearson(rows: list[dict]) -> float | None:
         (row["predicted_accept_minus_reject_m"],
          row["actual_accept_minus_reject_m"])
         for row in rows
-        if math.isfinite(row["predicted_accept_minus_reject_m"])
+        if row["predicted_accept_minus_reject_m"] is not None
+        and row["actual_accept_minus_reject_m"] is not None
+        and math.isfinite(row["predicted_accept_minus_reject_m"])
         and math.isfinite(row["actual_accept_minus_reject_m"])
     ]
     if len(pairs) < 2:

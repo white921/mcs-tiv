@@ -38,6 +38,28 @@ class OracleAlignedV2RescoreTests(unittest.TestCase):
             self.assertEqual(
                 rescore.discover_events(root), [event / "manifest.json"])
 
+    def test_unavailable_v2_evaluation_remains_an_unscored_row(self):
+        manifest = {
+            "event": {
+                "case": "eval3", "origin_policy": "yamashita",
+                "seed": 13, "ordinal": 1, "sim_time_s": 20.0,
+            },
+            "proposal_evaluation": None,
+            "oracle": {
+                "choice": "tie", "accept_minus_reject_distance_m": 0.0,
+            },
+            "policy_choices": {
+                policy: None for policy in rescore.POLICIES
+            },
+            "policy_scores": {},
+        }
+
+        row = rescore.event_row(manifest)
+
+        self.assertIsNone(row["predicted_accept_minus_reject_m"])
+        self.assertIsNone(row["oracle_aligned_v2_regret_m"])
+        self.assertIsNone(row["follower_count"])
+
 
 if __name__ == "__main__":
     unittest.main()
