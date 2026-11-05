@@ -192,6 +192,52 @@ class DecisionOracleCorpusTests(unittest.TestCase):
             command[command.index("--capture-resume-checkpoint") + 1],
             str(checkpoint))
 
+    def test_corpus_resolves_exact_event_checkpoint(self):
+        event = {
+            "case": "eval7", "origin_policy": "proposal", "seed": 23,
+            "ordinal": 9, "sim_time_s": 100.0,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            checkpoint = (root / "eval7" / "proposal" / "seed-23"
+                          / "checkpoints" / "t0000099.9")
+            checkpoint.mkdir(parents=True)
+            (checkpoint / "checkpoint.json").write_text(json.dumps({
+                "schema_version": 1, "case": "eval7", "seed": 23,
+                "simulation_time_s": 99.9,
+            }))
+            (checkpoint / "mcs-state.pkl").touch()
+            (checkpoint / "sumo-state.xml.gz").touch()
+            self.assertEqual(
+                corpus.exact_checkpoint_for_event(root, event), checkpoint)
+
+    def test_event_runner_passes_exact_checkpoint(self):
+        args = NS(
+            python=Path("/tmp/python"), sumo_home=Path("/tmp/sumo"),
+            duration=300.0, deceleration_loss_lambda=2.0,
+            cohort_mode="actors-followers")
+        event = {
+            "case": "eval7", "origin_policy": "proposal", "seed": 23,
+            "ordinal": 1, "sim_time_s": 100.0,
+            "receiver_id": "1", "sender_id": "2",
+            "desired_path_id": "2_3",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            checkpoint = root / "checkpoint"
+            checkpoint.mkdir()
+            (root / "runner-logs").mkdir()
+            with mock.patch.object(corpus.subprocess, "run") as run:
+                run.return_value.returncode = 1
+                corpus.run_event(
+                    args, root / "source", root / "git.json",
+                    root, 1, event, None, checkpoint)
+            command = run.call_args.args[0]
+        self.assertIn("--exact-checkpoint", command)
+        self.assertEqual(
+            command[command.index("--exact-checkpoint") + 1],
+            str(checkpoint))
+
     def test_eval7_checkpoint_reuse_is_excluded_after_failed_equivalence(self):
         args = NS(checkpoint_roots={
             "yamashita": Path("/unused"), "proposal": Path("/unused")})
@@ -215,6 +261,20 @@ class DecisionOracleCorpusTests(unittest.TestCase):
             (checkpoint / "sumo-state.xml.gz").touch()
             with self.assertRaisesRegex(ValueError, "seed mismatch"):
                 run_decision_oracle.capture_resume_metadata(
+                    checkpoint, args, 99.9)
+
+    def test_exact_checkpoint_metadata_requires_exact_time(self):
+        args = NS(case="eval3", seed=23)
+        with tempfile.TemporaryDirectory() as directory:
+            checkpoint = Path(directory)
+            (checkpoint / "checkpoint.json").write_text(json.dumps({
+                "schema_version": 1, "case": "eval3", "seed": 23,
+                "simulation_time_s": 99.8,
+            }))
+            (checkpoint / "mcs-state.pkl").touch()
+            (checkpoint / "sumo-state.xml.gz").touch()
+            with self.assertRaisesRegex(ValueError, "time mismatch"):
+                run_decision_oracle.exact_checkpoint_metadata(
                     checkpoint, args, 99.9)
 
     def test_boundary_identity_uses_boundary_request_field_names(self):

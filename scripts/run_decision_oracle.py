@@ -12,6 +12,7 @@ import json
 import math
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import time
@@ -132,6 +133,72 @@ def capture_resume_metadata(path, args, checkpoint_time):
     return metadata
 
 
+def exact_checkpoint_metadata(path, args, checkpoint_time):
+    """Validate a checkpoint already captured at event_time - 0.1 s."""
+    if path is None:
+        return None
+    required = ("checkpoint.json", "mcs-state.pkl", "sumo-state.xml.gz")
+    missing = [name for name in required if not (path / name).is_file()]
+    if missing:
+        raise ValueError(
+            f"exact event checkpoint is incomplete: {path}; missing {missing}")
+    metadata = json.loads((path / "checkpoint.json").read_text(encoding="utf-8"))
+    if metadata.get("schema_version") != mcs_checkpoint.SCHEMA_VERSION:
+        raise ValueError("exact event checkpoint schema mismatch")
+    if metadata.get("case") != args.case:
+        raise ValueError(
+            f"exact event checkpoint case mismatch: expected {args.case}, "
+            f"got {metadata.get('case')}")
+    if int(metadata.get("seed", -1)) != args.seed:
+        raise ValueError(
+            f"exact event checkpoint seed mismatch: expected {args.seed}, "
+            f"got {metadata.get('seed')}")
+    moment = float(metadata.get("simulation_time_s", math.inf))
+    if abs(moment - checkpoint_time) > 1e-6:
+        raise ValueError(
+            f"exact event checkpoint time mismatch: expected {checkpoint_time}, "
+            f"got {moment}")
+    return metadata
+
+
+def import_exact_checkpoint(args, event, source, event_dir, initial_hashes):
+    """Copy one preregistered exact checkpoint into a self-contained event."""
+    capture_dir = event_dir / "capture"
+    checkpoint_root = capture_dir / "checkpoints"
+    checkpoint_root.mkdir(parents=True)
+    checkpoint_time = round(float(args.event_time) - 0.1, 1)
+    metadata = exact_checkpoint_metadata(
+        args.exact_checkpoint, args, checkpoint_time)
+    checkpoint = checkpoint_root / mcs_checkpoint.checkpoint_name(checkpoint_time)
+    shutil.copytree(args.exact_checkpoint, checkpoint)
+    for name in ("stdout.log", "stderr.log", "negotiations.jsonl"):
+        (capture_dir / name).write_text("", encoding="utf-8")
+    fixed = fixed_input_details(
+        args.case, args.seed, args.duration, "fixed",
+        prefix_duration=args.duration, source_root=source)
+    manifest = {
+        "record_type": "decision-oracle-capture",
+        "event": event,
+        "command": None,
+        "exit_code": 0,
+        "elapsed_seconds": 0.0,
+        "checkpoint_time_s": checkpoint_time,
+        "checkpoint": str(checkpoint),
+        "capture_start": {
+            "mode": "preregistered-exact-checkpoint",
+            "path": str(args.exact_checkpoint),
+            "metadata": metadata,
+        },
+        "checkpoint_complete": True,
+        "source_unchanged": source_hashes(source) == initial_hashes,
+        "fixed_vehicle_input": fixed,
+    }
+    write_json(capture_dir / "manifest.json", manifest)
+    if not manifest["source_unchanged"]:
+        raise RuntimeError("source changed while importing exact checkpoint")
+    return checkpoint
+
+
 def run_capture(args, event, source, event_dir, initial_hashes):
     capture_dir = event_dir / "capture"
     capture_dir.mkdir()
@@ -250,9 +317,13 @@ def main():
     parser.add_argument(
         "--git-metadata-json", type=Path,
         help="start-of-batch Git metadata supplied by a corpus runner")
-    parser.add_argument(
+    capture_group = parser.add_mutually_exclusive_group()
+    capture_group.add_argument(
         "--capture-resume-checkpoint", type=Path,
         help="validated earlier checkpoint used only to shorten capture")
+    capture_group.add_argument(
+        "--exact-checkpoint", type=Path,
+        help="checkpoint already captured exactly at event_time - 0.1 s")
     parser.add_argument("--case", choices=("eval3", "eval5", "eval7"),
                         default="eval3")
     parser.add_argument("--origin-policy", choices=("yamashita", "proposal"),
@@ -282,6 +353,8 @@ def main():
         args.git_metadata_json = args.git_metadata_json.resolve()
     if args.capture_resume_checkpoint is not None:
         args.capture_resume_checkpoint = args.capture_resume_checkpoint.resolve()
+    if args.exact_checkpoint is not None:
+        args.exact_checkpoint = args.exact_checkpoint.resolve()
     if args.output.exists():
         parser.error("output directory already exists")
     if args.event_ordinal < 1:
@@ -293,6 +366,8 @@ def main():
     try:
         capture_resume_metadata(
             args.capture_resume_checkpoint, args, checkpoint_time)
+        exact_checkpoint_metadata(
+            args.exact_checkpoint, args, checkpoint_time)
     except (OSError, ValueError, json.JSONDecodeError) as error:
         parser.error(str(error))
     run_git = (json.loads(args.git_metadata_json.read_text(encoding="utf-8"))
@@ -315,7 +390,10 @@ def main():
         if not source.is_dir():
             parser.error(f"source snapshot does not exist: {source}")
         initial_hashes = source_hashes(source)
-    checkpoint = run_capture(args, event, source, event_dir, initial_hashes)
+    checkpoint = (
+        import_exact_checkpoint(args, event, source, event_dir, initial_hashes)
+        if args.exact_checkpoint is not None
+        else run_capture(args, event, source, event_dir, initial_hashes))
     accept, accept_samples = run_branch(
         args, event, source, event_dir, initial_hashes, checkpoint, "accept")
     fingerprint = accept["boundary"]["fingerprint"]

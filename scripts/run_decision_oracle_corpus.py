@@ -65,6 +65,28 @@ def validate_checkpoint_batch(root, origin_policy, duration):
     return {"path": str(path), "manifest": manifest}
 
 
+def validate_exact_checkpoint_batch(root):
+    if root is None:
+        return None
+    path = root / "experiment-manifest.json"
+    if not path.is_file():
+        raise ValueError(f"exact checkpoint batch manifest does not exist: {path}")
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    expected = {
+        "status": "completed", "workers": 10, "group_count": 60,
+        "failed_group_count": 0, "planned_event_count": 960,
+        "source_unchanged": True, "exit_code": 0,
+    }
+    failures = [
+        f"{name}={manifest.get(name)!r}"
+        for name, value in expected.items() if manifest.get(name) != value
+    ]
+    if failures:
+        raise ValueError(
+            f"invalid exact checkpoint batch {path}: " + ", ".join(failures))
+    return {"path": str(path), "manifest": manifest}
+
+
 def event_slug(index, event):
     return (
         f"{index:03d}-{event['case']}-{event['origin_policy']}-"
@@ -124,8 +146,27 @@ def capture_checkpoint_for_event(args, event):
     return max(candidates, key=lambda item: item[0], default=(None, None))[1]
 
 
+def exact_checkpoint_for_event(root, event):
+    if root is None:
+        return None
+    moment = round(float(event["sim_time_s"]) - 0.1, 1)
+    path = (root / event["case"] / event["origin_policy"]
+            / f"seed-{event['seed']}" / "checkpoints"
+            / f"t{moment:09.1f}")
+    required = ("checkpoint.json", "mcs-state.pkl", "sumo-state.xml.gz")
+    missing = [name for name in required if not (path / name).is_file()]
+    if missing:
+        raise ValueError(f"incomplete exact event checkpoint {path}: {missing}")
+    metadata = json.loads((path / "checkpoint.json").read_text(encoding="utf-8"))
+    if (metadata.get("case") != event["case"]
+            or int(metadata.get("seed", -1)) != int(event["seed"])
+            or abs(float(metadata.get("simulation_time_s", -1)) - moment) > 1e-6):
+        raise ValueError(f"exact event checkpoint metadata mismatch: {path}")
+    return path
+
+
 def run_event(args, source, git_metadata_path, output_root, index, event,
-              capture_checkpoint=None):
+              capture_checkpoint=None, exact_checkpoint=None):
     slug = event_slug(index, event)
     output = output_root / "events" / slug
     log_dir = output_root / "runner-logs"
@@ -150,6 +191,8 @@ def run_event(args, source, git_metadata_path, output_root, index, event,
     ]
     if capture_checkpoint is not None:
         command += ["--capture-resume-checkpoint", str(capture_checkpoint)]
+    if exact_checkpoint is not None:
+        command += ["--exact-checkpoint", str(exact_checkpoint)]
     started = time.monotonic()
     with (log_dir / f"{slug}.stdout.log").open("w", encoding="utf-8") as stdout, \
             (log_dir / f"{slug}.stderr.log").open("w", encoding="utf-8") as stderr:
@@ -160,6 +203,8 @@ def run_event(args, source, git_metadata_path, output_root, index, event,
         "elapsed_seconds": time.monotonic() - started,
         "capture_resume_checkpoint": (str(capture_checkpoint)
                                       if capture_checkpoint is not None else None),
+        "exact_checkpoint": (str(exact_checkpoint)
+                             if exact_checkpoint is not None else None),
     }
     if completed.returncode == 0:
         path, manifest = event_manifest(output)
@@ -215,6 +260,9 @@ def main():
     parser.add_argument(
         "--checkpoint-root-proposal", type=Path,
         help="natural-run batch root containing case/seed/checkpoints")
+    parser.add_argument(
+        "--exact-checkpoint-root", type=Path,
+        help="completed grouped batch containing event_time - 0.1 checkpoints")
     args = parser.parse_args()
     args.plan = args.plan.resolve()
     args.sumo_home = args.sumo_home.resolve()
@@ -225,12 +273,18 @@ def main():
     if ((args.checkpoint_root_yamashita is None)
             != (args.checkpoint_root_proposal is None)):
         parser.error("both natural-run checkpoint roots must be supplied together")
+    if (args.exact_checkpoint_root is not None
+            and args.checkpoint_root_yamashita is not None):
+        parser.error("exact and natural checkpoint roots are mutually exclusive")
     args.checkpoint_roots = {
         "yamashita": (args.checkpoint_root_yamashita.resolve()
                       if args.checkpoint_root_yamashita is not None else None),
         "proposal": (args.checkpoint_root_proposal.resolve()
                      if args.checkpoint_root_proposal is not None else None),
     }
+    args.exact_checkpoint_root = (
+        args.exact_checkpoint_root.resolve()
+        if args.exact_checkpoint_root is not None else None)
     if args.output.exists():
         parser.error("output directory already exists")
     if args.workers < 1:
@@ -249,10 +303,16 @@ def main():
             name: validate_checkpoint_batch(root, name, args.duration)
             for name, root in args.checkpoint_roots.items()
         }
-        capture_checkpoints = [
-            capture_checkpoint_for_event(args, event)
-            for event in plan["events"]
-        ]
+        exact_checkpoint_batch = validate_exact_checkpoint_batch(
+            args.exact_checkpoint_root)
+        exact_checkpoints = [
+            exact_checkpoint_for_event(args.exact_checkpoint_root, event)
+            for event in plan["events"]]
+        capture_checkpoints = (
+            [None] * len(plan["events"])
+            if args.exact_checkpoint_root is not None else [
+                capture_checkpoint_for_event(args, event)
+                for event in plan["events"]])
     except (OSError, ValueError, json.JSONDecodeError) as error:
         parser.error(str(error))
 
@@ -272,9 +332,9 @@ def main():
         futures = [
             pool.submit(
                 run_event, args, source, git_metadata_path,
-                args.output, index, event, capture_checkpoint)
-            for index, (event, capture_checkpoint) in enumerate(
-                zip(plan["events"], capture_checkpoints), 1)
+                args.output, index, event, capture_checkpoint, exact_checkpoint)
+            for index, (event, capture_checkpoint, exact_checkpoint) in enumerate(
+                zip(plan["events"], capture_checkpoints, exact_checkpoints), 1)
         ]
         for future in concurrent.futures.as_completed(futures):
             results.append(future.result())
@@ -313,6 +373,9 @@ def main():
             for name, path in args.checkpoint_roots.items()
         },
         "capture_checkpoint_batches": checkpoint_batches,
+        "exact_checkpoint_batch": exact_checkpoint_batch,
+        "exact_checkpoint_event_count": sum(
+            checkpoint is not None for checkpoint in exact_checkpoints),
         "capture_resume_event_count": sum(
             checkpoint is not None for checkpoint in capture_checkpoints),
         "capture_resume_excluded_strata": [
