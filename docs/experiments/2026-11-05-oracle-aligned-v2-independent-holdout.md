@@ -5,6 +5,7 @@
 - 位置づけ: `confirmatory independent holdout`
 - 実装branch: `codex/oracle-aligned-predictor-v2`
 - 判断規則固定commit: `41b2852bde46d63222e878c9bae2cbe2a3c967de`
+- 自然走行実行commit: `540c61e033fa793c9f7ed102b8e1cc004d682841`
 - 開発実験: [2026-11-05-oracle-aligned-predictor-v2-development.md](2026-11-05-oracle-aligned-predictor-v2-development.md)
 
 ## 目的

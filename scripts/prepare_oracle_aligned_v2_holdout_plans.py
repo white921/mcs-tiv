@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from plan_decision_oracle_corpus import CASES, build_plan  # noqa: E402
+from run_thesis_batch import git_metadata  # noqa: E402
 
 
 SEED_GROUPS = ((23, 24, 25, 26, 27), (28, 29, 30, 31, 32))
@@ -22,10 +23,44 @@ WINDOWS = (
     ("220-290", 220.0, 290.0, True),
 )
 SAMPLING_SEED = 20261105
+DISCOVERY_SOURCE_COMMIT = "540c61e033fa793c9f7ed102b8e1cc004d682841"
 
 
 def serialize(value: dict) -> bytes:
     return (json.dumps(value, indent=2, allow_nan=False) + "\n").encode()
+
+
+def validate_discovery(root: Path, origin: str) -> dict:
+    path = root / "experiment-manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    expected_method = (
+        str(manifest.get("method", "")).startswith("yamashita")
+        if origin == "yamashita"
+        else manifest.get("method") == "deceleration-propagation")
+    checks = {
+        "status": manifest.get("status") == "completed",
+        "completed_simulations": manifest.get("completed_simulations") == 30,
+        "failed_simulations": manifest.get("failed_simulations") == 0,
+        "duration_s": float(manifest.get("duration_s", -1)) == 300.0,
+        "workers": manifest.get("workers") == 10,
+        "cases": tuple(manifest.get("cases", ())) == tuple(CASES),
+        "seeds": sorted({
+            int(task["seed"]) for task in manifest.get("tasks", ())
+        }) == list(range(23, 33)),
+        "source_commit": (
+            manifest.get("git", {}).get("commit") == DISCOVERY_SOURCE_COMMIT),
+        "git_clean": manifest.get("git", {}).get("dirty") is False,
+        "method": expected_method,
+    }
+    failed = [name for name, passed in checks.items() if not passed]
+    if failed:
+        raise ValueError(
+            f"invalid {origin} discovery batch {path}: {', '.join(failed)}")
+    return {
+        "manifest": str(path.resolve()),
+        "manifest_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "source_commit": DISCOVERY_SOURCE_COMMIT,
+    }
 
 
 def main() -> None:
@@ -41,6 +76,13 @@ def main() -> None:
         "yamashita": args.yamashita_discovery.resolve(),
         "proposal": args.proposal_discovery.resolve(),
     }
+    try:
+        discovery_audit = {
+            origin: validate_discovery(root, origin)
+            for origin, root in discoveries.items()
+        }
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        parser.error(str(error))
     hashes = {}
     plans = []
     for seeds in SEED_GROUPS:
@@ -77,6 +119,8 @@ def main() -> None:
         "status": "frozen",
         "outcomes_inspected": False,
         "sampling_seed": SAMPLING_SEED,
+        "git": git_metadata(),
+        "discovery_audit": discovery_audit,
         "yamashita_discovery": str(discoveries["yamashita"]),
         "proposal_discovery": str(discoveries["proposal"]),
         "plan_count": len(plans),
