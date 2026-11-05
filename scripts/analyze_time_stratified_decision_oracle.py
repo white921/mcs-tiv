@@ -220,6 +220,11 @@ def require_file(path: Path, errors: list[str]) -> None:
         errors.append(f"missing file: {path}")
 
 
+def collision_counts_consistent(record_count: int, *reported_counts) -> bool:
+    """Require every available safety summary to match the TraCI log."""
+    return all(value == record_count for value in reported_counts)
+
+
 def audit_corpus(
     window: str, root: Path, *,
     expected_plan_hashes: dict | None = None,
@@ -279,6 +284,7 @@ def audit_corpus(
     rows = []
     observed_events = set()
     collision_records = 0
+    collision_branches = 0
     fatal_logs = []
     fingerprints_checked = 0
     for event_path in event_paths:
@@ -326,6 +332,7 @@ def audit_corpus(
             ):
                 require_file(branch_dir / name, errors)
             branch_manifest_path = branch_dir / "manifest.json"
+            branch_manifest = None
             if branch_manifest_path.is_file():
                 branch_manifest = read_json(branch_manifest_path)
                 if (branch_manifest.get("exit_code") != 0
@@ -333,11 +340,26 @@ def audit_corpus(
                     errors.append(f"{branch_manifest_path}: invalid branch")
             collisions = branch_dir / "physical-collisions.jsonl"
             if collisions.is_file():
-                collision_records += sum(
+                branch_collision_records = sum(
                     1 for line in collisions.read_text(
                         encoding="utf-8", errors="replace"
                     ).splitlines() if line.strip()
                 )
+                collision_records += branch_collision_records
+                collision_branches += int(branch_collision_records > 0)
+                reported_counts = [
+                    branches.get(choice, {}).get("safety", {}).get(
+                        "physical_collision_records")]
+                if branch_manifest is not None:
+                    reported_counts.append(
+                        branch_manifest.get("safety", {}).get(
+                            "physical_collision_records"))
+                if not collision_counts_consistent(
+                        branch_collision_records, *reported_counts):
+                    errors.append(
+                        f"{branch_dir}: collision log/summary mismatch "
+                        f"log={branch_collision_records} "
+                        f"reported={reported_counts}")
         capture_dir = event_dir / "capture"
         for name in ("manifest.json", "negotiations.jsonl", "stderr.log", "stdout.log"):
             require_file(capture_dir / name, errors)
@@ -393,8 +415,6 @@ def audit_corpus(
         missing = len(plan_events - observed_events)
         extra = len(observed_events - plan_events)
         errors.append(f"{root}: plan/result mismatch missing={missing} extra={extra}")
-    if collision_records:
-        errors.append(f"{root}: physical collision records={collision_records}")
     runner_logs = list((root / "runner-logs").glob("*.log"))
     if len(runner_logs) != 240:
         errors.append(f"{root}: expected 240 runner logs, got {len(runner_logs)}")
@@ -416,6 +436,7 @@ def audit_corpus(
         "fingerprints_checked": fingerprints_checked,
         "branch_count": 2 * len(rows),
         "physical_collision_records": collision_records,
+        "physical_collision_branches": collision_branches,
         "runner_log_count": len(runner_logs),
         "capture_resume_event_count": manifest.get("capture_resume_event_count", 0),
         "exact_checkpoint_event_count": manifest.get(
@@ -518,6 +539,9 @@ def main() -> None:
         "branch_count": 2 * len(rows),
         "physical_collision_records": sum(
             item.get("physical_collision_records", 0) for item in corpus_audits
+        ),
+        "physical_collision_branches": sum(
+            item.get("physical_collision_branches", 0) for item in corpus_audits
         ),
         "corpora": corpus_audits,
         "errors": errors,

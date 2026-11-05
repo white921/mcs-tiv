@@ -65,6 +65,10 @@ class TimeStratifiedAnalysisTest(unittest.TestCase):
                 {(23, 27, "0-100"): "a" * 64},
             )
 
+    def test_physical_collisions_are_valid_when_logs_match_summaries(self):
+        self.assertTrue(analysis.collision_counts_consistent(2, 2, 2))
+        self.assertFalse(analysis.collision_counts_consistent(2, 0, 2))
+
 
 if __name__ == "__main__":
     unittest.main()
