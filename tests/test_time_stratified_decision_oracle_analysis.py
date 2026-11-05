@@ -69,6 +69,23 @@ class TimeStratifiedAnalysisTest(unittest.TestCase):
         self.assertTrue(analysis.collision_counts_consistent(2, 2, 2))
         self.assertFalse(analysis.collision_counts_consistent(2, 0, 2))
 
+    def test_holdout_diagnostics_count_invalid_fallback_and_collisions(self):
+        rows = [
+            {"oracle_valid": True,
+             "oracle_aligned_v2_fallback_to_yamashita": True,
+             "accept_physical_collision_records": 0,
+             "reject_physical_collision_records": 0},
+            {"oracle_valid": False, "oracle_invalid_reason": "accept:safety_invalid",
+             "oracle_aligned_v2_fallback_to_yamashita": False,
+             "accept_physical_collision_records": 2,
+             "reject_physical_collision_records": 0},
+        ]
+        result = analysis.holdout_diagnostics(rows)
+        self.assertEqual(result["oracle_valid_events"], 1)
+        self.assertEqual(result["oracle_invalid_events"], 1)
+        self.assertEqual(result["oracle_aligned_v2_fallback_events"], 1)
+        self.assertEqual(result["accept_physical_collision_records"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

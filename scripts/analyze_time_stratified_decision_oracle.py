@@ -215,6 +215,27 @@ def policy_summary(rows: list[dict], policy: str) -> dict:
     }
 
 
+def holdout_diagnostics(rows: list[dict]) -> dict:
+    invalid_reasons = defaultdict(int)
+    for row in rows:
+        if not row.get("oracle_valid"):
+            invalid_reasons[row.get("oracle_invalid_reason") or "unknown"] += 1
+    return {
+        "oracle_valid_events": sum(row.get("oracle_valid") is True for row in rows),
+        "oracle_invalid_events": sum(row.get("oracle_valid") is not True for row in rows),
+        "oracle_invalid_reasons": dict(sorted(invalid_reasons.items())),
+        "oracle_aligned_v2_fallback_events": sum(
+            row.get("oracle_aligned_v2_fallback_to_yamashita") is True
+            for row in rows),
+        "accept_physical_collision_records": sum(
+            int(row.get("accept_physical_collision_records") or 0)
+            for row in rows),
+        "reject_physical_collision_records": sum(
+            int(row.get("reject_physical_collision_records") or 0)
+            for row in rows),
+    }
+
+
 def require_file(path: Path, errors: list[str]) -> None:
     if not path.is_file():
         errors.append(f"missing file: {path}")
@@ -390,10 +411,27 @@ def audit_corpus(
             "receiver_id": str(event["receiver_id"]),
             "sender_id": str(event["sender_id"]),
             "desired_path_id": str(event["desired_path_id"]),
+            "oracle_valid": event_manifest.get("oracle", {}).get("valid") is True,
             "oracle_choice": event_manifest.get("oracle", {}).get("choice"),
+            "oracle_invalid_reason": event_manifest.get("oracle", {}).get("reason"),
             "accept_minus_reject_distance_m": event_manifest.get(
                 "oracle", {}
             ).get("accept_minus_reject_distance_m"),
+            "predictor_evaluation_available": bool(
+                branches.get("accept", {}).get("boundary", {}).get(
+                    "proposal_evaluation")),
+            "oracle_aligned_v2_fallback_to_yamashita": (
+                not bool(branches.get("accept", {}).get("boundary", {}).get(
+                    "proposal_evaluation"))
+                and event_manifest.get("policy_choices", {}).get(
+                    "oracle_aligned_v2")
+                == event_manifest.get("policy_choices", {}).get("yamashita")),
+            "accept_physical_collision_records": branches.get(
+                "accept", {}).get("safety", {}).get(
+                    "physical_collision_records"),
+            "reject_physical_collision_records": branches.get(
+                "reject", {}).get("safety", {}).get(
+                    "physical_collision_records"),
             "corpus": root.name,
         }
         for policy in policies:
@@ -574,6 +612,7 @@ def main() -> None:
             "aggregation": "equal case x time-window macro mean",
         },
         "proposal_policy": args.proposal_policy,
+        "diagnostics": holdout_diagnostics(rows),
         "policies": {policy: policy_summary(rows, policy) for policy in policies},
         "primary_candidate_vs_arrival_only": primary,
         "secondary_candidate_vs_yamashita": secondary,
