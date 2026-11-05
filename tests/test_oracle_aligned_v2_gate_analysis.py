@@ -41,6 +41,12 @@ class OracleAlignedV2GateAnalysisTest(unittest.TestCase):
         self.assertEqual(analysis.regret(row, "reject"), 0.0)
         self.assertEqual(analysis.regret(row, "accept"), 4.0)
 
+    def test_tie_regret_still_uses_the_small_realised_gap(self):
+        row = self.row(actual=0.2)
+        row["oracle_choice"] = "tie"
+        self.assertEqual(analysis.regret(row, "accept"), 0.0)
+        self.assertEqual(analysis.regret(row, "reject"), 0.2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -70,7 +70,12 @@ def gated_choice(row: dict, threshold_m: float, mode: str) -> str:
 
 
 def regret(row: dict, choice: str) -> float:
-    return 0.0 if choice == row["oracle_choice"] else abs(row["actual_m"])
+    # Match decision_oracle.score_policy exactly.  An oracle "tie" means the
+    # distance gap is within tolerance, not necessarily numerically zero; the
+    # selected shorter branch can therefore retain a small positive regret.
+    if choice == "accept":
+        return max(0.0, -row["actual_m"])
+    return max(0.0, row["actual_m"])
 
 
 def score(rows: list[dict], threshold_m: float, mode: str) -> dict:
@@ -81,7 +86,7 @@ def score(rows: list[dict], threshold_m: float, mode: str) -> dict:
         row = dict(source)
         choice = gated_choice(row, threshold_m, mode)
         changes += choice != row["baseline_choice"]
-        correct += choice == row["oracle_choice"]
+        correct += row["oracle_choice"] == "tie" or choice == row["oracle_choice"]
         row["baseline_regret_m"] = regret(row, row["baseline_choice"])
         row["gated_regret_m"] = regret(row, choice)
         row["gated_minus_baseline_regret_m"] = (
