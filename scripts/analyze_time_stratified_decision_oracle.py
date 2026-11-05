@@ -239,6 +239,7 @@ def audit_corpus(
     key = (min(seeds, default=-1), max(seeds, default=-1), window)
     expected_hash = (expected_plan_hashes or EXPECTED_PLAN_HASHES).get(key)
     source_commits = expected_source_commits or EXPECTED_SOURCE_COMMITS
+    requires_exact_checkpoints = "oracle_aligned_v2" in policies
     checks = {
         "schema": manifest.get("schema") == "decision-oracle-corpus-v1",
         "status": manifest.get("status") == "completed",
@@ -251,6 +252,16 @@ def audit_corpus(
         "workers": manifest.get("workers") == 10,
         "cohort_mode": manifest.get("cohort_mode") == "actors-followers",
         "lambda": float(manifest.get("deceleration_loss_lambda", -1)) == 2.0,
+        "exact_checkpoint_events": (
+            not requires_exact_checkpoints
+            or manifest.get("exact_checkpoint_event_count") == 120),
+        "no_legacy_capture_resume": (
+            not requires_exact_checkpoints
+            or manifest.get("capture_resume_event_count") == 0),
+        "exact_checkpoint_batch": (
+            not requires_exact_checkpoints
+            or manifest.get("exact_checkpoint_batch", {}).get(
+                "manifest", {}).get("status") == "completed"),
         "plan_hash_manifest": manifest.get("plan_sha256") == plan_hash,
         "plan_hash_preregistered": expected_hash == plan_hash,
         "plan_event_count": len(plan.get("events", [])) == 120,
@@ -407,6 +418,8 @@ def audit_corpus(
         "physical_collision_records": collision_records,
         "runner_log_count": len(runner_logs),
         "capture_resume_event_count": manifest.get("capture_resume_event_count", 0),
+        "exact_checkpoint_event_count": manifest.get(
+            "exact_checkpoint_event_count", 0),
         "errors": errors,
     }
     return rows, audit, errors
