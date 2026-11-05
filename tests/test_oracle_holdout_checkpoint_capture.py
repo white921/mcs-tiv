@@ -29,6 +29,19 @@ class OracleHoldoutCheckpointCaptureTest(unittest.TestCase):
         self.assertEqual(len(grouped), 60)
         self.assertTrue(all(len(group) == 16 for group in grouped.values()))
 
+    def test_worker_exception_has_auditable_identity(self):
+        key = ("eval7", "proposal", 23)
+        error = RuntimeError("capture failed")
+        fallback = capture.failed_group_manifest(
+            key, 16, error, {"commit": "abc"})
+        self.assertEqual(
+            (fallback["case"], fallback["origin_policy"], fallback["seed"]),
+            key)
+        self.assertEqual(fallback["event_count"], 16)
+        self.assertEqual(fallback["checkpoint_count"], 0)
+        self.assertFalse(fallback["source_unchanged"])
+        self.assertEqual(fallback["exception"], "RuntimeError: capture failed")
+
 
 if __name__ == "__main__":
     unittest.main()

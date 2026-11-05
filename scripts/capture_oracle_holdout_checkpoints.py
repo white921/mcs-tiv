@@ -47,6 +47,22 @@ def load_events(paths: list[Path]) -> list[dict]:
     return events
 
 
+def failed_group_manifest(key: tuple, event_count: int, error: Exception,
+                          run_git: dict) -> dict:
+    case, origin, seed = key
+    return {
+        "schema": "oracle-holdout-exact-checkpoint-group-v1",
+        "status": "failed",
+        "case": case, "origin_policy": origin, "seed": seed,
+        "event_count": event_count,
+        "checkpoint_count": 0,
+        "exit_code": -1,
+        "exception": f"{type(error).__name__}: {error}",
+        "source_unchanged": False,
+        "git": run_git,
+    }
+
+
 def run_group(key: tuple, events: list[dict], args, run_git: dict) -> dict:
     case, origin, seed = key
     destination = args.output / case / origin / f"seed-{seed}"
@@ -155,7 +171,12 @@ def main() -> None:
             for key, values in sorted(grouped.items())
         }
         for future in concurrent.futures.as_completed(futures):
-            manifest = future.result()
+            key = futures[future]
+            try:
+                manifest = future.result()
+            except Exception as error:
+                manifest = failed_group_manifest(
+                    key, len(grouped[key]), error, run_git)
             manifests.append(manifest)
             log({
                 "event": "group_finished",
@@ -182,7 +203,8 @@ def main() -> None:
         # intentionally share one pre-decision checkpoint, but every planned
         # event must still have a checkpoint reference.
         "event_checkpoint_reference_count": sum(
-            item["event_count"] for item in manifests),
+            item["event_count"] for item in manifests
+            if item["status"] == "completed"),
         "checkpoint_count": sum(item["checkpoint_count"] for item in manifests),
         "plan_sha256": plan_hashes,
         "source_unchanged": all(item["source_unchanged"] for item in manifests),
