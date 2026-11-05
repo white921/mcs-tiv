@@ -129,6 +129,18 @@ def run_event(event: dict, args) -> dict:
     }
 
 
+def run_event_safe(event: dict, args) -> dict:
+    """Keep an auditable smoke manifest even if one worker raises."""
+    try:
+        return run_event(event, args)
+    except Exception as error:
+        return {
+            "event": event,
+            "equivalent": False,
+            "exception": f"{type(error).__name__}: {error}",
+        }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plan-dir", type=Path, required=True)
@@ -160,7 +172,7 @@ def main() -> None:
         parser.error("exact checkpoint batch is incomplete or from another source")
     args.output.mkdir(parents=True)
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as pool:
-        results = list(pool.map(lambda event: run_event(event, args), events))
+        results = list(pool.map(lambda event: run_event_safe(event, args), events))
     passed = all(result.get("equivalent") is True for result in results)
     manifest = {
         "schema": "oracle-exact-checkpoint-equivalence-v1",

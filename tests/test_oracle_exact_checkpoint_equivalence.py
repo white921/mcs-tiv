@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,6 +58,15 @@ class OracleExactCheckpointEquivalenceTest(unittest.TestCase):
         self.assertFalse(result["equivalent"])
         self.assertFalse(result["cross_process_boundary_fingerprint_match"])
         self.assertIn("boundary_fingerprint", result["differences"])
+
+    def test_worker_exception_is_preserved_as_failed_result(self):
+        event = {"case": "eval7", "origin_policy": "proposal", "seed": 23}
+        with mock.patch.object(
+                validation, "run_event", side_effect=RuntimeError("boom")):
+            result = validation.run_event_safe(event, object())
+        self.assertFalse(result["equivalent"])
+        self.assertEqual(result["event"], event)
+        self.assertEqual(result["exception"], "RuntimeError: boom")
 
 
 if __name__ == "__main__":
