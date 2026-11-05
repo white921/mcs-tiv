@@ -43,6 +43,9 @@ def validate_discovery(root: Path, origin: str) -> dict:
         "failed_simulations": manifest.get("failed_simulations") == 0,
         "duration_s": float(manifest.get("duration_s", -1)) == 300.0,
         "workers": manifest.get("workers") == 10,
+        "diagnostic_traces": manifest.get("diagnostic_traces") is True,
+        "checkpoint_interval_s": (
+            float(manifest.get("checkpoint_interval_s", -1)) == 30.0),
         "cases": tuple(manifest.get("cases", ())) == tuple(CASES),
         "seeds": sorted({
             int(task["seed"]) for task in manifest.get("tasks", ())

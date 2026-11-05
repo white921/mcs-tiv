@@ -31,6 +31,7 @@ class OracleAlignedV2HoldoutPlansTest(unittest.TestCase):
                 "status": "completed", "completed_simulations": 30,
                 "failed_simulations": 0, "duration_s": 300.0,
                 "workers": 10, "cases": ["eval3", "eval5", "eval7"],
+                "diagnostic_traces": True, "checkpoint_interval_s": 30.0,
                 "tasks": [{"seed": seed} for seed in range(23, 33)],
                 "git": {"commit": plans.DISCOVERY_SOURCE_COMMIT,
                         "dirty": False},
