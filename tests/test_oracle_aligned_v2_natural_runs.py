@@ -28,6 +28,9 @@ class OracleAlignedV2NaturalRunsTest(unittest.TestCase):
             self.rows(), "difference", 100, 20261105)
         self.assertEqual(first, second)
 
+    def test_collision_episodes_are_a_reported_metric(self):
+        self.assertIn("physical_collision_episodes", analysis.METRICS)
+
 
 if __name__ == "__main__":
     unittest.main()
