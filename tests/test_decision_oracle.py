@@ -14,6 +14,34 @@ import thesis_tiv
 
 
 class DecisionOracleTests(unittest.TestCase):
+    def test_fixed_input_boundary_ignores_dormant_rng_state(self):
+        first = oracle.replay_rng_hashes(
+            fixed_input_schedule=object(),
+            python_random_state="process-one",
+            vehicle_type_random_state="vehicle-process-one")
+        second = oracle.replay_rng_hashes(
+            fixed_input_schedule=object(),
+            python_random_state="process-two",
+            vehicle_type_random_state="vehicle-process-two")
+
+        self.assertEqual(first, second)
+        self.assertEqual(first, {
+            "python_random_state_hash": None,
+            "vehicle_type_random_state_hash": None,
+        })
+
+    def test_stochastic_boundary_keeps_rng_state(self):
+        first = oracle.replay_rng_hashes(
+            fixed_input_schedule=None,
+            python_random_state="process-one",
+            vehicle_type_random_state="vehicle-process-one")
+        second = oracle.replay_rng_hashes(
+            fixed_input_schedule=None,
+            python_random_state="process-two",
+            vehicle_type_random_state="vehicle-process-two")
+
+        self.assertNotEqual(first, second)
+
     def test_fingerprint_detects_cursor_and_state_change(self):
         args = dict(sim_time_s=3.0, vehicle_states=[{"id": "a", "x": 1, "y": 2, "speed": 3}],
                     fixed_input_cursor={"left": 2}, random_state="rng", controller_state_hash="state")

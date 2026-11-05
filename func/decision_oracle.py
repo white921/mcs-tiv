@@ -73,6 +73,28 @@ def canonical_hash(value):
     return hashlib.sha256(encoded).hexdigest()
 
 
+def replay_rng_hashes(*, fixed_input_schedule, python_random_state,
+                      vehicle_type_random_state):
+    """Return only RNG state that can influence the remaining replay.
+
+    A fixed-input schedule already contains every departure time, route, and
+    vehicle type.  The two RNGs are therefore dormant in those runs and are
+    initially seeded from process entropy.  Including those unused states in a
+    cross-process boundary fingerprint creates false mismatches even when the
+    physical and controller states are identical.
+    """
+    if fixed_input_schedule is not None:
+        return {
+            "python_random_state_hash": None,
+            "vehicle_type_random_state_hash": None,
+        }
+    return {
+        "python_random_state_hash": canonical_hash(repr(python_random_state)),
+        "vehicle_type_random_state_hash": canonical_hash(
+            repr(vehicle_type_random_state)),
+    }
+
+
 def checkpoint_fingerprint(*, sim_time_s, vehicle_states, fixed_input_cursor,
                            random_state, controller_state_hash):
     """Only compact, observable fields are compared between restored branches."""
@@ -136,16 +158,18 @@ def boundary_context(*, request_manifest, traci, vehicles,
                     if fixed_input_schedule is not None else None)
     controllers = sorted((_controller_witness(vehicle) for vehicle in vehicles),
                          key=lambda item: item["id"])
-    return {
+    context = {
         "request": request_manifest,
         "sim_time_s": float(traci.simulation.getTime()),
         "physical_vehicles": physical,
         "fixed_input_cursor": fixed_cursor,
-        "python_random_state_hash": canonical_hash(repr(python_random_state)),
-        "vehicle_type_random_state_hash": canonical_hash(
-            repr(vehicle_type_random_state)),
         "controller_state_hash": canonical_hash(controllers),
     }
+    context.update(replay_rng_hashes(
+        fixed_input_schedule=fixed_input_schedule,
+        python_random_state=python_random_state,
+        vehicle_type_random_state=vehicle_type_random_state))
+    return context
 
 
 def realised_metrics(samples, cohort):

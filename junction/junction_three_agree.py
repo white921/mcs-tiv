@@ -219,17 +219,18 @@ def _oracle_boundary_context(request_manifest):
     controllers = sorted(
         (_controller_witness(vehicle) for vehicle in vehicle_instance),
         key=lambda item: item["id"])
-    return {
+    context = {
         "request": request_manifest,
         "sim_time_s": float(traci.simulation.getTime()),
         "physical_vehicles": physical,
         "fixed_input_cursor": fixed_cursor,
-        "python_random_state_hash": decision_oracle.canonical_hash(
-            repr(random.getstate())),
-        "vehicle_type_random_state_hash": decision_oracle.canonical_hash(
-            repr(vehicle_type_rng.getstate())),
         "controller_state_hash": decision_oracle.canonical_hash(controllers),
     }
+    context.update(decision_oracle.replay_rng_hashes(
+        fixed_input_schedule=fixed_input_schedule,
+        python_random_state=random.getstate(),
+        vehicle_type_random_state=vehicle_type_rng.getstate()))
+    return context
 
 
 def _checkpoint_globals():
