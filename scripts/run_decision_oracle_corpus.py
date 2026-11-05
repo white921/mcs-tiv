@@ -75,7 +75,7 @@ def validate_exact_checkpoint_batch(root):
     expected = {
         "status": "completed", "workers": 10, "group_count": 60,
         "failed_group_count": 0, "planned_event_count": 960,
-        "checkpoint_count": 960,
+        "event_checkpoint_reference_count": 960,
         "source_unchanged": True, "exit_code": 0,
     }
     failures = [
@@ -85,6 +85,12 @@ def validate_exact_checkpoint_batch(root):
     if failures:
         raise ValueError(
             f"invalid exact checkpoint batch {path}: " + ", ".join(failures))
+    checkpoint_count = manifest.get("checkpoint_count")
+    if (not isinstance(checkpoint_count, int)
+            or not 1 <= checkpoint_count <= 960):
+        raise ValueError(
+            f"invalid exact checkpoint batch {path}: "
+            f"checkpoint_count={checkpoint_count!r}")
     return {"path": str(path), "manifest": manifest}
 
 

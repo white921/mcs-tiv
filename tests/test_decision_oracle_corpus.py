@@ -211,6 +211,33 @@ class DecisionOracleCorpusTests(unittest.TestCase):
             self.assertEqual(
                 corpus.exact_checkpoint_for_event(root, event), checkpoint)
 
+    def test_exact_batch_allows_shared_physical_checkpoints(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "experiment-manifest.json").write_text(json.dumps({
+                "status": "completed", "workers": 10, "group_count": 60,
+                "failed_group_count": 0, "planned_event_count": 960,
+                "event_checkpoint_reference_count": 960,
+                "checkpoint_count": 958, "source_unchanged": True,
+                "exit_code": 0,
+            }))
+            result = corpus.validate_exact_checkpoint_batch(root)
+            self.assertEqual(result["manifest"]["checkpoint_count"], 958)
+
+    def test_exact_batch_requires_all_event_checkpoint_references(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "experiment-manifest.json").write_text(json.dumps({
+                "status": "completed", "workers": 10, "group_count": 60,
+                "failed_group_count": 0, "planned_event_count": 960,
+                "event_checkpoint_reference_count": 959,
+                "checkpoint_count": 958, "source_unchanged": True,
+                "exit_code": 0,
+            }))
+            with self.assertRaisesRegex(
+                    ValueError, "event_checkpoint_reference_count=959"):
+                corpus.validate_exact_checkpoint_batch(root)
+
     def test_event_runner_passes_exact_checkpoint(self):
         args = NS(
             python=Path("/tmp/python"), sumo_home=Path("/tmp/sumo"),

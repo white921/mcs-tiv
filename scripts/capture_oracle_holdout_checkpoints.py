@@ -178,6 +178,11 @@ def main() -> None:
         "group_count": len(manifests),
         "failed_group_count": len(failures),
         "planned_event_count": len(events),
+        # Multiple negotiations can occur at the same 0.1 s instant.  They
+        # intentionally share one pre-decision checkpoint, but every planned
+        # event must still have a checkpoint reference.
+        "event_checkpoint_reference_count": sum(
+            item["event_count"] for item in manifests),
         "checkpoint_count": sum(item["checkpoint_count"] for item in manifests),
         "plan_sha256": plan_hashes,
         "source_unchanged": all(item["source_unchanged"] for item in manifests),

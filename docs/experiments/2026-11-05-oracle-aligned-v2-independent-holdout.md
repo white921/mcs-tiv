@@ -54,6 +54,8 @@ seedは`23–27`と`28–32`の2群に分け、4時間帯それぞれに120場�
 case×origin×seedの16交渉を1回の0秒からの再生で通過し、各`event_time - 0.1秒`の
 SUMO/MCS対checkpointを一括保存する。全60再生を10 workerで実行し、その後の
 Accept/Reject 1,920分岐はこの正確checkpointから開始する。
+同一0.1秒に複数交渉がある場合は同じ物理checkpointを共有するが、960場面
+すべてがcheckpointへ解決できることを完了条件とする。
 
 正式corpusの開始前に、Eval.3/5/7×山下/固定v2の6条件で、従来の個別の
 0秒からのcaptureと一括checkpointを比較する。対象交渉ID、policy choice、cohort、
