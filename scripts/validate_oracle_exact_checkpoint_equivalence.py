@@ -171,8 +171,26 @@ def main() -> None:
             or capture_manifest.get("git", {}).get("commit") != run_git.get("commit")):
         parser.error("exact checkpoint batch is incomplete or from another source")
     args.output.mkdir(parents=True)
+    runner_log = args.output / "runner.log"
+
+    def log(record: dict) -> None:
+        with runner_log.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+        print(json.dumps(record, ensure_ascii=False), flush=True)
+
+    log({"event": "equivalence_started", "event_count": len(events),
+         "workers": args.workers})
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as pool:
         results = list(pool.map(lambda event: run_event_safe(event, args), events))
+    for result in results:
+        log({
+            "event": "equivalence_event_finished",
+            "case": result["event"]["case"],
+            "origin_policy": result["event"]["origin_policy"],
+            "seed": result["event"]["seed"],
+            "equivalent": result.get("equivalent") is True,
+            "exception": result.get("exception"),
+        })
     passed = all(result.get("equivalent") is True for result in results)
     manifest = {
         "schema": "oracle-exact-checkpoint-equivalence-v1",
@@ -185,7 +203,9 @@ def main() -> None:
         "exit_code": 0 if passed else 1,
     }
     write_json(args.output / "experiment-manifest.json", manifest)
-    print(json.dumps(manifest, indent=2))
+    log({"event": "equivalence_finished", "status": manifest["status"],
+         "equivalent_event_count": manifest["equivalent_event_count"]})
+    print(json.dumps(manifest, indent=2), flush=True)
     raise SystemExit(manifest["exit_code"])
 
 
