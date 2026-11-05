@@ -46,6 +46,18 @@ seedは`23–27`と`28–32`の2群に分け、4時間帯それぞれに120場�
 全8 plan、960場面、1,920分岐とする。各planはハッシュと件数を固定し、前のplanが
 120/120正常終了した場合だけ次を開始する。
 
+## checkpoint作成の事前固定
+
+各選択交渉を0秒から個別再現する重複を避けるため、plan固定後に同一
+case×origin×seedの16交渉を1回の0秒からの再生で通過し、各`event_time - 0.1秒`の
+SUMO/MCS対checkpointを一括保存する。全60再生を10 workerで実行し、その後の
+Accept/Reject 1,920分岐はこの正確checkpointから開始する。
+
+正式corpusの開始前に、Eval.3/5/7×山下/固定v2の6条件で、従来の個別の
+0秒からのcaptureと一括checkpointを比較する。対象交渉ID、policy choice、cohort、
+Accept/Reject実現指標、oracle、物理衝突が一致しない場合は正式corpusを
+開始しない。この効率化はplan、判断規則、分岐時間、cohort、指標を変更しない。
+
 ## 確認基準
 
 主比較は、次の両方を満たしたときにのみ独立holdoutでの改善を確認したとする。
