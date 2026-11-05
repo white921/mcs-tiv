@@ -224,6 +224,13 @@ class DecisionOracleCorpusTests(unittest.TestCase):
             result = corpus.validate_exact_checkpoint_batch(root)
             self.assertEqual(result["manifest"]["checkpoint_count"], 958)
 
+    def test_corpus_records_audited_checkpoint_source_override(self):
+        source = (ROOT / "scripts" / "run_decision_oracle_corpus.py").read_text()
+
+        self.assertIn("--allow-checkpoint-source-commit", source)
+        self.assertIn("--checkpoint-compatibility-note", source)
+        self.assertIn("exact_checkpoint_source_compatibility", source)
+
     def test_exact_batch_requires_all_event_checkpoint_references(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

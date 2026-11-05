@@ -149,6 +149,12 @@ def main() -> None:
     parser.add_argument("--python", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--workers", type=int, default=6)
+    parser.add_argument(
+        "--allow-checkpoint-source-commit",
+        help="explicitly allow checkpoints from this recorded source commit")
+    parser.add_argument(
+        "--checkpoint-compatibility-note",
+        help="audit note required when checkpoint and replay commits differ")
     args = parser.parse_args()
     args.plan_dir = args.plan_dir.resolve()
     args.exact_checkpoint_root = args.exact_checkpoint_root.resolve()
@@ -167,9 +173,25 @@ def main() -> None:
         parser.error("equivalence validation requires a clean worktree")
     capture_manifest = read_json(
         args.exact_checkpoint_root / "experiment-manifest.json")
-    if (capture_manifest.get("status") != "completed"
-            or capture_manifest.get("git", {}).get("commit") != run_git.get("commit")):
-        parser.error("exact checkpoint batch is incomplete or from another source")
+    if capture_manifest.get("status") != "completed":
+        parser.error("exact checkpoint batch is incomplete")
+    checkpoint_commit = capture_manifest.get("git", {}).get("commit")
+    source_match = checkpoint_commit == run_git.get("commit")
+    if not source_match:
+        if args.allow_checkpoint_source_commit != checkpoint_commit:
+            parser.error(
+                "exact checkpoint batch is from another source; pass its "
+                "recorded commit explicitly only after a compatibility audit")
+        if not (args.checkpoint_compatibility_note or "").strip():
+            parser.error(
+                "--checkpoint-compatibility-note is required for a source override")
+    checkpoint_source_compatibility = {
+        "checkpoint_source_commit": checkpoint_commit,
+        "replay_source_commit": run_git.get("commit"),
+        "source_commit_match": source_match,
+        "override_used": not source_match,
+        "note": (args.checkpoint_compatibility_note if not source_match else None),
+    }
     args.output.mkdir(parents=True)
     runner_log = args.output / "runner.log"
 
@@ -196,6 +218,7 @@ def main() -> None:
         "schema": "oracle-exact-checkpoint-equivalence-v1",
         "status": "passed" if passed else "failed",
         "git": run_git,
+        "checkpoint_source_compatibility": checkpoint_source_compatibility,
         "events": results,
         "event_count": len(results),
         "equivalent_event_count": sum(

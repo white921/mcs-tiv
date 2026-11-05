@@ -13,6 +13,14 @@ SPEC.loader.exec_module(validation)
 
 
 class OracleExactCheckpointEquivalenceTest(unittest.TestCase):
+    def test_cli_exposes_audited_checkpoint_source_override(self):
+        source = (ROOT / "scripts" /
+                  "validate_oracle_exact_checkpoint_equivalence.py").read_text()
+
+        self.assertIn("--allow-checkpoint-source-commit", source)
+        self.assertIn("--checkpoint-compatibility-note", source)
+        self.assertIn("checkpoint_source_compatibility", source)
+
     def test_equal_event_manifests_pass(self):
         event = {
             "event": {"case": "eval3"},
