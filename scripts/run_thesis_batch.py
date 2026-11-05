@@ -84,6 +84,7 @@ CASES = {
         "seeds": [1, 2, 3, 4, 5], "reference": 7.4159,
         "holdout_seeds": [6, 8, 9, 10, 12],
         "attribution_holdout_seeds": list(range(13, 23)),
+        "oracle_v2_holdout_seeds": list(range(23, 33)),
         "fixed_input": "fixed_inputs/thesis/eval3/seed-{seed}.jsonl",
     },
     "eval4": {
@@ -97,6 +98,7 @@ CASES = {
         "seeds": [1, 2, 3, 4, 5], "reference": 6.4420,
         "holdout_seeds": [6, 8, 9, 10, 12],
         "attribution_holdout_seeds": list(range(13, 23)),
+        "oracle_v2_holdout_seeds": list(range(23, 33)),
         "fixed_input": "fixed_inputs/thesis/eval5/seed-{seed}.jsonl",
     },
     "eval6": {
@@ -110,6 +112,7 @@ CASES = {
         "seeds": [1, 2, 3, 7, 11], "reference": 4.2084,
         "holdout_seeds": [6, 8, 9, 10, 12],
         "attribution_holdout_seeds": list(range(13, 23)),
+        "oracle_v2_holdout_seeds": list(range(23, 33)),
         "fixed_input": "fixed_inputs/thesis/eval7/seed-{seed}.jsonl",
     },
 }
@@ -228,6 +231,7 @@ def build_tasks(case_names, seeds_per_case=None, seeds=None):
                 set(documented)
                 | set(CASES[name].get("holdout_seeds", ()))
                 | set(CASES[name].get("attribution_holdout_seeds", ()))
+                | set(CASES[name].get("oracle_v2_holdout_seeds", ()))
             )
             unknown = [seed for seed in seeds if seed not in allowed]
             if unknown:

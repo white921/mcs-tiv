@@ -39,6 +39,7 @@ EXPECTED = {
 }
 HOLDOUT_SEEDS = (6, 8, 9, 10, 12)
 ATTRIBUTION_HOLDOUT_SEEDS = tuple(range(13, 23))
+ORACLE_V2_HOLDOUT_SEEDS = tuple(range(23, 33))
 
 
 class FixedVehicleInputTests(unittest.TestCase):
@@ -49,7 +50,8 @@ class FixedVehicleInputTests(unittest.TestCase):
         expected_paths = {
             ROOT / "fixed_inputs" / "thesis" / case / f"seed-{seed}.jsonl"
             for case, values in EXPECTED.items()
-            for seed in values["seeds"] + HOLDOUT_SEEDS + ATTRIBUTION_HOLDOUT_SEEDS
+            for seed in (values["seeds"] + HOLDOUT_SEEDS
+                         + ATTRIBUTION_HOLDOUT_SEEDS + ORACLE_V2_HOLDOUT_SEEDS)
         }
         self.assertEqual(set(self.paths()), expected_paths)
         for case, values in EXPECTED.items():
@@ -59,6 +61,10 @@ class FixedVehicleInputTests(unittest.TestCase):
             self.assertEqual(
                 tuple(CASES[case]["attribution_holdout_seeds"]),
                 ATTRIBUTION_HOLDOUT_SEEDS,
+            )
+            self.assertEqual(
+                tuple(CASES[case]["oracle_v2_holdout_seeds"]),
+                ORACLE_V2_HOLDOUT_SEEDS,
             )
 
     def test_every_file_loads_identically_and_preserves_conditions(self):
@@ -97,7 +103,8 @@ class FixedVehicleInputTests(unittest.TestCase):
 
     def test_batch_manifest_metadata_uses_relative_path_schema_and_sha256(self):
         for case, values in EXPECTED.items():
-            for seed in values["seeds"] + HOLDOUT_SEEDS + ATTRIBUTION_HOLDOUT_SEEDS:
+            for seed in (values["seeds"] + HOLDOUT_SEEDS
+                         + ATTRIBUTION_HOLDOUT_SEEDS + ORACLE_V2_HOLDOUT_SEEDS):
                 with self.subTest(case=case, seed=seed):
                     details = fixed_input_details(case, seed, 600, "fixed")
                     path = ROOT / details["relative_path"]
@@ -140,6 +147,7 @@ class FixedVehicleInputTests(unittest.TestCase):
         self.assertEqual(build_tasks(["eval3"], seeds=[5]), [("eval3", 5)])
         self.assertEqual(build_tasks(["eval3"], seeds=[6]), [("eval3", 6)])
         self.assertEqual(build_tasks(["eval3"], seeds=[22]), [("eval3", 22)])
+        self.assertEqual(build_tasks(["eval3"], seeds=[32]), [("eval3", 32)])
         self.assertEqual(
             build_tasks(["eval3"], seeds_per_case=2),
             [("eval3", 1), ("eval3", 2)],
