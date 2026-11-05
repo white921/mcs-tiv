@@ -113,6 +113,10 @@ def run_event(index: int, old_path: Path, args) -> dict:
         MCS_ORACLE_FORCE_DECISION="accept",
         MCS_ORACLE_EXPECTED_FINGERPRINT=old_fingerprint,
         MCS_ORACLE_BOUNDARY_AUDIT=str(boundary_path),
+        # Proposal-origin checkpoints were created by the old lambda=2 active
+        # rule.  Reproduce that lifecycle until the fixed boundary while the
+        # boundary's separate proposal_evaluation records v2 in shadow.
+        MCS_DECELERATION_REPLAY_LEGACY_ACTIVE="1",
     )
     command, _ = scenario_command(
         replay, args.source, float(event["sim_time_s"]), checkpoint)
@@ -179,6 +183,9 @@ def run_event(index: int, old_path: Path, args) -> dict:
         "exit_code": code,
         "elapsed_seconds": elapsed,
         "proposal_evaluation": evaluation,
+        "origin_replay_decision_rule": (
+            "legacy-time-equivalent-lambda-2"
+            if event["origin_policy"] == "proposal" else "yamashita"),
         "actor_vehicle_ids": sorted(actor_ids),
         "follower_vehicle_ids": sorted(follower_ids),
         "cohort_vehicle_ids": sorted(cohort),

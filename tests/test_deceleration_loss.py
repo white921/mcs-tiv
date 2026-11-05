@@ -439,6 +439,27 @@ class DecelerationLossTests(unittest.TestCase):
         self.assertIsNone(prediction.active_decision(
             receiver, desired, alternative, 0.0, (40.0, 0.0)))
 
+    def test_legacy_active_replay_does_not_replace_v2_shadow_result(self):
+        receiver = NS(id="b")
+        desired = NS(vehID="a", pathID="desired")
+        record = {
+            "status": "evaluated",
+            "decision": "accept",
+            "legacy_time_equivalent_decision": "reject",
+        }
+        prediction.configure("active")
+        with patch.object(prediction, "REPLAY_LEGACY_ACTIVE", True), \
+                patch.object(prediction, "_record_evaluation",
+                             return_value=record):
+            accepted = prediction.active_decision(
+                receiver, desired, object(), 3.0, (0.0, 0.0))
+
+        self.assertFalse(accepted)
+        self.assertEqual(record["decision"], "accept")
+        self.assertEqual(
+            prediction.ACTIVE_DECISION_UNTIL[("b", "a", "desired")], 4.0)
+        prediction.configure("off")
+
     def test_active_decision_locks_only_the_same_desired_path_for_one_second(self):
         def path(veh, kind, name, speeds):
             return NS(vehID=veh, type=kind, pathID=name,

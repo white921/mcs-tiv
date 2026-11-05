@@ -55,6 +55,17 @@ def _loss_lambda_from_environment():
 
 LOSS_LAMBDA = _loss_lambda_from_environment()
 
+
+def _legacy_active_replay_from_environment():
+    value = os.environ.get("MCS_DECELERATION_REPLAY_LEGACY_ACTIVE", "0")
+    if value not in ("0", "1"):
+        raise ValueError(
+            "MCS_DECELERATION_REPLAY_LEGACY_ACTIVE must be 0 or 1")
+    return value == "1"
+
+
+REPLAY_LEGACY_ACTIVE = _legacy_active_replay_from_environment()
+
 COUNTS = Counter()
 RECORDS = []
 # A desired MCM is normally regenerated every second.  Keep an active
@@ -567,7 +578,11 @@ def active_decision(receiver, desired, alternative, now, conflict_point):
         return None
     key = (str(receiver.id), str(desired.vehID), str(desired.pathID))
     ACTIVE_DECISION_UNTIL[key] = now + REPLAN_INTERVAL
-    return record["decision"] == "accept"
+    choice = (record["legacy_time_equivalent_decision"]
+              if REPLAY_LEGACY_ACTIVE else record["decision"])
+    if REPLAY_LEGACY_ACTIVE:
+        COUNTS["legacy_active_replay_decisions"] += 1
+    return choice == "accept"
 
 
 def record_tiv_comparison(proposal_accept, tiv_accept):
