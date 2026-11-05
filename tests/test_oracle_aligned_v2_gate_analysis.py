@@ -37,6 +37,12 @@ class OracleAlignedV2GateAnalysisTest(unittest.TestCase):
         self.assertEqual(
             analysis.gated_choice(row, 10, "accept_to_reject"), "reject")
 
+    def test_unavailable_prediction_keeps_online_fallback_choice(self):
+        row = self.row(baseline="reject")
+        row["predicted_m"] = None
+        self.assertEqual(
+            analysis.gated_choice(row, 10, "accept_to_reject"), "reject")
+
     def test_regret_uses_realised_distance_gap(self):
         row = self.row(actual=-4.0)
         self.assertEqual(analysis.regret(row, "reject"), 0.0)

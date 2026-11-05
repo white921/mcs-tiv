@@ -33,7 +33,7 @@ BOOTSTRAP_REPETITIONS = 100_000
 BOOTSTRAP_SEED = 20261105
 
 
-def load_rows(path: Path) -> list[dict]:
+def load_rows(path: Path, *, online_fallback: bool = False) -> list[dict]:
     rows = []
     with path.open(encoding="utf-8", newline="") as stream:
         for source in csv.DictReader(stream):
@@ -41,7 +41,12 @@ def load_rows(path: Path) -> list[dict]:
             actual = source["actual_accept_minus_reject_m"]
             baseline = source["arrival_only_choice"]
             oracle = source["oracle_choice"]
-            if not predicted or not actual or baseline not in ("accept", "reject"):
+            yamashita = source["yamashita_choice"]
+            if (online_fallback and baseline not in ("accept", "reject")
+                    and yamashita in ("accept", "reject")):
+                baseline = yamashita
+            if (not actual or baseline not in ("accept", "reject")
+                    or (not online_fallback and not predicted)):
                 continue
             rows.append({
                 "case": source["case"],
@@ -49,11 +54,12 @@ def load_rows(path: Path) -> list[dict]:
                 "origin_policy": source["origin_policy"],
                 "seed": int(source["seed"]),
                 "ordinal": int(source["ordinal"]),
-                "predicted_m": float(predicted),
+                "predicted_m": float(predicted) if predicted else None,
                 "actual_m": float(actual),
                 "baseline_choice": baseline,
                 "oracle_choice": oracle,
-                "yamashita_choice": source["yamashita_choice"],
+                "yamashita_choice": yamashita,
+                "prediction_available": bool(predicted),
             })
     return rows
 
@@ -61,6 +67,8 @@ def load_rows(path: Path) -> list[dict]:
 def gated_choice(row: dict, threshold_m: float, mode: str) -> str:
     baseline = row["baseline_choice"]
     predicted = row["predicted_m"]
+    if predicted is None:
+        return baseline
     if mode in ("symmetric", "accept_to_reject"):
         if baseline == "accept" and predicted < -threshold_m:
             return "reject"
@@ -217,8 +225,8 @@ def leave_one_cluster_out(rows: list[dict]) -> dict:
     }
 
 
-def analyze(rows: list[dict]) -> dict:
-    return {
+def analyze(rows: list[dict], fallback_rows: list[dict] | None = None) -> dict:
+    output = {
         "schema": "oracle-aligned-v2-gate-development-analysis-v1",
         "development_only": True,
         "reason": "gate selection and scoring use the same 960-event oracle corpus",
@@ -234,6 +242,20 @@ def analyze(rows: list[dict]) -> dict:
         "fixed_accept_to_reject_10m_vs_yamashita": (
             fixed_gate_vs_yamashita(rows, 10)),
     }
+    if fallback_rows is not None:
+        output["online_fallback_sensitivity"] = {
+            "rule": (
+                "when prediction is unavailable, both arrival-only and fixed "
+                "v2 use the observed Yamashita choice, matching online control"),
+            "events": len(fallback_rows),
+            "prediction_unavailable_events": sum(
+                not row["prediction_available"] for row in fallback_rows),
+            "fixed_accept_to_reject_10m": fixed_gate_analysis(
+                fallback_rows, 10),
+            "fixed_accept_to_reject_10m_vs_yamashita": (
+                fixed_gate_vs_yamashita(fallback_rows, 10)),
+        }
+    return output
 
 
 def main() -> None:
@@ -242,10 +264,12 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     rows = load_rows(args.events_csv)
+    fallback_rows = load_rows(args.events_csv, online_fallback=True)
     if not rows:
         parser.error("no scored v2 rows found")
     args.output.write_text(
-        json.dumps(analyze(rows), ensure_ascii=False, indent=2) + "\n",
+        json.dumps(analyze(rows, fallback_rows), ensure_ascii=False, indent=2)
+        + "\n",
         encoding="utf-8")
 
 
