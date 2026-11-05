@@ -118,8 +118,13 @@ def run_event(index: int, old_path: Path, args) -> dict:
         # boundary's separate proposal_evaluation records v2 in shadow.
         MCS_DECELERATION_REPLAY_LEGACY_ACTIVE="1",
     )
+    # A few restored Eval.7 states report the target one floating-point step
+    # after an equal-valued --stop-time comparison.  Allow two extra simulator
+    # ticks; the audited target boundary is still fixed by ordinal, identity,
+    # and fingerprint, and no post-boundary state enters the rescore.
+    stop_time = round(float(event["sim_time_s"]) + 0.2, 1)
     command, _ = scenario_command(
-        replay, args.source, float(event["sim_time_s"]), checkpoint)
+        replay, args.source, stop_time, checkpoint)
     code, elapsed = run_process(
         command, args.source / {
             "eval3": "junction", "eval5": "junction", "eval7": "merge",
