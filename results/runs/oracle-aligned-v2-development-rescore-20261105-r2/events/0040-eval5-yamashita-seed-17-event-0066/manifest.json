@@ -1,0 +1,207 @@
+{
+  "schema": "decision-oracle-v2-rescore-event-v1",
+  "event": {
+    "case": "eval5",
+    "seed": 17,
+    "origin_policy": "yamashita",
+    "ordinal": 66,
+    "sim_time_s": 78.1,
+    "receiver_id": "25",
+    "sender_id": "23",
+    "desired_path_id": "23_28"
+  },
+  "source_event_manifest": "/media/yamada/UbuntuData/\u30c9\u30ad\u30e5\u30e1\u30f3\u30c8/\u5352\u8ad6\u7814\u7a76/mcs-tiv-follower-impact-time-stratified-results/results/runs/follower-impact-time-stratified-13-17-t000-100-f8412b94/events/040-eval5-yamashita-seed-17-event-0066/eval5-yamashita-seed-17-event-0066/manifest.json",
+  "source_checkpoint": "/media/yamada/UbuntuData/\u30c9\u30ad\u30e5\u30e1\u30f3\u30c8/\u5352\u8ad6\u7814\u7a76/mcs-tiv-follower-impact-time-stratified-results/results/runs/follower-impact-time-stratified-13-17-t000-100-f8412b94/events/040-eval5-yamashita-seed-17-event-0066/eval5-yamashita-seed-17-event-0066/capture/checkpoints/t0000078.0",
+  "boundary_fingerprint": "31ea8c4a8b0a09f7d8b4c46f30599fc992054239e3aa7c76640020de54bddc9b",
+  "boundary_fingerprint_match": true,
+  "command": [
+    "/media/yamada/UbuntuData/home-yamada/Documents/\u5352\u696d\u7814\u7a76/mcs-tiv/.venv-py315-sumo128/bin/python",
+    "-u",
+    "junction_four_agree.py",
+    "7",
+    "17",
+    "300",
+    "300",
+    "300",
+    "300",
+    "--nogui",
+    "--quiet",
+    "--duration",
+    "300.0",
+    "--stop-time",
+    "78.3",
+    "--bus-allocation",
+    "fixed",
+    "--fixed-input",
+    "../fixed_inputs/thesis/eval5/seed-17.jsonl",
+    "--no-save",
+    "--bus-share",
+    "0.25",
+    "--resume-checkpoint",
+    "/media/yamada/UbuntuData/\u30c9\u30ad\u30e5\u30e1\u30f3\u30c8/\u5352\u8ad6\u7814\u7a76/mcs-tiv-follower-impact-time-stratified-results/results/runs/follower-impact-time-stratified-13-17-t000-100-f8412b94/events/040-eval5-yamashita-seed-17-event-0066/eval5-yamashita-seed-17-event-0066/capture/checkpoints/t0000078.0"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 6.3928601811639965,
+  "proposal_evaluation": {
+    "accept_follower_ids": [],
+    "accept_loss_m": 0,
+    "accept_time_equivalent_loss_s": 0.0,
+    "arrival_margin_s": 1.9000000000000057,
+    "arrival_only_decision": "reject",
+    "arrival_status": "both_reached",
+    "decision": "reject",
+    "decision_basis": "reject_distance_advantage",
+    "decision_rule": "oracle-aligned-direct-distance-v2",
+    "direct_accept_distance_m": 88.43314999999996,
+    "direct_accept_minus_reject_m": -31.890200000000092,
+    "direct_distance_deadband_m": 1.0,
+    "direct_distance_decision": "reject",
+    "direct_distance_decision_basis": "reject_distance_advantage",
+    "direct_distance_vehicle_details": {
+      "23": {
+        "accept_distance_m": 53.95635000000001,
+        "accept_minus_reject_distance_m": 24.076399999999953,
+        "reject_distance_m": 29.879950000000054
+      },
+      "25": {
+        "accept_distance_m": 34.47679999999995,
+        "accept_minus_reject_distance_m": -55.96660000000005,
+        "reject_distance_m": 90.4434
+      }
+    },
+    "direct_reject_distance_m": 120.32335000000005,
+    "effective_loss_margin_s": 0.0,
+    "excluded_loss_vehicle_ids": [
+      "23",
+      "25"
+    ],
+    "final_margin_s": 1.9000000000000057,
+    "follower_count": 0,
+    "follower_replans": 0,
+    "legacy_time_equivalent_decision": "reject",
+    "loss_lambda": 2.0,
+    "loss_margin_s": 0.0,
+    "loss_vehicle_ids": [],
+    "negative_loss_credit_s": 0.0,
+    "receiver_arrival_reached": true,
+    "receiver_arrival_s": 7.200000000000003,
+    "reject_follower_ids": [],
+    "reject_loss_m": 0,
+    "reject_minus_accept_m": 0,
+    "reject_time_equivalent_loss_s": 0.0,
+    "replan_interval_s": 1.0,
+    "request_arrival_reached": true,
+    "request_arrival_s": 9.100000000000009,
+    "time_half_life_s": null,
+    "time_weighting": "uniform",
+    "union_follower_ids": [],
+    "vehicle_ids": [
+      "23",
+      "25"
+    ],
+    "vehicle_loss_details": {},
+    "weighted_loss_margin_s": 0.0
+  },
+  "origin_replay_decision_rule": "yamashita",
+  "actor_vehicle_ids": [
+    "23",
+    "25"
+  ],
+  "follower_vehicle_ids": [],
+  "cohort_vehicle_ids": [
+    "23",
+    "25"
+  ],
+  "branches": {
+    "accept": {
+      "distance_m": 52.89018924042828,
+      "delay_s": 16.192210997809344,
+      "lost_distance_m": 224.90981075957188,
+      "speed_sum_mps": 528.9018924042824,
+      "speed_samples": 200,
+      "stop_time_s": 0.0,
+      "hard_brake_time_s": 1.3,
+      "arrived_vehicle_ids": [],
+      "invalid_reason": null,
+      "mean_speed_mps": 2.644509462021412,
+      "safety": {
+        "valid": true,
+        "physical_collision_records": 0
+      }
+    },
+    "reject": {
+      "distance_m": 118.67586282177776,
+      "delay_s": 11.456021395120395,
+      "lost_distance_m": 159.12413717822267,
+      "speed_sum_mps": 1186.758628217778,
+      "speed_samples": 200,
+      "stop_time_s": 0.0,
+      "hard_brake_time_s": 0.1,
+      "arrived_vehicle_ids": [],
+      "invalid_reason": null,
+      "mean_speed_mps": 5.93379314108889,
+      "safety": {
+        "valid": true,
+        "physical_collision_records": 0
+      }
+    }
+  },
+  "oracle": {
+    "valid": true,
+    "choice": "reject",
+    "accept_minus_reject_distance_m": -65.78567358134947,
+    "tie_tolerance_m": 1.0
+  },
+  "policy_choices": {
+    "yamashita": "reject",
+    "oracle_aligned_v2": "reject",
+    "arrival_only": "reject",
+    "proposal_lambda_0.25": "reject",
+    "proposal_lambda_0.5": "reject",
+    "proposal_lambda_0.75": "reject",
+    "proposal_lambda_1": "reject",
+    "proposal_lambda_2": "reject"
+  },
+  "policy_scores": {
+    "yamashita": {
+      "scored": true,
+      "correct": true,
+      "regret_m": 0.0
+    },
+    "oracle_aligned_v2": {
+      "scored": true,
+      "correct": true,
+      "regret_m": 0.0
+    },
+    "arrival_only": {
+      "scored": true,
+      "correct": true,
+      "regret_m": 0.0
+    },
+    "proposal_lambda_0.25": {
+      "scored": true,
+      "correct": true,
+      "regret_m": 0.0
+    },
+    "proposal_lambda_0.5": {
+      "scored": true,
+      "correct": true,
+      "regret_m": 0.0
+    },
+    "proposal_lambda_0.75": {
+      "scored": true,
+      "correct": true,
+      "regret_m": 0.0
+    },
+    "proposal_lambda_1": {
+      "scored": true,
+      "correct": true,
+      "regret_m": 0.0
+    },
+    "proposal_lambda_2": {
+      "scored": true,
+      "correct": true,
+      "regret_m": 0.0
+    }
+  }
+}

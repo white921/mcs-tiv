@@ -1,0 +1,141 @@
+{
+  "schema": "decision-oracle-v2-rescore-event-v1",
+  "event": {
+    "case": "eval5",
+    "seed": 21,
+    "origin_policy": "yamashita",
+    "ordinal": 252,
+    "sim_time_s": 208.9,
+    "receiver_id": "36",
+    "sender_id": "83",
+    "desired_path_id": "83_50"
+  },
+  "source_event_manifest": "/media/yamada/UbuntuData/\u30c9\u30ad\u30e5\u30e1\u30f3\u30c8/\u5352\u8ad6\u7814\u7a76/mcs-tiv-follower-impact-time-stratified-results/results/runs/follower-impact-time-stratified-18-22-t160-220-checkpoint-hybrid-3862a877/events/035-eval5-yamashita-seed-21-event-0252/eval5-yamashita-seed-21-event-0252/manifest.json",
+  "source_checkpoint": "/media/yamada/UbuntuData/\u30c9\u30ad\u30e5\u30e1\u30f3\u30c8/\u5352\u8ad6\u7814\u7a76/mcs-tiv-follower-impact-time-stratified-results/results/runs/follower-impact-time-stratified-18-22-t160-220-checkpoint-hybrid-3862a877/events/035-eval5-yamashita-seed-21-event-0252/eval5-yamashita-seed-21-event-0252/capture/checkpoints/t0000208.8",
+  "boundary_fingerprint": "fafa9475e42cfee7c9076b77f7cc480586816b57013120daa48ad3a4a6200340",
+  "boundary_fingerprint_match": true,
+  "command": [
+    "/media/yamada/UbuntuData/home-yamada/Documents/\u5352\u696d\u7814\u7a76/mcs-tiv/.venv-py315-sumo128/bin/python",
+    "-u",
+    "junction_four_agree.py",
+    "7",
+    "21",
+    "300",
+    "300",
+    "300",
+    "300",
+    "--nogui",
+    "--quiet",
+    "--duration",
+    "300.0",
+    "--stop-time",
+    "209.1",
+    "--bus-allocation",
+    "fixed",
+    "--fixed-input",
+    "../fixed_inputs/thesis/eval5/seed-21.jsonl",
+    "--no-save",
+    "--bus-share",
+    "0.25",
+    "--resume-checkpoint",
+    "/media/yamada/UbuntuData/\u30c9\u30ad\u30e5\u30e1\u30f3\u30c8/\u5352\u8ad6\u7814\u7a76/mcs-tiv-follower-impact-time-stratified-results/results/runs/follower-impact-time-stratified-18-22-t160-220-checkpoint-hybrid-3862a877/events/035-eval5-yamashita-seed-21-event-0252/eval5-yamashita-seed-21-event-0252/capture/checkpoints/t0000208.8"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 10.150366626912728,
+  "proposal_evaluation": null,
+  "origin_replay_decision_rule": "yamashita",
+  "actor_vehicle_ids": [
+    "36",
+    "83"
+  ],
+  "follower_vehicle_ids": [],
+  "cohort_vehicle_ids": [
+    "36",
+    "83"
+  ],
+  "branches": {
+    "accept": {
+      "distance_m": 56.67833822834139,
+      "delay_s": 14.9032408411153,
+      "lost_distance_m": 193.3216617716588,
+      "speed_sum_mps": 566.783382283414,
+      "speed_samples": 200,
+      "stop_time_s": 9.099999999999984,
+      "hard_brake_time_s": 0.0,
+      "arrived_vehicle_ids": [],
+      "invalid_reason": null,
+      "mean_speed_mps": 2.8339169114170697,
+      "safety": {
+        "valid": true,
+        "physical_collision_records": 0
+      }
+    },
+    "reject": {
+      "distance_m": 61.20984964391877,
+      "delay_s": 14.490562588306105,
+      "lost_distance_m": 188.79015035608137,
+      "speed_sum_mps": 612.0984964391876,
+      "speed_samples": 200,
+      "stop_time_s": 9.99999999999998,
+      "hard_brake_time_s": 0.0,
+      "arrived_vehicle_ids": [],
+      "invalid_reason": null,
+      "mean_speed_mps": 3.060492482195938,
+      "safety": {
+        "valid": true,
+        "physical_collision_records": 0
+      }
+    }
+  },
+  "oracle": {
+    "valid": true,
+    "choice": "reject",
+    "accept_minus_reject_distance_m": -4.531511415577384,
+    "tie_tolerance_m": 1.0
+  },
+  "policy_choices": {
+    "yamashita": "accept",
+    "arrival_only": null,
+    "oracle_aligned_v2": null,
+    "proposal_lambda_0.25": null,
+    "proposal_lambda_0.5": null,
+    "proposal_lambda_0.75": null,
+    "proposal_lambda_1": null,
+    "proposal_lambda_2": null
+  },
+  "policy_scores": {
+    "yamashita": {
+      "scored": true,
+      "correct": false,
+      "regret_m": 4.531511415577384
+    },
+    "arrival_only": {
+      "scored": false,
+      "reason": "invalid_policy_choice"
+    },
+    "oracle_aligned_v2": {
+      "scored": false,
+      "reason": "invalid_policy_choice"
+    },
+    "proposal_lambda_0.25": {
+      "scored": false,
+      "reason": "invalid_policy_choice"
+    },
+    "proposal_lambda_0.5": {
+      "scored": false,
+      "reason": "invalid_policy_choice"
+    },
+    "proposal_lambda_0.75": {
+      "scored": false,
+      "reason": "invalid_policy_choice"
+    },
+    "proposal_lambda_1": {
+      "scored": false,
+      "reason": "invalid_policy_choice"
+    },
+    "proposal_lambda_2": {
+      "scored": false,
+      "reason": "invalid_policy_choice"
+    }
+  }
+}
