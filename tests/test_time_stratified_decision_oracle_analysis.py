@@ -1,5 +1,7 @@
 import importlib.util
+import json
 from pathlib import Path
+import tempfile
 import unittest
 
 
@@ -53,6 +55,15 @@ class TimeStratifiedAnalysisTest(unittest.TestCase):
 
     def test_percentile_uses_nearest_rank(self):
         self.assertEqual(analysis.percentile(list(range(1, 101)), 0.95), 95)
+
+    def test_expected_plan_hashes_support_new_preregistered_seed_groups(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "hashes.json"
+            path.write_text(json.dumps({"23-27:0-100": "a" * 64}))
+            self.assertEqual(
+                analysis.load_expected_plan_hashes(path),
+                {(23, 27, "0-100"): "a" * 64},
+            )
 
 
 if __name__ == "__main__":

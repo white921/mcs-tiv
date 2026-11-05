@@ -220,7 +220,12 @@ def require_file(path: Path, errors: list[str]) -> None:
         errors.append(f"missing file: {path}")
 
 
-def audit_corpus(window: str, root: Path) -> tuple[list[dict], dict, list[str]]:
+def audit_corpus(
+    window: str, root: Path, *,
+    expected_plan_hashes: dict | None = None,
+    expected_source_commits: set[str] | None = None,
+    policies: tuple[str, ...] = POLICIES,
+) -> tuple[list[dict], dict, list[str]]:
     errors = []
     for name in ("manifest.json", "plan.json", "run-git-metadata.json", "runner.log"):
         require_file(root / name, errors)
@@ -232,7 +237,8 @@ def audit_corpus(window: str, root: Path) -> tuple[list[dict], dict, list[str]]:
     plan_hash = hashlib.sha256(plan_bytes).hexdigest()
     seeds = sorted({int(event["seed"]) for event in plan.get("events", [])})
     key = (min(seeds, default=-1), max(seeds, default=-1), window)
-    expected_hash = EXPECTED_PLAN_HASHES.get(key)
+    expected_hash = (expected_plan_hashes or EXPECTED_PLAN_HASHES).get(key)
+    source_commits = expected_source_commits or EXPECTED_SOURCE_COMMITS
     checks = {
         "schema": manifest.get("schema") == "decision-oracle-corpus-v1",
         "status": manifest.get("status") == "completed",
@@ -241,7 +247,7 @@ def audit_corpus(window: str, root: Path) -> tuple[list[dict], dict, list[str]]:
         "failed_event_count": manifest.get("failed_event_count") == 0,
         "source_unchanged": manifest.get("source_unchanged") is True,
         "git_clean": manifest.get("git", {}).get("dirty") is False,
-        "source_commit": manifest.get("git", {}).get("commit") in EXPECTED_SOURCE_COMMITS,
+        "source_commit": manifest.get("git", {}).get("commit") in source_commits,
         "workers": manifest.get("workers") == 10,
         "cohort_mode": manifest.get("cohort_mode") == "actors-followers",
         "lambda": float(manifest.get("deceleration_loss_lambda", -1)) == 2.0,
@@ -357,7 +363,7 @@ def audit_corpus(window: str, root: Path) -> tuple[list[dict], dict, list[str]]:
             ).get("accept_minus_reject_distance_m"),
             "corpus": root.name,
         }
-        for policy in POLICIES:
+        for policy in policies:
             score = event_manifest.get("policy_scores", {}).get(policy, {})
             row[f"{policy}_choice"] = event_manifest.get(
                 "policy_choices", {}
@@ -415,6 +421,23 @@ def parse_corpus(value: str) -> tuple[str, Path]:
     return window, Path(path).resolve()
 
 
+def load_expected_plan_hashes(path: Path) -> dict[tuple[int, int, str], str]:
+    source = read_json(path)
+    output = {}
+    for name, value in source.items():
+        try:
+            seed_range, window = name.split(":", 1)
+            seed_min, seed_max = map(int, seed_range.split("-", 1))
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                f"invalid expected plan hash key {name!r}; "
+                "use SEED_MIN-SEED_MAX:WINDOW") from error
+        if window not in WINDOWS or not re.fullmatch(r"[0-9a-f]{64}", value):
+            raise ValueError(f"invalid expected plan hash entry: {name}={value}")
+        output[(seed_min, seed_max, window)] = value
+    return output
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -424,18 +447,44 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--bootstrap-repetitions", type=int, default=100_000)
     parser.add_argument("--bootstrap-seed", type=int, default=20261103)
+    parser.add_argument(
+        "--proposal-policy", default="proposal_lambda_2",
+        help="policy field compared with arrival_only and yamashita")
+    parser.add_argument(
+        "--expected-plan-hashes", type=Path,
+        help="JSON map keyed as SEED_MIN-SEED_MAX:WINDOW")
+    parser.add_argument(
+        "--expected-source-commit", action="append",
+        help="allowed clean source commit; repeat when needed")
     args = parser.parse_args()
     if len(args.corpus) != 8:
         parser.error("exactly eight corpus roots are required")
     if args.output.exists():
         parser.error("output directory already exists")
     args.output.mkdir(parents=True)
+    if not re.fullmatch(r"[a-z0-9_]+", args.proposal_policy):
+        parser.error("--proposal-policy must be a policy field name")
+    try:
+        expected_hashes = (
+            load_expected_plan_hashes(args.expected_plan_hashes)
+            if args.expected_plan_hashes else EXPECTED_PLAN_HASHES)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        parser.error(str(error))
+    expected_commits = (
+        set(args.expected_source_commit)
+        if args.expected_source_commit else EXPECTED_SOURCE_COMMITS)
+    policies = tuple(dict.fromkeys(
+        ("arrival_only", args.proposal_policy, "yamashita")))
 
     rows = []
     corpus_audits = []
     errors = []
     for window, root in args.corpus:
-        corpus_rows, audit, corpus_errors = audit_corpus(window, root)
+        corpus_rows, audit, corpus_errors = audit_corpus(
+            window, root,
+            expected_plan_hashes=expected_hashes,
+            expected_source_commits=expected_commits,
+            policies=policies)
         rows.extend(corpus_rows)
         corpus_audits.append(audit)
         errors.extend(corpus_errors)
@@ -468,11 +517,11 @@ def main() -> None:
         raise SystemExit(f"audit failed with {len(errors)} errors; see audit.json")
 
     primary = comparison(
-        rows, "arrival_only", "proposal_lambda_2",
+        rows, "arrival_only", args.proposal_policy,
         args.bootstrap_repetitions, args.bootstrap_seed,
     )
     secondary = comparison(
-        rows, "yamashita", "proposal_lambda_2",
+        rows, "yamashita", args.proposal_policy,
         args.bootstrap_repetitions, args.bootstrap_seed + 10_000,
     )
     summary = {
@@ -487,7 +536,12 @@ def main() -> None:
             "cluster": "origin_policy x seed within case",
             "aggregation": "equal case x time-window macro mean",
         },
-        "policies": {policy: policy_summary(rows, policy) for policy in POLICIES},
+        "proposal_policy": args.proposal_policy,
+        "policies": {policy: policy_summary(rows, policy) for policy in policies},
+        "primary_candidate_vs_arrival_only": primary,
+        "secondary_candidate_vs_yamashita": secondary,
+        # Backward-compatible aliases retained for the completed 2026-11-03
+        # analysis and any existing readers of its schema.
         "primary_proposal_vs_arrival_only": primary,
         "secondary_proposal_vs_yamashita": secondary,
     }
