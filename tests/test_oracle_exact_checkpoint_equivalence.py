@@ -34,6 +34,30 @@ class OracleExactCheckpointEquivalenceTest(unittest.TestCase):
         self.assertTrue(result["equivalent"])
         self.assertTrue(result["cross_process_boundary_fingerprint_match"])
 
+    def test_boundary_fingerprint_mismatch_fails(self):
+        reference = {
+            "event": {"case": "eval3"},
+            "policy_choices": {"oracle_aligned_v2": "reject"},
+            "actor_vehicle_ids": ["1", "2"],
+            "follower_vehicle_ids": ["3"],
+            "cohort_vehicle_ids": ["1", "2", "3"],
+            "oracle": {"choice": "reject", "valid": True},
+            "boundary_fingerprint": "from-start",
+            "branches": {
+                branch: {
+                    "metrics": {"distance_m": 10.0, "hard_brake_time_s": 0.0,
+                                "stop_time_s": 0.0},
+                    "safety": {"valid": True, "physical_collision_records": 0},
+                }
+                for branch in ("accept", "reject")
+            },
+        }
+        exact = {**reference, "boundary_fingerprint": "checkpoint"}
+        result = validation.compare(reference, exact)
+        self.assertFalse(result["equivalent"])
+        self.assertFalse(result["cross_process_boundary_fingerprint_match"])
+        self.assertIn("boundary_fingerprint", result["differences"])
+
 
 if __name__ == "__main__":
     unittest.main()

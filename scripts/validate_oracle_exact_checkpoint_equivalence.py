@@ -58,6 +58,10 @@ def event_manifest(root: Path) -> dict:
 
 def compare(reference: dict, exact: dict) -> dict:
     differences = []
+    fingerprint_match = (
+        reference["boundary_fingerprint"] == exact["boundary_fingerprint"])
+    if not fingerprint_match:
+        differences.append("boundary_fingerprint")
     exact_fields = (
         "event", "policy_choices", "actor_vehicle_ids", "follower_vehicle_ids",
         "cohort_vehicle_ids",
@@ -83,8 +87,7 @@ def compare(reference: dict, exact: dict) -> dict:
         "equivalent": not differences,
         "differences": differences,
         "numeric_differences": numeric,
-        "cross_process_boundary_fingerprint_match": (
-            reference["boundary_fingerprint"] == exact["boundary_fingerprint"]),
+        "cross_process_boundary_fingerprint_match": fingerprint_match,
     }
 
 
