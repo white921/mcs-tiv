@@ -224,9 +224,15 @@ def policy_choices(yamashita_choice, proposal_evaluation,
     choices = {"yamashita": yamashita_choice}
     if not proposal_evaluation:
         choices["arrival_only"] = None
+        choices["oracle_aligned_v2"] = None
         for value in lambdas:
             choices[f"proposal_lambda_{value:g}"] = None
         return choices
+    direct_choice = (proposal_evaluation.get("decision")
+                     if proposal_evaluation.get("decision_rule") ==
+                     "oracle-aligned-direct-distance-v2" else None)
+    choices["oracle_aligned_v2"] = (
+        direct_choice if direct_choice in ("accept", "reject") else None)
     arrival_status = proposal_evaluation.get("arrival_status")
     if arrival_status == "both_reached":
         arrival = float(proposal_evaluation["arrival_margin_s"])

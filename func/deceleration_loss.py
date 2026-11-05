@@ -93,6 +93,74 @@ def distance_losses(reference: Mapping[str, SpeedProfile],
     }
 
 
+def travelled_distance(profile: SpeedProfile) -> float:
+    """Integrate one predicted speed profile into travelled metres."""
+    total = 0.0
+    for index in range(len(profile.times) - 1):
+        left, right = profile.times[index:index + 2]
+        total += (
+            profile.speeds[index] + profile.speeds[index + 1]
+        ) * (right - left) / 2
+    return total
+
+
+def direct_distance_decision(
+    accept: Mapping[str, SpeedProfile],
+    reject: Mapping[str, SpeedProfile], *,
+    fallback_decision: str,
+    deadband_m: float = 1.0,
+) -> dict:
+    """Choose the predicted branch with greater aggregate travel distance.
+
+    This deliberately uses the same signed quantity as the decision oracle:
+    aggregate Accept distance minus aggregate Reject distance in metres over a
+    policy-independent vehicle union.  Small differences abstain and retain
+    the arrival-only fallback instead of treating model noise as evidence.
+    """
+    if set(accept) != set(reject):
+        raise ValueError("accept and reject must cover identical vehicle IDs")
+    if fallback_decision not in ("accept", "reject"):
+        raise ValueError("fallback decision must be accept or reject")
+    if not math.isfinite(deadband_m) or deadband_m < 0:
+        raise ValueError("distance deadband must be finite and non-negative")
+
+    details = {}
+    accept_distance_m = 0.0
+    reject_distance_m = 0.0
+    for vehicle_id in sorted(accept):
+        if accept[vehicle_id].times != reject[vehicle_id].times:
+            raise ValueError("accept and reject profiles must use the same time grid")
+        accept_distance = travelled_distance(accept[vehicle_id])
+        reject_distance = travelled_distance(reject[vehicle_id])
+        accept_distance_m += accept_distance
+        reject_distance_m += reject_distance
+        details[vehicle_id] = {
+            "accept_distance_m": accept_distance,
+            "reject_distance_m": reject_distance,
+            "accept_minus_reject_distance_m": accept_distance - reject_distance,
+        }
+
+    difference = accept_distance_m - reject_distance_m
+    if difference > deadband_m:
+        decision = "accept"
+        basis = "accept_distance_advantage"
+    elif difference < -deadband_m:
+        decision = "reject"
+        basis = "reject_distance_advantage"
+    else:
+        decision = fallback_decision
+        basis = "distance_deadband_fallback"
+    return {
+        "direct_accept_distance_m": accept_distance_m,
+        "direct_reject_distance_m": reject_distance_m,
+        "direct_accept_minus_reject_m": difference,
+        "direct_distance_deadband_m": deadband_m,
+        "direct_distance_vehicle_details": details,
+        "direct_distance_decision_basis": basis,
+        "direct_distance_decision": decision,
+    }
+
+
 def time_equivalent_decision(
     reference: Mapping[str, SpeedProfile],
     accept: Mapping[str, SpeedProfile],

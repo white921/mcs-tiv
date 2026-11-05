@@ -14,7 +14,11 @@ import math
 import os
 from collections import Counter
 
-from deceleration_loss import SpeedProfile, time_equivalent_decision
+from deceleration_loss import (
+    SpeedProfile,
+    direct_distance_decision,
+    time_equivalent_decision,
+)
 import evaluation_metrics
 from trajectory_arrival import arrival_delay
 
@@ -29,6 +33,7 @@ STANDSTILL_GAP = 5.0
 LANE_TOLERANCE = 2.0
 MERGE_TOLERANCE = 1.6
 ALIGNMENT_COSINE = math.cos(math.radians(30.0))
+DIRECT_DISTANCE_DEADBAND_M = 1.0
 
 
 def _time_half_life_from_environment():
@@ -290,24 +295,45 @@ def _propagate_follower(vehicle_id, base, leader, gap):
 
 
 def _case_profiles(roots, candidates, now):
-    """Build roots and their follower queues for one counterfactual case."""
+    """Build roots and physically adjacent follower chains for one case.
+
+    Each next follower is searched relative to the preceding follower.  This
+    matters because ``_followers`` returns gaps relative to the leader passed
+    to it; reusing the original root's gaps after changing leaders would make
+    downstream vehicles follow with a non-adjacent gap.
+    """
     profiles = {vehicle_id: _profile(path, vehicle_id, now)
                 for vehicle_id, path in roots.items()}
     assigned = set(roots)
     for root_id, root_path in roots.items():
+        leader_id = root_id
         leader = profiles[root_id]
         leader_path = root_path
-        leader_x, leader_y = _position(leader_path, now)
-        for follower_id, follower_path, gap in _followers(
-                root_id, leader_path, candidates, now, assigned):
-            fx, fy = _position(follower_path, now)
+        while True:
+            followers = _followers(
+                leader_id, leader_path, candidates, now, assigned)
+            if not followers:
+                break
+            follower_id, follower_path, gap = followers[0]
             base = _profile(follower_path, follower_id, now)
             leader = _propagate_follower(follower_id, base, leader, gap)
             profiles[follower_id] = leader
             assigned.add(follower_id)
+            leader_id = follower_id
             leader_path = follower_path
-            leader_x, leader_y = fx, fy
     return profiles
+
+
+def _arrival_only_decision(result):
+    """Recover the baseline decision without using predicted follower loss."""
+    status = result["arrival_status"]
+    if status == "both_reached":
+        return "accept" if result["arrival_margin_s"] <= 0 else "reject"
+    if status == "receiver_unreached":
+        return "accept"
+    if status in ("request_unreached", "both_unreached"):
+        return "reject"
+    raise ValueError("arrival-only decision is unavailable")
 
 
 def _evaluate_detail(receiver, desired, alternative, now, conflict_point):
@@ -371,7 +397,7 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_point):
             raise ValueError(
                 "allowed speed is unavailable for vehicle " + vehicle_id)
         allowed_speeds[vehicle_id] = value
-    result = time_equivalent_decision(
+    legacy_result = time_equivalent_decision(
         {vehicle_id: reference[vehicle_id] for vehicle_id in loss_vehicle_ids},
         {vehicle_id: accept[vehicle_id] for vehicle_id in loss_vehicle_ids},
         {vehicle_id: reject[vehicle_id] for vehicle_id in loss_vehicle_ids},
@@ -381,8 +407,28 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_point):
             receiver_planned, conflict_point, now),
         loss_lambda=LOSS_LAMBDA,
         time_half_life_s=TIME_HALF_LIFE_S)
+    fallback_decision = _arrival_only_decision(legacy_result)
+    direct_result = direct_distance_decision(
+        {vehicle_id: accept[vehicle_id] for vehicle_id in union_ids},
+        {vehicle_id: reject[vehicle_id] for vehicle_id in union_ids},
+        fallback_decision=fallback_decision,
+        deadband_m=DIRECT_DISTANCE_DEADBAND_M)
+    if legacy_result["arrival_status"] == "both_reached":
+        decision = direct_result["direct_distance_decision"]
+        decision_basis = direct_result["direct_distance_decision_basis"]
+    else:
+        # Preserve the existing reachability gate.  A short-horizon distance
+        # estimate must not make an unreachable request appear feasible.
+        decision = fallback_decision
+        decision_basis = "unreachable_arrival_fallback"
     union_follower_ids = accept_follower_ids | reject_follower_ids
-    result = {**result, "vehicle_ids": sorted(union_ids),
+    result = {**legacy_result, **direct_result,
+              "legacy_time_equivalent_decision": legacy_result["decision"],
+              "arrival_only_decision": fallback_decision,
+              "decision_rule": "oracle-aligned-direct-distance-v2",
+              "decision": decision,
+              "decision_basis": decision_basis,
+              "vehicle_ids": sorted(union_ids),
               "loss_vehicle_ids": sorted(loss_vehicle_ids),
               "excluded_loss_vehicle_ids": sorted(actor_ids),
               "accept_follower_ids": sorted(accept_follower_ids),
@@ -479,6 +525,20 @@ def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode
                     "weighted_loss_margin_s": result["weighted_loss_margin_s"],
                     "final_margin_s": result["final_margin_s"],
                     "loss_lambda": result["loss_lambda"],
+                    "decision_rule": result["decision_rule"],
+                    "arrival_only_decision": result["arrival_only_decision"],
+                    "legacy_time_equivalent_decision": result[
+                        "legacy_time_equivalent_decision"],
+                    "direct_accept_distance_m": result[
+                        "direct_accept_distance_m"],
+                    "direct_reject_distance_m": result[
+                        "direct_reject_distance_m"],
+                    "direct_accept_minus_reject_m": result[
+                        "direct_accept_minus_reject_m"],
+                    "direct_distance_deadband_m": result[
+                        "direct_distance_deadband_m"],
+                    "direct_distance_decision_basis": result[
+                        "direct_distance_decision_basis"],
                 })
         record = {"time": now, "receiver": str(receiver.id), "sender": str(desired.vehID),
                   "desired_path_id": desired.pathID, "alternative_path_id": alternative.pathID,

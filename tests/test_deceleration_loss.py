@@ -48,6 +48,28 @@ class DecelerationLossTests(unittest.TestCase):
         self.assertAlmostEqual(loss.decision_margin(reference, accept, reject)[
             "reject_minus_accept_m"], .2)
 
+    def test_direct_distance_decision_matches_oracle_quantity_and_deadband(self):
+        accept = {"v": self.profile((10, 10, 10))}
+        reject = {"v": self.profile((5, 5, 5))}
+
+        result = loss.direct_distance_decision(
+            accept, reject, fallback_decision="reject", deadband_m=.5)
+
+        self.assertAlmostEqual(result["direct_accept_distance_m"], 2.0)
+        self.assertAlmostEqual(result["direct_reject_distance_m"], 1.0)
+        self.assertAlmostEqual(result["direct_accept_minus_reject_m"], 1.0)
+        self.assertEqual(result["direct_distance_decision"], "accept")
+        self.assertEqual(
+            result["direct_distance_decision_basis"],
+            "accept_distance_advantage")
+
+        abstained = loss.direct_distance_decision(
+            accept, reject, fallback_decision="reject", deadband_m=1.0)
+        self.assertEqual(abstained["direct_distance_decision"], "reject")
+        self.assertEqual(
+            abstained["direct_distance_decision_basis"],
+            "distance_deadband_fallback")
+
     def test_time_equivalent_formula_covers_arrival_loss_tradeoff_and_tie(self):
         reference = {"v": self.profile((10, 10, 10))}
         neutral = {"v": self.profile((10, 10, 10))}
@@ -195,6 +217,60 @@ class DecelerationLossTests(unittest.TestCase):
         self.assertEqual(result["loss_vehicle_ids"], ["c"])
         self.assertEqual(result["excluded_loss_vehicle_ids"], ["a", "b"])
         self.assertEqual(set(result["vehicle_loss_details"]), {"c"})
+
+    def test_follower_chain_recomputes_each_adjacent_gap(self):
+        def path(veh, lane_position):
+            times = [0.0, 5.0, 10.0]
+            return NS(
+                vehID=veh, type="planned", pathID=veh + "planned",
+                t=times, s_d=[8.0, 8.0, 8.0],
+                x=[lane_position + 8 * time for time in times],
+                y=[0.0] * 3, yaw=[0.0] * 3,
+                lane_id="main_0", lane_position=lane_position,
+                allowed_speed_mps=10.0)
+
+        root = path("root", 30.0)
+        first = path("first", 20.0)
+        second = path("second", 10.0)
+        observed_gaps = []
+
+        def record_gap(vehicle_id, base, leader, gap):
+            observed_gaps.append((vehicle_id, gap))
+            return base
+
+        with patch.object(
+                prediction, "_propagate_follower", side_effect=record_gap):
+            profiles = prediction._case_profiles(
+                {"root": root}, {"first": first, "second": second}, 0.0)
+
+        self.assertEqual(set(profiles), {"root", "first", "second"})
+        self.assertEqual(observed_gaps, [("first", 5.0), ("second", 5.0)])
+
+    def test_prediction_reports_direct_distance_decision_over_actors_and_followers(self):
+        def path(veh, kind, x0, speeds):
+            times = [0.0, 5.0, 10.0]
+            return NS(
+                vehID=veh, type=kind, pathID=veh + kind,
+                t=times, s_d=speeds,
+                x=[x0 + 8 * time for time in times], y=[0.0] * 3,
+                yaw=[0.0] * 3, allowed_speed_mps=10.0)
+
+        receiver = NS(
+            id="b", plannedPath=path("b", "planned", 100, [8, 8, 8]),
+            receivedPaths=[
+                path("a", "planned", 20, [4, 4, 4]),
+                path("c", "planned", 0, [8, 8, 8]),
+            ])
+        result = prediction.evaluate(
+            receiver, path("a", "desired", 20, [10, 10, 10]),
+            path("b", "alter", 100, [8, 8, 8]), 0.0, (40.0, 0.0))
+
+        self.assertEqual(result["decision_rule"],
+                         "oracle-aligned-direct-distance-v2")
+        self.assertEqual(
+            set(result["direct_distance_vehicle_details"]), {"a", "b", "c"})
+        self.assertGreater(result["direct_accept_minus_reject_m"], 1.0)
+        self.assertEqual(result["decision"], "accept")
 
     def test_negotiating_actors_are_excluded_from_loss_but_follower_is_included(self):
         def path(veh, kind, x0, speeds):

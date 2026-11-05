@@ -67,9 +67,13 @@ class DecisionOracleTests(unittest.TestCase):
             "arrival_status": "both_reached",
             "arrival_margin_s": -0.5,
             "loss_margin_s": 1.0,
+            "direct_distance_decision": "accept",
+            "decision_rule": "oracle-aligned-direct-distance-v2",
+            "decision": "accept",
         })
         self.assertEqual(choices["yamashita"], "reject")
         self.assertEqual(choices["arrival_only"], "accept")
+        self.assertEqual(choices["oracle_aligned_v2"], "accept")
         self.assertEqual(choices["proposal_lambda_0.25"], "accept")
         self.assertEqual(choices["proposal_lambda_0.5"], "accept")
         self.assertEqual(choices["proposal_lambda_0.75"], "reject")
@@ -87,6 +91,7 @@ class DecisionOracleTests(unittest.TestCase):
         self.assertTrue(all(
             choice == "reject" for name, choice in choices.items()
             if name.startswith("proposal_lambda_")))
+        self.assertIsNone(choices["oracle_aligned_v2"])
 
     def test_completed_event_requires_matching_restore(self):
         with tempfile.TemporaryDirectory() as temporary:
