@@ -161,6 +161,41 @@ def direct_distance_decision(
     }
 
 
+def reject_override_decision(
+    accept_minus_reject_m: float, *,
+    fallback_decision: str,
+    reject_threshold_m: float,
+) -> dict:
+    """Allow only a confidence-gated Accept-to-Reject override.
+
+    Development evidence showed that predicted Reject benefits were useful,
+    while predicted Accept benefits were not reliable enough to reverse an
+    arrival-only Reject.  The signed distance prediction remains available for
+    diagnostics; this policy changes only a fallback Accept whose predicted
+    Reject advantage is greater than ``reject_threshold_m``.
+    """
+    difference = float(accept_minus_reject_m)
+    if not math.isfinite(difference):
+        raise ValueError("predicted distance difference must be finite")
+    if fallback_decision not in ("accept", "reject"):
+        raise ValueError("fallback decision must be accept or reject")
+    if not math.isfinite(reject_threshold_m) or reject_threshold_m < 0:
+        raise ValueError("reject threshold must be finite and non-negative")
+
+    override = (
+        fallback_decision == "accept"
+        and difference < -reject_threshold_m
+    )
+    return {
+        "reject_override_threshold_m": reject_threshold_m,
+        "reject_override_applied": override,
+        "reject_override_decision_basis": (
+            "predicted_reject_advantage"
+            if override else "arrival_only_fallback"),
+        "reject_override_decision": "reject" if override else fallback_decision,
+    }
+
+
 def time_equivalent_decision(
     reference: Mapping[str, SpeedProfile],
     accept: Mapping[str, SpeedProfile],

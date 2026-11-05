@@ -70,6 +70,21 @@ class DecelerationLossTests(unittest.TestCase):
             abstained["direct_distance_decision_basis"],
             "distance_deadband_fallback")
 
+    def test_reject_override_is_one_way_and_confidence_gated(self):
+        weak_reject = loss.reject_override_decision(
+            -10.0, fallback_decision="accept", reject_threshold_m=10.0)
+        strong_reject = loss.reject_override_decision(
+            -10.1, fallback_decision="accept", reject_threshold_m=10.0)
+        predicted_accept = loss.reject_override_decision(
+            100.0, fallback_decision="reject", reject_threshold_m=10.0)
+
+        self.assertEqual(weak_reject["reject_override_decision"], "accept")
+        self.assertFalse(weak_reject["reject_override_applied"])
+        self.assertEqual(strong_reject["reject_override_decision"], "reject")
+        self.assertTrue(strong_reject["reject_override_applied"])
+        self.assertEqual(predicted_accept["reject_override_decision"], "reject")
+        self.assertFalse(predicted_accept["reject_override_applied"])
+
     def test_time_equivalent_formula_covers_arrival_loss_tradeoff_and_tie(self):
         reference = {"v": self.profile((10, 10, 10))}
         neutral = {"v": self.profile((10, 10, 10))}
@@ -273,11 +288,12 @@ class DecelerationLossTests(unittest.TestCase):
             path("b", "alter", 100, [8, 8, 8]), 0.0, (40.0, 0.0))
 
         self.assertEqual(result["decision_rule"],
-                         "oracle-aligned-direct-distance-v2")
+                         "oracle-aligned-reject-gated-v2")
         self.assertEqual(
             set(result["direct_distance_vehicle_details"]), {"a", "b", "c"})
         self.assertGreater(result["direct_accept_minus_reject_m"], 1.0)
         self.assertEqual(result["decision"], "accept")
+        self.assertFalse(result["reject_override_applied"])
 
     def test_negotiating_actors_are_excluded_from_loss_but_follower_is_included(self):
         def path(veh, kind, x0, speeds):

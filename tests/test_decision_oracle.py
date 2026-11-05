@@ -68,7 +68,7 @@ class DecisionOracleTests(unittest.TestCase):
             "arrival_margin_s": -0.5,
             "loss_margin_s": 1.0,
             "direct_distance_decision": "accept",
-            "decision_rule": "oracle-aligned-direct-distance-v2",
+            "decision_rule": "oracle-aligned-reject-gated-v2",
             "decision": "accept",
         })
         self.assertEqual(choices["yamashita"], "reject")

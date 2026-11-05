@@ -17,6 +17,7 @@ from collections import Counter
 from deceleration_loss import (
     SpeedProfile,
     direct_distance_decision,
+    reject_override_decision,
     time_equivalent_decision,
 )
 import evaluation_metrics
@@ -34,6 +35,7 @@ LANE_TOLERANCE = 2.0
 MERGE_TOLERANCE = 1.6
 ALIGNMENT_COSINE = math.cos(math.radians(30.0))
 DIRECT_DISTANCE_DEADBAND_M = 1.0
+DIRECT_REJECT_OVERRIDE_THRESHOLD_M = 10.0
 
 
 def _time_half_life_from_environment():
@@ -444,19 +446,23 @@ def _evaluate_detail(
         {vehicle_id: reject[vehicle_id] for vehicle_id in union_ids},
         fallback_decision=fallback_decision,
         deadband_m=DIRECT_DISTANCE_DEADBAND_M)
+    gated_result = reject_override_decision(
+        direct_result["direct_accept_minus_reject_m"],
+        fallback_decision=fallback_decision,
+        reject_threshold_m=DIRECT_REJECT_OVERRIDE_THRESHOLD_M)
     if legacy_result["arrival_status"] == "both_reached":
-        decision = direct_result["direct_distance_decision"]
-        decision_basis = direct_result["direct_distance_decision_basis"]
+        decision = gated_result["reject_override_decision"]
+        decision_basis = gated_result["reject_override_decision_basis"]
     else:
         # Preserve the existing reachability gate.  A short-horizon distance
         # estimate must not make an unreachable request appear feasible.
         decision = fallback_decision
         decision_basis = "unreachable_arrival_fallback"
     union_follower_ids = accept_follower_ids | reject_follower_ids
-    result = {**legacy_result, **direct_result,
+    result = {**legacy_result, **direct_result, **gated_result,
               "legacy_time_equivalent_decision": legacy_result["decision"],
               "arrival_only_decision": fallback_decision,
-              "decision_rule": "oracle-aligned-direct-distance-v2",
+              "decision_rule": "oracle-aligned-reject-gated-v2",
               "decision": decision,
               "decision_basis": decision_basis,
               "vehicle_ids": sorted(union_ids),
@@ -572,6 +578,12 @@ def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode
                         "direct_distance_deadband_m"],
                     "direct_distance_decision_basis": result[
                         "direct_distance_decision_basis"],
+                    "reject_override_threshold_m": result[
+                        "reject_override_threshold_m"],
+                    "reject_override_applied": result[
+                        "reject_override_applied"],
+                    "reject_override_decision_basis": result[
+                        "reject_override_decision_basis"],
                 })
         record = {"time": now, "receiver": str(receiver.id), "sender": str(desired.vehID),
                   "desired_path_id": desired.pathID, "alternative_path_id": alternative.pathID,

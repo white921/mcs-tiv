@@ -154,7 +154,9 @@ def run_event(index: int, old_path: Path, args) -> dict:
         accept = dict(old["branches"]["accept"]["metrics"])
         reject = dict(old["branches"]["reject"]["metrics"])
     else:
-        if evaluation.get("decision_rule") != "oracle-aligned-direct-distance-v2":
+        if evaluation.get("decision_rule") not in (
+                "oracle-aligned-direct-distance-v2",
+                "oracle-aligned-reject-gated-v2"):
             raise RuntimeError(f"unexpected proposal evaluation for {old_path}")
         follower_ids = set(map(str, evaluation.get("union_follower_ids", ())))
         cohort = actor_ids | follower_ids
