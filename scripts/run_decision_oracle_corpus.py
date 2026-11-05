@@ -319,6 +319,11 @@ def main():
     run_git = git_metadata()
     if run_git.get("dirty") is not False:
         parser.error("formal corpus requires a clean worktree at startup")
+    if (exact_checkpoint_batch is not None
+            and exact_checkpoint_batch["manifest"].get("git", {}).get("commit")
+            != run_git.get("commit")):
+        parser.error(
+            "exact checkpoint batch source commit must match corpus source")
     args.output.mkdir(parents=True)
     (args.output / "events").mkdir()
     (args.output / "runner-logs").mkdir()
