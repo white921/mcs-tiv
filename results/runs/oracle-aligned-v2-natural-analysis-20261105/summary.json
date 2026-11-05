@@ -1,0 +1,118 @@
+{
+  "schema": "oracle-aligned-v2-natural-run-analysis-v1",
+  "cases": [
+    "eval3",
+    "eval5",
+    "eval7"
+  ],
+  "seeds": [
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32
+  ],
+  "duration_s": 300,
+  "paired_runs": 30,
+  "bootstrap": {
+    "repetitions": 100000,
+    "seed": 20261105,
+    "unit": "paired seed resampled jointly across cases",
+    "aggregation": "equal-case macro mean"
+  },
+  "comparisons": {
+    "mean_speed_mps": {
+      "baseline_macro_case_mean": 6.5763419922699216,
+      "proposal_macro_case_mean": 6.597894942707754,
+      "proposal_minus_baseline_macro_case_mean": 0.02155295043783137,
+      "paired_seed_bootstrap_95pct": [
+        -0.1179336862836756,
+        0.16284486292516334
+      ],
+      "by_case": {
+        "eval3": 0.0673474989408942,
+        "eval5": -0.01988871804371346,
+        "eval7": 0.017200070416313374
+      }
+    },
+    "stop_rate": {
+      "baseline_macro_case_mean": 0.08485430736653853,
+      "proposal_macro_case_mean": 0.11485156534056386,
+      "proposal_minus_baseline_macro_case_mean": 0.029997257974025342,
+      "paired_seed_bootstrap_95pct": [
+        0.005229209439211305,
+        0.05234924171436764
+      ],
+      "by_case": {
+        "eval3": -0.01334593969123941,
+        "eval5": 0.004853152045476054,
+        "eval7": 0.09848456156783938
+      }
+    },
+    "hard_brake_rate": {
+      "baseline_macro_case_mean": 0.003520737098839887,
+      "proposal_macro_case_mean": 0.0031895003010019955,
+      "proposal_minus_baseline_macro_case_mean": -0.0003312367978378923,
+      "paired_seed_bootstrap_95pct": [
+        -0.0007404531950209953,
+        8.60421970907517e-05
+      ],
+      "by_case": {
+        "eval3": -0.00022530753572115006,
+        "eval5": -0.0004867065367921963,
+        "eval7": -0.0002816963210003306
+      }
+    },
+    "vehicles_exited_by_300s": {
+      "baseline_macro_case_mean": 99.0,
+      "proposal_macro_case_mean": 100.16666666666667,
+      "proposal_minus_baseline_macro_case_mean": 1.1666666666666667,
+      "paired_seed_bootstrap_95pct": [
+        0.6,
+        1.7333333333333334
+      ],
+      "by_case": {
+        "eval3": -0.4,
+        "eval5": 0.6,
+        "eval7": 3.3
+      }
+    },
+    "negotiation_decisions": {
+      "baseline_macro_case_mean": 1492.9333333333334,
+      "proposal_macro_case_mean": 927.3333333333334,
+      "proposal_minus_baseline_macro_case_mean": -565.6,
+      "paired_seed_bootstrap_95pct": [
+        -722.5333333333333,
+        -416.2666666666667
+      ],
+      "by_case": {
+        "eval3": -142.7,
+        "eval5": -136.8,
+        "eval7": -1417.3
+      }
+    },
+    "physical_collision_episodes": {
+      "baseline_macro_case_mean": 0.0,
+      "proposal_macro_case_mean": 0.0,
+      "proposal_minus_baseline_macro_case_mean": 0.0,
+      "paired_seed_bootstrap_95pct": [
+        0.0,
+        0.0
+      ],
+      "by_case": {
+        "eval3": 0.0,
+        "eval5": 0.0,
+        "eval7": 0.0
+      }
+    }
+  },
+  "limitations": [
+    "This network-wide 300-second evaluation is separate from the 10-second counterfactual decision-regret holdout.",
+    "vehicles_exited_by_300s is generated vehicles minus active generated vehicles in the final trace frame; physical collision audits are reported alongside it because collision removals would confound this throughput proxy."
+  ]
+}
