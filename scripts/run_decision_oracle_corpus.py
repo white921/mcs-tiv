@@ -327,22 +327,45 @@ def main():
     args.output.mkdir(parents=True)
     (args.output / "events").mkdir()
     (args.output / "runner-logs").mkdir()
+    runner_log = args.output / "runner.log"
+
+    def log(record):
+        line = json.dumps(record, ensure_ascii=False, allow_nan=False)
+        with runner_log.open("a", encoding="utf-8") as stream:
+            stream.write(line + "\n")
+        print(line, flush=True)
+
     (args.output / "plan.json").write_bytes(plan_bytes)
     git_metadata_path = args.output / "run-git-metadata.json"
     write_json(git_metadata_path, run_git)
     source, initial_hashes = prepare_source(args.output, "eval3")
     started = time.time()
+    log({"event": "corpus_started", "planned_event_count": 120,
+         "workers": args.workers})
     results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as pool:
-        futures = [
-            pool.submit(
+        futures = {}
+        for index, (event, capture_checkpoint, exact_checkpoint) in enumerate(
+                zip(plan["events"], capture_checkpoints, exact_checkpoints), 1):
+            future = pool.submit(
                 run_event, args, source, git_metadata_path,
                 args.output, index, event, capture_checkpoint, exact_checkpoint)
-            for index, (event, capture_checkpoint, exact_checkpoint) in enumerate(
-                zip(plan["events"], capture_checkpoints, exact_checkpoints), 1)
-        ]
+            # Retain enough identity to leave an auditable incomplete manifest
+            # if a worker raises before it can write a normal event result.
+            futures[future] = (index, event)
         for future in concurrent.futures.as_completed(futures):
-            results.append(future.result())
+            index, event = futures[future]
+            try:
+                result = future.result()
+            except Exception as error:
+                result = {
+                    "index": index, "slug": event_slug(index, event),
+                    "event": event, "exit_code": -1,
+                    "exception": f"{type(error).__name__}: {error}",
+                }
+            results.append(result)
+            log({"event": "event_finished", "index": index,
+                 "exit_code": result.get("exit_code")})
     results.sort(key=lambda item: item["index"])
     completed_events = [result["manifest"] for result in results
                         if result.get("manifest") is not None]
@@ -401,13 +424,15 @@ def main():
         ],
     }
     write_json(args.output / "manifest.json", manifest)
-    print(json.dumps({
+    final_record = {
+        "event": "corpus_finished",
         "status": status,
         "completed_event_count": len(completed_events),
         "failed_event_count": len(failures),
         "primary_macro_case_mean_regret_m": manifest[
             "primary_macro_case_mean_regret_m"],
-    }, indent=2, allow_nan=False))
+    }
+    log(final_record)
     raise SystemExit(0 if status == "completed" else 1)
 
 
