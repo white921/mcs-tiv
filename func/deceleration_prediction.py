@@ -335,6 +335,22 @@ def _case_profiles(roots, candidates, now):
     return profiles
 
 
+def _legacy_case_profiles(roots, candidates, now):
+    """Reproduce the pre-v2 non-adjacent queue only for saved-run replay."""
+    profiles = {vehicle_id: _profile(path, vehicle_id, now)
+                for vehicle_id, path in roots.items()}
+    assigned = set(roots)
+    for root_id, root_path in roots.items():
+        leader = profiles[root_id]
+        for follower_id, follower_path, gap in _followers(
+                root_id, root_path, candidates, now, assigned):
+            base = _profile(follower_path, follower_id, now)
+            leader = _propagate_follower(follower_id, base, leader, gap)
+            profiles[follower_id] = leader
+            assigned.add(follower_id)
+    return profiles
+
+
 def _arrival_only_decision(result):
     """Recover the baseline decision without using predicted follower loss."""
     status = result["arrival_status"]
@@ -347,7 +363,9 @@ def _arrival_only_decision(result):
     raise ValueError("arrival-only decision is unavailable")
 
 
-def _evaluate_detail(receiver, desired, alternative, now, conflict_point):
+def _evaluate_detail(
+        receiver, desired, alternative, now, conflict_point, *,
+        legacy_follower_chain=False):
     """Return the comparison and both case profiles for instrumentation."""
     sender_id, receiver_id = str(desired.vehID), str(receiver.id)
     candidates = _latest_planned(receiver)
@@ -369,8 +387,10 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_point):
     candidates[receiver_id] = receiver_planned
     reject_roots = {sender_id: sender_planned, receiver_id: receiver_planned}
     accept_roots = {sender_id: desired, receiver_id: receiver_alternative}
-    reject = _case_profiles(reject_roots, candidates, now)
-    accept = _case_profiles(accept_roots, candidates, now)
+    case_profiles = (_legacy_case_profiles
+                     if legacy_follower_chain else _case_profiles)
+    reject = case_profiles(reject_roots, candidates, now)
+    accept = case_profiles(accept_roots, candidates, now)
 
     # Accepting and rejecting can legitimately affect different following
     # queues.  Compare both cases over their union instead of dropping the
@@ -488,7 +508,9 @@ def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode
     COUNTS[mode + "_attempts"] += 1
     try:
         result, accept_profiles, reject_profiles = _evaluate_detail(
-            receiver, desired, alternative, now, conflict_point)
+            receiver, desired, alternative, now, conflict_point,
+            legacy_follower_chain=(
+                mode == "active" and REPLAY_LEGACY_ACTIVE))
     except (AttributeError, IndexError, TypeError, ValueError, ZeroDivisionError) as error:
         COUNTS[mode + "_unsupported"] += 1
         record = {"time": now, "receiver": str(receiver.id),

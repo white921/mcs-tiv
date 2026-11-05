@@ -246,6 +246,13 @@ class DecelerationLossTests(unittest.TestCase):
         self.assertEqual(set(profiles), {"root", "first", "second"})
         self.assertEqual(observed_gaps, [("first", 5.0), ("second", 5.0)])
 
+        observed_gaps.clear()
+        with patch.object(
+                prediction, "_propagate_follower", side_effect=record_gap):
+            prediction._legacy_case_profiles(
+                {"root": root}, {"first": first, "second": second}, 0.0)
+        self.assertEqual(observed_gaps, [("first", 5.0), ("second", 15.0)])
+
     def test_prediction_reports_direct_distance_decision_over_actors_and_followers(self):
         def path(veh, kind, x0, speeds):
             times = [0.0, 5.0, 10.0]
