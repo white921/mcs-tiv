@@ -1,0 +1,3002 @@
+{
+  "schema": "decision-oracle-corpus-v1",
+  "status": "completed",
+  "plan_sha256": "7089f8afcd8022929b792bbce35d595bf5ea840f82b0ee60396774791ff8eb1e",
+  "planned_event_count": 120,
+  "completed_event_count": 120,
+  "failed_event_count": 0,
+  "failures": [],
+  "source_unchanged": true,
+  "git": {
+    "commit": "e3276b2f74f022f8617bfc01bdda6600768359a0",
+    "branch": null,
+    "dirty": false
+  },
+  "python": "/media/yamada/UbuntuData/home-yamada/Documents/\u5352\u696d\u7814\u7a76/mcs-tiv/.venv-py315-sumo128/bin/python",
+  "sumo_home": "/media/yamada/UbuntuData/home-yamada/Documents/\u5352\u696d\u7814\u7a76/mcs-tiv/.venv-py315-sumo128/lib/python3.15/site-packages/sumo",
+  "duration_s": 300.0,
+  "deceleration_loss_lambda": 2.0,
+  "cohort_mode": "actors-followers",
+  "workers": 10,
+  "capture_checkpoint_roots": {
+    "yamashita": null,
+    "proposal": null
+  },
+  "capture_checkpoint_batches": {
+    "yamashita": null,
+    "proposal": null
+  },
+  "exact_checkpoint_batch": {
+    "path": "/media/yamada/UbuntuData/\u30c9\u30ad\u30e5\u30e1\u30f3\u30c8/\u5352\u8ad6\u7814\u7a76/mcs-tiv-follower-impact-time-stratified-results/results/runs/oracle-aligned-v2-independent-exact-checkpoints-20261105/experiment-manifest.json",
+    "manifest": {
+      "schema": "oracle-holdout-exact-checkpoint-batch-v1",
+      "status": "completed",
+      "git": {
+        "commit": "5d26269e14c03cc38c1964c79517e1f6a8139736",
+        "branch": null,
+        "dirty": false
+      },
+      "workers": 10,
+      "group_count": 60,
+      "failed_group_count": 0,
+      "planned_event_count": 960,
+      "event_checkpoint_reference_count": 960,
+      "checkpoint_count": 950,
+      "plan_sha256": {
+        "oracle-v2-23-27-t0-100.json": "d5b708fa63f949d3b7576eede83f89c83ee212698d081cd393510f795d03a6df",
+        "oracle-v2-23-27-t100-160.json": "8b8bc6f883d0b368b59f7c271cc90f877593ac413ebd26cb25169f615defb5a0",
+        "oracle-v2-23-27-t160-220.json": "4c8d0b3fffba1c626583a791786d17a3fa72db87be3af99b24ac3a7dc0fffc75",
+        "oracle-v2-23-27-t220-290.json": "679e6f046ba74cb8626e66a802430525474faa649b660cfee3d7da55ed2af8ac",
+        "oracle-v2-28-32-t0-100.json": "7089f8afcd8022929b792bbce35d595bf5ea840f82b0ee60396774791ff8eb1e",
+        "oracle-v2-28-32-t100-160.json": "ee13211f9b31874b5071d4c3247a258a0dd56a728ccc9181b90cc699b31a81cb",
+        "oracle-v2-28-32-t160-220.json": "8bf22d1e7f82b3e823c27a0db0190fdeabf51ba03f9808472dc16a5eae6aee7b",
+        "oracle-v2-28-32-t220-290.json": "38eacd862ef3256ac525f449bdf58f7674cbbc5b44f975e06e740cd08f0c7523"
+      },
+      "source_unchanged": true,
+      "elapsed_seconds": 24078.135898590088,
+      "exit_code": 0
+    }
+  },
+  "exact_checkpoint_source_compatibility": {
+    "checkpoint_source_commit": "5d26269e14c03cc38c1964c79517e1f6a8139736",
+    "corpus_source_commit": "e3276b2f74f022f8617bfc01bdda6600768359a0",
+    "source_commit_match": false,
+    "override_used": true,
+    "note": "Fixed-input RNG state was dormant; e3276b2f changes only fingerprint auditing and records this provenance override."
+  },
+  "exact_checkpoint_event_count": 120,
+  "capture_resume_event_count": 0,
+  "capture_resume_excluded_strata": [
+    {
+      "case": "eval7",
+      "origin_policy": "proposal"
+    },
+    {
+      "case": "eval7",
+      "origin_policy": "yamashita"
+    }
+  ],
+  "started_epoch": 1793943008.8333268,
+  "ended_epoch": 1793946366.021453,
+  "overall": {
+    "events_total": 120,
+    "events_valid": 120,
+    "invalid_reasons": {},
+    "policies": {
+      "yamashita": {
+        "n": 115,
+        "correct": 100,
+        "accuracy": 0.8695652173913043,
+        "mean_regret_m": 3.008542295606395,
+        "median_regret_m": 0.0,
+        "p95_regret_m": 24.722325034751094
+      },
+      "oracle_aligned_v2": {
+        "n": 120,
+        "correct": 107,
+        "accuracy": 0.8916666666666667,
+        "mean_regret_m": 2.2212127780686095,
+        "median_regret_m": 0.0,
+        "p95_regret_m": 11.478961272364472
+      },
+      "arrival_only": {
+        "n": 120,
+        "correct": 105,
+        "accuracy": 0.875,
+        "mean_regret_m": 2.8359227166451566,
+        "median_regret_m": 0.0,
+        "p95_regret_m": 22.8005206685541
+      },
+      "proposal_lambda_0.25": {
+        "n": 120,
+        "correct": 105,
+        "accuracy": 0.875,
+        "mean_regret_m": 2.8359227166451566,
+        "median_regret_m": 0.0,
+        "p95_regret_m": 22.8005206685541
+      },
+      "proposal_lambda_0.5": {
+        "n": 120,
+        "correct": 106,
+        "accuracy": 0.8833333333333333,
+        "mean_regret_m": 2.645918377740539,
+        "median_regret_m": 0.0,
+        "p95_regret_m": 12.086321640964002
+      },
+      "proposal_lambda_0.75": {
+        "n": 120,
+        "correct": 106,
+        "accuracy": 0.8833333333333333,
+        "mean_regret_m": 2.645918377740539,
+        "median_regret_m": 0.0,
+        "p95_regret_m": 12.086321640964002
+      },
+      "proposal_lambda_1": {
+        "n": 120,
+        "correct": 106,
+        "accuracy": 0.8833333333333333,
+        "mean_regret_m": 2.645918377740539,
+        "median_regret_m": 0.0,
+        "p95_regret_m": 12.086321640964002
+      },
+      "proposal_lambda_2": {
+        "n": 120,
+        "correct": 106,
+        "accuracy": 0.8833333333333333,
+        "mean_regret_m": 2.645918377740539,
+        "median_regret_m": 0.0,
+        "p95_regret_m": 12.086321640964002
+      }
+    }
+  },
+  "by_case": {
+    "eval3": {
+      "events_total": 40,
+      "events_valid": 40,
+      "invalid_reasons": {},
+      "policies": {
+        "yamashita": {
+          "n": 37,
+          "correct": 34,
+          "accuracy": 0.918918918918919,
+          "mean_regret_m": 1.110549279827159,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 11.478961272364472
+        },
+        "oracle_aligned_v2": {
+          "n": 40,
+          "correct": 37,
+          "accuracy": 0.925,
+          "mean_regret_m": 1.0272580838401222,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 4.787757547455726
+        },
+        "arrival_only": {
+          "n": 40,
+          "correct": 37,
+          "accuracy": 0.925,
+          "mean_regret_m": 1.0272580838401222,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 4.787757547455726
+        },
+        "proposal_lambda_0.25": {
+          "n": 40,
+          "correct": 37,
+          "accuracy": 0.925,
+          "mean_regret_m": 1.0272580838401222,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 4.787757547455726
+        },
+        "proposal_lambda_0.5": {
+          "n": 40,
+          "correct": 37,
+          "accuracy": 0.925,
+          "mean_regret_m": 1.0272580838401222,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 4.787757547455726
+        },
+        "proposal_lambda_0.75": {
+          "n": 40,
+          "correct": 37,
+          "accuracy": 0.925,
+          "mean_regret_m": 1.0272580838401222,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 4.787757547455726
+        },
+        "proposal_lambda_1": {
+          "n": 40,
+          "correct": 37,
+          "accuracy": 0.925,
+          "mean_regret_m": 1.0272580838401222,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 4.787757547455726
+        },
+        "proposal_lambda_2": {
+          "n": 40,
+          "correct": 37,
+          "accuracy": 0.925,
+          "mean_regret_m": 1.0272580838401222,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 4.787757547455726
+        }
+      }
+    },
+    "eval5": {
+      "events_total": 40,
+      "events_valid": 40,
+      "invalid_reasons": {},
+      "policies": {
+        "yamashita": {
+          "n": 38,
+          "correct": 28,
+          "accuracy": 0.7368421052631579,
+          "mean_regret_m": 6.241346720529897,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 56.63630995794824
+        },
+        "oracle_aligned_v2": {
+          "n": 40,
+          "correct": 31,
+          "accuracy": 0.775,
+          "mean_regret_m": 4.513371635554696,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 30.485626116872197
+        },
+        "arrival_only": {
+          "n": 40,
+          "correct": 31,
+          "accuracy": 0.775,
+          "mean_regret_m": 4.513371635554696,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 30.485626116872197
+        },
+        "proposal_lambda_0.25": {
+          "n": 40,
+          "correct": 31,
+          "accuracy": 0.775,
+          "mean_regret_m": 4.513371635554696,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 30.485626116872197
+        },
+        "proposal_lambda_0.5": {
+          "n": 40,
+          "correct": 31,
+          "accuracy": 0.775,
+          "mean_regret_m": 4.513371635554696,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 30.485626116872197
+        },
+        "proposal_lambda_0.75": {
+          "n": 40,
+          "correct": 31,
+          "accuracy": 0.775,
+          "mean_regret_m": 4.513371635554696,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 30.485626116872197
+        },
+        "proposal_lambda_1": {
+          "n": 40,
+          "correct": 31,
+          "accuracy": 0.775,
+          "mean_regret_m": 4.513371635554696,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 30.485626116872197
+        },
+        "proposal_lambda_2": {
+          "n": 40,
+          "correct": 31,
+          "accuracy": 0.775,
+          "mean_regret_m": 4.513371635554696,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 30.485626116872197
+        }
+      }
+    },
+    "eval7": {
+      "events_total": 40,
+      "events_valid": 40,
+      "invalid_reasons": {},
+      "policies": {
+        "yamashita": {
+          "n": 40,
+          "correct": 38,
+          "accuracy": 0.95,
+          "mean_regret_m": 1.693021631524863,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "oracle_aligned_v2": {
+          "n": 40,
+          "correct": 39,
+          "accuracy": 0.975,
+          "mean_regret_m": 1.1230086148110103,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "arrival_only": {
+          "n": 40,
+          "correct": 37,
+          "accuracy": 0.925,
+          "mean_regret_m": 2.967138430540652,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 22.8005206685541
+        },
+        "proposal_lambda_0.25": {
+          "n": 40,
+          "correct": 37,
+          "accuracy": 0.925,
+          "mean_regret_m": 2.967138430540652,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 22.8005206685541
+        },
+        "proposal_lambda_0.5": {
+          "n": 40,
+          "correct": 38,
+          "accuracy": 0.95,
+          "mean_regret_m": 2.3971254138267994,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "proposal_lambda_0.75": {
+          "n": 40,
+          "correct": 38,
+          "accuracy": 0.95,
+          "mean_regret_m": 2.3971254138267994,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "proposal_lambda_1": {
+          "n": 40,
+          "correct": 38,
+          "accuracy": 0.95,
+          "mean_regret_m": 2.3971254138267994,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "proposal_lambda_2": {
+          "n": 40,
+          "correct": 38,
+          "accuracy": 0.95,
+          "mean_regret_m": 2.3971254138267994,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        }
+      }
+    }
+  },
+  "by_origin": {
+    "proposal": {
+      "events_total": 60,
+      "events_valid": 60,
+      "invalid_reasons": {},
+      "policies": {
+        "yamashita": {
+          "n": 55,
+          "correct": 49,
+          "accuracy": 0.8909090909090909,
+          "mean_regret_m": 1.0183260109467316,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 8.151014289353071
+        },
+        "oracle_aligned_v2": {
+          "n": 60,
+          "correct": 55,
+          "accuracy": 0.9166666666666666,
+          "mean_regret_m": 0.5534568322252689,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 4.787757547455726
+        },
+        "arrival_only": {
+          "n": 60,
+          "correct": 53,
+          "accuracy": 0.8833333333333333,
+          "mean_regret_m": 1.7828767093783633,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 8.151014289353071
+        },
+        "proposal_lambda_0.25": {
+          "n": 60,
+          "correct": 53,
+          "accuracy": 0.8833333333333333,
+          "mean_regret_m": 1.7828767093783633,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 8.151014289353071
+        },
+        "proposal_lambda_0.5": {
+          "n": 60,
+          "correct": 54,
+          "accuracy": 0.9,
+          "mean_regret_m": 1.4028680315691282,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 6.540879840137919
+        },
+        "proposal_lambda_0.75": {
+          "n": 60,
+          "correct": 54,
+          "accuracy": 0.9,
+          "mean_regret_m": 1.4028680315691282,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 6.540879840137919
+        },
+        "proposal_lambda_1": {
+          "n": 60,
+          "correct": 54,
+          "accuracy": 0.9,
+          "mean_regret_m": 1.4028680315691282,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 6.540879840137919
+        },
+        "proposal_lambda_2": {
+          "n": 60,
+          "correct": 54,
+          "accuracy": 0.9,
+          "mean_regret_m": 1.4028680315691282,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 6.540879840137919
+        }
+      }
+    },
+    "yamashita": {
+      "events_total": 60,
+      "events_valid": 60,
+      "invalid_reasons": {},
+      "policies": {
+        "yamashita": {
+          "n": 60,
+          "correct": 51,
+          "accuracy": 0.85,
+          "mean_regret_m": 4.832907223211087,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 33.19525608452537
+        },
+        "oracle_aligned_v2": {
+          "n": 60,
+          "correct": 52,
+          "accuracy": 0.8666666666666667,
+          "mean_regret_m": 3.88896872391195,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 30.485626116872197
+        },
+        "arrival_only": {
+          "n": 60,
+          "correct": 52,
+          "accuracy": 0.8666666666666667,
+          "mean_regret_m": 3.88896872391195,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 30.485626116872197
+        },
+        "proposal_lambda_0.25": {
+          "n": 60,
+          "correct": 52,
+          "accuracy": 0.8666666666666667,
+          "mean_regret_m": 3.88896872391195,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 30.485626116872197
+        },
+        "proposal_lambda_0.5": {
+          "n": 60,
+          "correct": 52,
+          "accuracy": 0.8666666666666667,
+          "mean_regret_m": 3.88896872391195,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 30.485626116872197
+        },
+        "proposal_lambda_0.75": {
+          "n": 60,
+          "correct": 52,
+          "accuracy": 0.8666666666666667,
+          "mean_regret_m": 3.88896872391195,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 30.485626116872197
+        },
+        "proposal_lambda_1": {
+          "n": 60,
+          "correct": 52,
+          "accuracy": 0.8666666666666667,
+          "mean_regret_m": 3.88896872391195,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 30.485626116872197
+        },
+        "proposal_lambda_2": {
+          "n": 60,
+          "correct": 52,
+          "accuracy": 0.8666666666666667,
+          "mean_regret_m": 3.88896872391195,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 30.485626116872197
+        }
+      }
+    }
+  },
+  "by_case_origin": {
+    "eval3:proposal": {
+      "events_total": 20,
+      "events_valid": 20,
+      "invalid_reasons": {},
+      "policies": {
+        "yamashita": {
+          "n": 17,
+          "correct": 15,
+          "accuracy": 0.8823529411764706,
+          "mean_regret_m": 0.9628234305208113,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 11.478961272364472
+        },
+        "oracle_aligned_v2": {
+          "n": 20,
+          "correct": 18,
+          "accuracy": 0.9,
+          "mean_regret_m": 0.8183999159426897,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 4.787757547455726
+        },
+        "arrival_only": {
+          "n": 20,
+          "correct": 18,
+          "accuracy": 0.9,
+          "mean_regret_m": 0.8183999159426897,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 4.787757547455726
+        },
+        "proposal_lambda_0.25": {
+          "n": 20,
+          "correct": 18,
+          "accuracy": 0.9,
+          "mean_regret_m": 0.8183999159426897,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 4.787757547455726
+        },
+        "proposal_lambda_0.5": {
+          "n": 20,
+          "correct": 18,
+          "accuracy": 0.9,
+          "mean_regret_m": 0.8183999159426897,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 4.787757547455726
+        },
+        "proposal_lambda_0.75": {
+          "n": 20,
+          "correct": 18,
+          "accuracy": 0.9,
+          "mean_regret_m": 0.8183999159426897,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 4.787757547455726
+        },
+        "proposal_lambda_1": {
+          "n": 20,
+          "correct": 18,
+          "accuracy": 0.9,
+          "mean_regret_m": 0.8183999159426897,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 4.787757547455726
+        },
+        "proposal_lambda_2": {
+          "n": 20,
+          "correct": 18,
+          "accuracy": 0.9,
+          "mean_regret_m": 0.8183999159426897,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 4.787757547455726
+        }
+      }
+    },
+    "eval3:yamashita": {
+      "events_total": 20,
+      "events_valid": 20,
+      "invalid_reasons": {},
+      "policies": {
+        "yamashita": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 1.2361162517375548,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "oracle_aligned_v2": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 1.2361162517375548,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "arrival_only": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 1.2361162517375548,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "proposal_lambda_0.25": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 1.2361162517375548,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "proposal_lambda_0.5": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 1.2361162517375548,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "proposal_lambda_0.75": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 1.2361162517375548,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "proposal_lambda_1": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 1.2361162517375548,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "proposal_lambda_2": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 1.2361162517375548,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        }
+      }
+    },
+    "eval5:proposal": {
+      "events_total": 20,
+      "events_valid": 20,
+      "invalid_reasons": {},
+      "policies": {
+        "yamashita": {
+          "n": 18,
+          "correct": 15,
+          "accuracy": 0.8333333333333334,
+          "mean_regret_m": 0.935522867481241,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 8.151014289353071
+        },
+        "oracle_aligned_v2": {
+          "n": 20,
+          "correct": 17,
+          "accuracy": 0.85,
+          "mean_regret_m": 0.8419705807331169,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 6.540879840137919
+        },
+        "arrival_only": {
+          "n": 20,
+          "correct": 17,
+          "accuracy": 0.85,
+          "mean_regret_m": 0.8419705807331169,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 6.540879840137919
+        },
+        "proposal_lambda_0.25": {
+          "n": 20,
+          "correct": 17,
+          "accuracy": 0.85,
+          "mean_regret_m": 0.8419705807331169,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 6.540879840137919
+        },
+        "proposal_lambda_0.5": {
+          "n": 20,
+          "correct": 17,
+          "accuracy": 0.85,
+          "mean_regret_m": 0.8419705807331169,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 6.540879840137919
+        },
+        "proposal_lambda_0.75": {
+          "n": 20,
+          "correct": 17,
+          "accuracy": 0.85,
+          "mean_regret_m": 0.8419705807331169,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 6.540879840137919
+        },
+        "proposal_lambda_1": {
+          "n": 20,
+          "correct": 17,
+          "accuracy": 0.85,
+          "mean_regret_m": 0.8419705807331169,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 6.540879840137919
+        },
+        "proposal_lambda_2": {
+          "n": 20,
+          "correct": 17,
+          "accuracy": 0.85,
+          "mean_regret_m": 0.8419705807331169,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 6.540879840137919
+        }
+      }
+    },
+    "eval5:yamashita": {
+      "events_total": 20,
+      "events_valid": 20,
+      "invalid_reasons": {},
+      "policies": {
+        "yamashita": {
+          "n": 20,
+          "correct": 13,
+          "accuracy": 0.65,
+          "mean_regret_m": 11.016588188273687,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 56.63630995794824
+        },
+        "oracle_aligned_v2": {
+          "n": 20,
+          "correct": 14,
+          "accuracy": 0.7,
+          "mean_regret_m": 8.184772690376274,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 33.19525608452537
+        },
+        "arrival_only": {
+          "n": 20,
+          "correct": 14,
+          "accuracy": 0.7,
+          "mean_regret_m": 8.184772690376274,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 33.19525608452537
+        },
+        "proposal_lambda_0.25": {
+          "n": 20,
+          "correct": 14,
+          "accuracy": 0.7,
+          "mean_regret_m": 8.184772690376274,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 33.19525608452537
+        },
+        "proposal_lambda_0.5": {
+          "n": 20,
+          "correct": 14,
+          "accuracy": 0.7,
+          "mean_regret_m": 8.184772690376274,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 33.19525608452537
+        },
+        "proposal_lambda_0.75": {
+          "n": 20,
+          "correct": 14,
+          "accuracy": 0.7,
+          "mean_regret_m": 8.184772690376274,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 33.19525608452537
+        },
+        "proposal_lambda_1": {
+          "n": 20,
+          "correct": 14,
+          "accuracy": 0.7,
+          "mean_regret_m": 8.184772690376274,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 33.19525608452537
+        },
+        "proposal_lambda_2": {
+          "n": 20,
+          "correct": 14,
+          "accuracy": 0.7,
+          "mean_regret_m": 8.184772690376274,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 33.19525608452537
+        }
+      }
+    },
+    "eval7:proposal": {
+      "events_total": 20,
+      "events_valid": 20,
+      "invalid_reasons": {},
+      "policies": {
+        "yamashita": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 1.140026033427705,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "oracle_aligned_v2": {
+          "n": 20,
+          "correct": 20,
+          "accuracy": 1.0,
+          "mean_regret_m": 0.0,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "arrival_only": {
+          "n": 20,
+          "correct": 18,
+          "accuracy": 0.9,
+          "mean_regret_m": 3.688259631459283,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 22.8005206685541
+        },
+        "proposal_lambda_0.25": {
+          "n": 20,
+          "correct": 18,
+          "accuracy": 0.9,
+          "mean_regret_m": 3.688259631459283,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 22.8005206685541
+        },
+        "proposal_lambda_0.5": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 2.5482335980315782,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "proposal_lambda_0.75": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 2.5482335980315782,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "proposal_lambda_1": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 2.5482335980315782,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "proposal_lambda_2": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 2.5482335980315782,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        }
+      }
+    },
+    "eval7:yamashita": {
+      "events_total": 20,
+      "events_valid": 20,
+      "invalid_reasons": {},
+      "policies": {
+        "yamashita": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 2.2460172296220207,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "oracle_aligned_v2": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 2.2460172296220207,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "arrival_only": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 2.2460172296220207,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "proposal_lambda_0.25": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 2.2460172296220207,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "proposal_lambda_0.5": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 2.2460172296220207,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "proposal_lambda_0.75": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 2.2460172296220207,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "proposal_lambda_1": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 2.2460172296220207,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        },
+        "proposal_lambda_2": {
+          "n": 20,
+          "correct": 19,
+          "accuracy": 0.95,
+          "mean_regret_m": 2.2460172296220207,
+          "median_regret_m": 0.0,
+          "p95_regret_m": 0.0
+        }
+      }
+    }
+  },
+  "primary_macro_case_mean_regret_m": {
+    "arrival_only": 2.835922716645157,
+    "oracle_aligned_v2": 2.2212127780686095,
+    "proposal_lambda_0.25": 2.835922716645157,
+    "proposal_lambda_0.5": 2.6459183777405393,
+    "proposal_lambda_0.75": 2.6459183777405393,
+    "proposal_lambda_1": 2.6459183777405393,
+    "proposal_lambda_2": 2.6459183777405393,
+    "yamashita": 3.01497254396064
+  },
+  "event_results": [
+    {
+      "index": 1,
+      "slug": "001-eval3-yamashita-seed-28-event-0002",
+      "event": {
+        "case": "eval3",
+        "seed": 28,
+        "origin_policy": "yamashita",
+        "ordinal": 2,
+        "sim_time_s": 36.4,
+        "receiver_id": "15",
+        "sender_id": "9",
+        "desired_path_id": "9_34"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/001-eval3-yamashita-seed-28-event-0002/eval3-yamashita-seed-28-event-0002/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 2,
+      "slug": "002-eval3-yamashita-seed-28-event-0053",
+      "event": {
+        "case": "eval3",
+        "seed": 28,
+        "origin_policy": "yamashita",
+        "ordinal": 53,
+        "sim_time_s": 61.5,
+        "receiver_id": "31",
+        "sender_id": "29",
+        "desired_path_id": "29_36"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/002-eval3-yamashita-seed-28-event-0053/eval3-yamashita-seed-28-event-0053/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 3,
+      "slug": "003-eval3-yamashita-seed-28-event-0068",
+      "event": {
+        "case": "eval3",
+        "seed": 28,
+        "origin_policy": "yamashita",
+        "ordinal": 68,
+        "sim_time_s": 66.5,
+        "receiver_id": "33",
+        "sender_id": "29",
+        "desired_path_id": "29_47"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/003-eval3-yamashita-seed-28-event-0068/eval3-yamashita-seed-28-event-0068/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 4,
+      "slug": "004-eval3-yamashita-seed-28-event-0096",
+      "event": {
+        "case": "eval3",
+        "seed": 28,
+        "origin_policy": "yamashita",
+        "ordinal": 96,
+        "sim_time_s": 85.0,
+        "receiver_id": "47",
+        "sender_id": "41",
+        "desired_path_id": "41_38"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/004-eval3-yamashita-seed-28-event-0096/eval3-yamashita-seed-28-event-0096/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 5,
+      "slug": "005-eval3-yamashita-seed-29-event-0001",
+      "event": {
+        "case": "eval3",
+        "seed": 29,
+        "origin_policy": "yamashita",
+        "ordinal": 1,
+        "sim_time_s": 24.5,
+        "receiver_id": "3",
+        "sender_id": "0",
+        "desired_path_id": "0_18"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/005-eval3-yamashita-seed-29-event-0001/eval3-yamashita-seed-29-event-0001/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 6,
+      "slug": "006-eval3-yamashita-seed-29-event-0042",
+      "event": {
+        "case": "eval3",
+        "seed": 29,
+        "origin_policy": "yamashita",
+        "ordinal": 42,
+        "sim_time_s": 69.3,
+        "receiver_id": "10",
+        "sender_id": "21",
+        "desired_path_id": "21_36"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/006-eval3-yamashita-seed-29-event-0042/eval3-yamashita-seed-29-event-0042/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 7,
+      "slug": "007-eval3-yamashita-seed-29-event-0043",
+      "event": {
+        "case": "eval3",
+        "seed": 29,
+        "origin_policy": "yamashita",
+        "ordinal": 43,
+        "sim_time_s": 70.2,
+        "receiver_id": "8",
+        "sender_id": "21",
+        "desired_path_id": "21_38"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/007-eval3-yamashita-seed-29-event-0043/eval3-yamashita-seed-29-event-0043/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 8,
+      "slug": "008-eval3-yamashita-seed-29-event-0048",
+      "event": {
+        "case": "eval3",
+        "seed": 29,
+        "origin_policy": "yamashita",
+        "ordinal": 48,
+        "sim_time_s": 72.2,
+        "receiver_id": "8",
+        "sender_id": "21",
+        "desired_path_id": "21_43"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/008-eval3-yamashita-seed-29-event-0048/eval3-yamashita-seed-29-event-0048/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 9,
+      "slug": "009-eval3-yamashita-seed-30-event-0064",
+      "event": {
+        "case": "eval3",
+        "seed": 30,
+        "origin_policy": "yamashita",
+        "ordinal": 64,
+        "sim_time_s": 32.8,
+        "receiver_id": "11",
+        "sender_id": "9",
+        "desired_path_id": "9_25"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/009-eval3-yamashita-seed-30-event-0064/eval3-yamashita-seed-30-event-0064/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 10,
+      "slug": "010-eval3-yamashita-seed-30-event-0117",
+      "event": {
+        "case": "eval3",
+        "seed": 30,
+        "origin_policy": "yamashita",
+        "ordinal": 117,
+        "sim_time_s": 68.9,
+        "receiver_id": "12",
+        "sender_id": "21",
+        "desired_path_id": "21_60"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/010-eval3-yamashita-seed-30-event-0117/eval3-yamashita-seed-30-event-0117/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 11,
+      "slug": "011-eval3-yamashita-seed-30-event-0245",
+      "event": {
+        "case": "eval3",
+        "seed": 30,
+        "origin_policy": "yamashita",
+        "ordinal": 245,
+        "sim_time_s": 87.0,
+        "receiver_id": "16",
+        "sender_id": "29",
+        "desired_path_id": "29_143"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/011-eval3-yamashita-seed-30-event-0245/eval3-yamashita-seed-30-event-0245/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 12,
+      "slug": "012-eval3-yamashita-seed-30-event-0265",
+      "event": {
+        "case": "eval3",
+        "seed": 30,
+        "origin_policy": "yamashita",
+        "ordinal": 265,
+        "sim_time_s": 90.5,
+        "receiver_id": "25",
+        "sender_id": "18",
+        "desired_path_id": "18_62"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/012-eval3-yamashita-seed-30-event-0265/eval3-yamashita-seed-30-event-0265/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 13,
+      "slug": "013-eval3-yamashita-seed-31-event-0020",
+      "event": {
+        "case": "eval3",
+        "seed": 31,
+        "origin_policy": "yamashita",
+        "ordinal": 20,
+        "sim_time_s": 94.2,
+        "receiver_id": "53",
+        "sender_id": "6",
+        "desired_path_id": "6_40"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/013-eval3-yamashita-seed-31-event-0020/eval3-yamashita-seed-31-event-0020/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 14,
+      "slug": "014-eval3-yamashita-seed-31-event-0021",
+      "event": {
+        "case": "eval3",
+        "seed": 31,
+        "origin_policy": "yamashita",
+        "ordinal": 21,
+        "sim_time_s": 94.2,
+        "receiver_id": "53",
+        "sender_id": "47",
+        "desired_path_id": "47_29"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/014-eval3-yamashita-seed-31-event-0021/eval3-yamashita-seed-31-event-0021/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 15,
+      "slug": "015-eval3-yamashita-seed-31-event-0022",
+      "event": {
+        "case": "eval3",
+        "seed": 31,
+        "origin_policy": "yamashita",
+        "ordinal": 22,
+        "sim_time_s": 95.0,
+        "receiver_id": "8",
+        "sender_id": "6",
+        "desired_path_id": "6_42"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/015-eval3-yamashita-seed-31-event-0022/eval3-yamashita-seed-31-event-0022/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 16,
+      "slug": "016-eval3-yamashita-seed-31-event-0025",
+      "event": {
+        "case": "eval3",
+        "seed": 31,
+        "origin_policy": "yamashita",
+        "ordinal": 25,
+        "sim_time_s": 96.0,
+        "receiver_id": "53",
+        "sender_id": "6",
+        "desired_path_id": "6_45"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/016-eval3-yamashita-seed-31-event-0025/eval3-yamashita-seed-31-event-0025/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 17,
+      "slug": "017-eval3-yamashita-seed-32-event-0002",
+      "event": {
+        "case": "eval3",
+        "seed": 32,
+        "origin_policy": "yamashita",
+        "ordinal": 2,
+        "sim_time_s": 14.4,
+        "receiver_id": "2",
+        "sender_id": "1",
+        "desired_path_id": "1_18"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/017-eval3-yamashita-seed-32-event-0002/eval3-yamashita-seed-32-event-0002/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 18,
+      "slug": "018-eval3-yamashita-seed-32-event-0003",
+      "event": {
+        "case": "eval3",
+        "seed": 32,
+        "origin_policy": "yamashita",
+        "ordinal": 3,
+        "sim_time_s": 15.4,
+        "receiver_id": "2",
+        "sender_id": "1",
+        "desired_path_id": "1_20"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/018-eval3-yamashita-seed-32-event-0003/eval3-yamashita-seed-32-event-0003/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 19,
+      "slug": "019-eval3-yamashita-seed-32-event-0006",
+      "event": {
+        "case": "eval3",
+        "seed": 32,
+        "origin_policy": "yamashita",
+        "ordinal": 6,
+        "sim_time_s": 18.4,
+        "receiver_id": "2",
+        "sender_id": "1",
+        "desired_path_id": "1_26"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/019-eval3-yamashita-seed-32-event-0006/eval3-yamashita-seed-32-event-0006/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 20,
+      "slug": "020-eval3-yamashita-seed-32-event-0012",
+      "event": {
+        "case": "eval3",
+        "seed": 32,
+        "origin_policy": "yamashita",
+        "ordinal": 12,
+        "sim_time_s": 96.5,
+        "receiver_id": "33",
+        "sender_id": "27",
+        "desired_path_id": "27_36"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/020-eval3-yamashita-seed-32-event-0012/eval3-yamashita-seed-32-event-0012/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 21,
+      "slug": "021-eval5-yamashita-seed-28-event-0039",
+      "event": {
+        "case": "eval5",
+        "seed": 28,
+        "origin_policy": "yamashita",
+        "ordinal": 39,
+        "sim_time_s": 32.8,
+        "receiver_id": "4",
+        "sender_id": "0",
+        "desired_path_id": "0_23"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/021-eval5-yamashita-seed-28-event-0039/eval5-yamashita-seed-28-event-0039/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 22,
+      "slug": "022-eval5-yamashita-seed-28-event-0088",
+      "event": {
+        "case": "eval5",
+        "seed": 28,
+        "origin_policy": "yamashita",
+        "ordinal": 88,
+        "sim_time_s": 46.5,
+        "receiver_id": "15",
+        "sender_id": "6",
+        "desired_path_id": "6_75"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/022-eval5-yamashita-seed-28-event-0088/eval5-yamashita-seed-28-event-0088/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 23,
+      "slug": "023-eval5-yamashita-seed-28-event-0113",
+      "event": {
+        "case": "eval5",
+        "seed": 28,
+        "origin_policy": "yamashita",
+        "ordinal": 113,
+        "sim_time_s": 51.0,
+        "receiver_id": "17",
+        "sender_id": "8",
+        "desired_path_id": "8_45"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/023-eval5-yamashita-seed-28-event-0113/eval5-yamashita-seed-28-event-0113/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 24,
+      "slug": "024-eval5-yamashita-seed-28-event-0199",
+      "event": {
+        "case": "eval5",
+        "seed": 28,
+        "origin_policy": "yamashita",
+        "ordinal": 199,
+        "sim_time_s": 72.9,
+        "receiver_id": "17",
+        "sender_id": "27",
+        "desired_path_id": "27_77"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/024-eval5-yamashita-seed-28-event-0199/eval5-yamashita-seed-28-event-0199/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 25,
+      "slug": "025-eval5-yamashita-seed-29-event-0045",
+      "event": {
+        "case": "eval5",
+        "seed": 29,
+        "origin_policy": "yamashita",
+        "ordinal": 45,
+        "sim_time_s": 31.9,
+        "receiver_id": "13",
+        "sender_id": "5",
+        "desired_path_id": "5_52"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/025-eval5-yamashita-seed-29-event-0045/eval5-yamashita-seed-29-event-0045/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 26,
+      "slug": "026-eval5-yamashita-seed-29-event-0059",
+      "event": {
+        "case": "eval5",
+        "seed": 29,
+        "origin_policy": "yamashita",
+        "ordinal": 59,
+        "sim_time_s": 35.8,
+        "receiver_id": "15",
+        "sender_id": "5",
+        "desired_path_id": "5_58"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/026-eval5-yamashita-seed-29-event-0059/eval5-yamashita-seed-29-event-0059/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 27,
+      "slug": "027-eval5-yamashita-seed-29-event-0073",
+      "event": {
+        "case": "eval5",
+        "seed": 29,
+        "origin_policy": "yamashita",
+        "ordinal": 73,
+        "sim_time_s": 40.9,
+        "receiver_id": "0",
+        "sender_id": "5",
+        "desired_path_id": "5_71"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/027-eval5-yamashita-seed-29-event-0073/eval5-yamashita-seed-29-event-0073/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 28,
+      "slug": "028-eval5-yamashita-seed-29-event-0111",
+      "event": {
+        "case": "eval5",
+        "seed": 29,
+        "origin_policy": "yamashita",
+        "ordinal": 111,
+        "sim_time_s": 58.5,
+        "receiver_id": "2",
+        "sender_id": "21",
+        "desired_path_id": "21_49"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/028-eval5-yamashita-seed-29-event-0111/eval5-yamashita-seed-29-event-0111/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 29,
+      "slug": "029-eval5-yamashita-seed-30-event-0066",
+      "event": {
+        "case": "eval5",
+        "seed": 30,
+        "origin_policy": "yamashita",
+        "ordinal": 66,
+        "sim_time_s": 35.6,
+        "receiver_id": "4",
+        "sender_id": "7",
+        "desired_path_id": "7_41"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/029-eval5-yamashita-seed-30-event-0066/eval5-yamashita-seed-30-event-0066/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 30,
+      "slug": "030-eval5-yamashita-seed-30-event-0088",
+      "event": {
+        "case": "eval5",
+        "seed": 30,
+        "origin_policy": "yamashita",
+        "ordinal": 88,
+        "sim_time_s": 39.6,
+        "receiver_id": "2",
+        "sender_id": "7",
+        "desired_path_id": "7_49"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/030-eval5-yamashita-seed-30-event-0088/eval5-yamashita-seed-30-event-0088/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 31,
+      "slug": "031-eval5-yamashita-seed-30-event-0106",
+      "event": {
+        "case": "eval5",
+        "seed": 30,
+        "origin_policy": "yamashita",
+        "ordinal": 106,
+        "sim_time_s": 45.1,
+        "receiver_id": "23",
+        "sender_id": "13",
+        "desired_path_id": "13_35"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/031-eval5-yamashita-seed-30-event-0106/eval5-yamashita-seed-30-event-0106/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 32,
+      "slug": "032-eval5-yamashita-seed-30-event-0198",
+      "event": {
+        "case": "eval5",
+        "seed": 30,
+        "origin_policy": "yamashita",
+        "ordinal": 198,
+        "sim_time_s": 97.4,
+        "receiver_id": "10",
+        "sender_id": "51",
+        "desired_path_id": "51_29"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/032-eval5-yamashita-seed-30-event-0198/eval5-yamashita-seed-30-event-0198/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 33,
+      "slug": "033-eval5-yamashita-seed-31-event-0027",
+      "event": {
+        "case": "eval5",
+        "seed": 31,
+        "origin_policy": "yamashita",
+        "ordinal": 27,
+        "sim_time_s": 52.3,
+        "receiver_id": "17",
+        "sender_id": "15",
+        "desired_path_id": "15_36"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/033-eval5-yamashita-seed-31-event-0027/eval5-yamashita-seed-31-event-0027/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 34,
+      "slug": "034-eval5-yamashita-seed-31-event-0091",
+      "event": {
+        "case": "eval5",
+        "seed": 31,
+        "origin_policy": "yamashita",
+        "ordinal": 91,
+        "sim_time_s": 84.2,
+        "receiver_id": "41",
+        "sender_id": "39",
+        "desired_path_id": "39_27"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/034-eval5-yamashita-seed-31-event-0091/eval5-yamashita-seed-31-event-0091/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 35,
+      "slug": "035-eval5-yamashita-seed-31-event-0118",
+      "event": {
+        "case": "eval5",
+        "seed": 31,
+        "origin_policy": "yamashita",
+        "ordinal": 118,
+        "sim_time_s": 92.6,
+        "receiver_id": "43",
+        "sender_id": "35",
+        "desired_path_id": "35_61"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/035-eval5-yamashita-seed-31-event-0118/eval5-yamashita-seed-31-event-0118/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 36,
+      "slug": "036-eval5-yamashita-seed-31-event-0139",
+      "event": {
+        "case": "eval5",
+        "seed": 31,
+        "origin_policy": "yamashita",
+        "ordinal": 139,
+        "sim_time_s": 98.6,
+        "receiver_id": "43",
+        "sender_id": "35",
+        "desired_path_id": "35_75"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/036-eval5-yamashita-seed-31-event-0139/eval5-yamashita-seed-31-event-0139/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 37,
+      "slug": "037-eval5-yamashita-seed-32-event-0010",
+      "event": {
+        "case": "eval5",
+        "seed": 32,
+        "origin_policy": "yamashita",
+        "ordinal": 10,
+        "sim_time_s": 29.0,
+        "receiver_id": "5",
+        "sender_id": "2",
+        "desired_path_id": "2_40"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/037-eval5-yamashita-seed-32-event-0010/eval5-yamashita-seed-32-event-0010/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 38,
+      "slug": "038-eval5-yamashita-seed-32-event-0011",
+      "event": {
+        "case": "eval5",
+        "seed": 32,
+        "origin_policy": "yamashita",
+        "ordinal": 11,
+        "sim_time_s": 66.7,
+        "receiver_id": "19",
+        "sender_id": "4",
+        "desired_path_id": "4_26"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/038-eval5-yamashita-seed-32-event-0011/eval5-yamashita-seed-32-event-0011/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 39,
+      "slug": "039-eval5-yamashita-seed-32-event-0021",
+      "event": {
+        "case": "eval5",
+        "seed": 32,
+        "origin_policy": "yamashita",
+        "ordinal": 21,
+        "sim_time_s": 77.2,
+        "receiver_id": "17",
+        "sender_id": "6",
+        "desired_path_id": "6_30"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/039-eval5-yamashita-seed-32-event-0021/eval5-yamashita-seed-32-event-0021/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 40,
+      "slug": "040-eval5-yamashita-seed-32-event-0022",
+      "event": {
+        "case": "eval5",
+        "seed": 32,
+        "origin_policy": "yamashita",
+        "ordinal": 22,
+        "sim_time_s": 77.3,
+        "receiver_id": "23",
+        "sender_id": "17",
+        "desired_path_id": "17_27"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/040-eval5-yamashita-seed-32-event-0022/eval5-yamashita-seed-32-event-0022/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 41,
+      "slug": "041-eval7-yamashita-seed-28-event-0036",
+      "event": {
+        "case": "eval7",
+        "seed": 28,
+        "origin_policy": "yamashita",
+        "ordinal": 36,
+        "sim_time_s": 62.3,
+        "receiver_id": "27",
+        "sender_id": "25",
+        "desired_path_id": "25_62"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/041-eval7-yamashita-seed-28-event-0036/eval7-yamashita-seed-28-event-0036/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 42,
+      "slug": "042-eval7-yamashita-seed-28-event-0048",
+      "event": {
+        "case": "eval7",
+        "seed": 28,
+        "origin_policy": "yamashita",
+        "ordinal": 48,
+        "sim_time_s": 74.0,
+        "receiver_id": "41",
+        "sender_id": "35",
+        "desired_path_id": "35_51"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/042-eval7-yamashita-seed-28-event-0048/eval7-yamashita-seed-28-event-0048/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 43,
+      "slug": "043-eval7-yamashita-seed-28-event-0064",
+      "event": {
+        "case": "eval7",
+        "seed": 28,
+        "origin_policy": "yamashita",
+        "ordinal": 64,
+        "sim_time_s": 79.4,
+        "receiver_id": "51",
+        "sender_id": "10",
+        "desired_path_id": "10_32"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/043-eval7-yamashita-seed-28-event-0064/eval7-yamashita-seed-28-event-0064/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 44,
+      "slug": "044-eval7-yamashita-seed-28-event-0113",
+      "event": {
+        "case": "eval7",
+        "seed": 28,
+        "origin_policy": "yamashita",
+        "ordinal": 113,
+        "sim_time_s": 98.8,
+        "receiver_id": "59",
+        "sender_id": "57",
+        "desired_path_id": "57_67"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/044-eval7-yamashita-seed-28-event-0113/eval7-yamashita-seed-28-event-0113/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 45,
+      "slug": "045-eval7-yamashita-seed-29-event-0086",
+      "event": {
+        "case": "eval7",
+        "seed": 29,
+        "origin_policy": "yamashita",
+        "ordinal": 86,
+        "sim_time_s": 75.5,
+        "receiver_id": "47",
+        "sender_id": "31",
+        "desired_path_id": "31_81"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/045-eval7-yamashita-seed-29-event-0086/eval7-yamashita-seed-29-event-0086/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 46,
+      "slug": "046-eval7-yamashita-seed-29-event-0119",
+      "event": {
+        "case": "eval7",
+        "seed": 29,
+        "origin_policy": "yamashita",
+        "ordinal": 119,
+        "sim_time_s": 86.1,
+        "receiver_id": "59",
+        "sender_id": "53",
+        "desired_path_id": "53_44"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/046-eval7-yamashita-seed-29-event-0119/eval7-yamashita-seed-29-event-0119/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 47,
+      "slug": "047-eval7-yamashita-seed-29-event-0152",
+      "event": {
+        "case": "eval7",
+        "seed": 29,
+        "origin_policy": "yamashita",
+        "ordinal": 152,
+        "sim_time_s": 92.8,
+        "receiver_id": "63",
+        "sender_id": "10",
+        "desired_path_id": "10_76"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/047-eval7-yamashita-seed-29-event-0152/eval7-yamashita-seed-29-event-0152/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 48,
+      "slug": "048-eval7-yamashita-seed-29-event-0175",
+      "event": {
+        "case": "eval7",
+        "seed": 29,
+        "origin_policy": "yamashita",
+        "ordinal": 175,
+        "sim_time_s": 98.0,
+        "receiver_id": "65",
+        "sender_id": "55",
+        "desired_path_id": "55_64"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/048-eval7-yamashita-seed-29-event-0175/eval7-yamashita-seed-29-event-0175/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 49,
+      "slug": "049-eval7-yamashita-seed-30-event-0018",
+      "event": {
+        "case": "eval7",
+        "seed": 30,
+        "origin_policy": "yamashita",
+        "ordinal": 18,
+        "sim_time_s": 47.1,
+        "receiver_id": "21",
+        "sender_id": "11",
+        "desired_path_id": "11_75"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/049-eval7-yamashita-seed-30-event-0018/eval7-yamashita-seed-30-event-0018/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 50,
+      "slug": "050-eval7-yamashita-seed-30-event-0046",
+      "event": {
+        "case": "eval7",
+        "seed": 30,
+        "origin_policy": "yamashita",
+        "ordinal": 46,
+        "sim_time_s": 57.2,
+        "receiver_id": "31",
+        "sender_id": "27",
+        "desired_path_id": "27_49"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/050-eval7-yamashita-seed-30-event-0046/eval7-yamashita-seed-30-event-0046/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 51,
+      "slug": "051-eval7-yamashita-seed-30-event-0078",
+      "event": {
+        "case": "eval7",
+        "seed": 30,
+        "origin_policy": "yamashita",
+        "ordinal": 78,
+        "sim_time_s": 73.1,
+        "receiver_id": "41",
+        "sender_id": "29",
+        "desired_path_id": "29_87"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/051-eval7-yamashita-seed-30-event-0078/eval7-yamashita-seed-30-event-0078/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 52,
+      "slug": "052-eval7-yamashita-seed-30-event-0102",
+      "event": {
+        "case": "eval7",
+        "seed": 30,
+        "origin_policy": "yamashita",
+        "ordinal": 102,
+        "sim_time_s": 81.2,
+        "receiver_id": "53",
+        "sender_id": "8",
+        "desired_path_id": "8_56"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/052-eval7-yamashita-seed-30-event-0102/eval7-yamashita-seed-30-event-0102/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 53,
+      "slug": "053-eval7-yamashita-seed-31-event-0045",
+      "event": {
+        "case": "eval7",
+        "seed": 31,
+        "origin_policy": "yamashita",
+        "ordinal": 45,
+        "sim_time_s": 57.6,
+        "receiver_id": "23",
+        "sender_id": "19",
+        "desired_path_id": "19_88"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/053-eval7-yamashita-seed-31-event-0045/eval7-yamashita-seed-31-event-0045/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 54,
+      "slug": "054-eval7-yamashita-seed-31-event-0059",
+      "event": {
+        "case": "eval7",
+        "seed": 31,
+        "origin_policy": "yamashita",
+        "ordinal": 59,
+        "sim_time_s": 59.6,
+        "receiver_id": "6",
+        "sender_id": "27",
+        "desired_path_id": "27_64"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/054-eval7-yamashita-seed-31-event-0059/eval7-yamashita-seed-31-event-0059/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 55,
+      "slug": "055-eval7-yamashita-seed-31-event-0081",
+      "event": {
+        "case": "eval7",
+        "seed": 31,
+        "origin_policy": "yamashita",
+        "ordinal": 81,
+        "sim_time_s": 65.8,
+        "receiver_id": "12",
+        "sender_id": "8",
+        "desired_path_id": "8_51"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/055-eval7-yamashita-seed-31-event-0081/eval7-yamashita-seed-31-event-0081/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 56,
+      "slug": "056-eval7-yamashita-seed-31-event-0124",
+      "event": {
+        "case": "eval7",
+        "seed": 31,
+        "origin_policy": "yamashita",
+        "ordinal": 124,
+        "sim_time_s": 80.1,
+        "receiver_id": "39",
+        "sender_id": "35",
+        "desired_path_id": "35_91"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/056-eval7-yamashita-seed-31-event-0124/eval7-yamashita-seed-31-event-0124/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 57,
+      "slug": "057-eval7-yamashita-seed-32-event-0012",
+      "event": {
+        "case": "eval7",
+        "seed": 32,
+        "origin_policy": "yamashita",
+        "ordinal": 12,
+        "sim_time_s": 54.0,
+        "receiver_id": "21",
+        "sender_id": "17",
+        "desired_path_id": "17_51"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/057-eval7-yamashita-seed-32-event-0012/eval7-yamashita-seed-32-event-0012/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 58,
+      "slug": "058-eval7-yamashita-seed-32-event-0023",
+      "event": {
+        "case": "eval7",
+        "seed": 32,
+        "origin_policy": "yamashita",
+        "ordinal": 23,
+        "sim_time_s": 67.5,
+        "receiver_id": "23",
+        "sender_id": "29",
+        "desired_path_id": "29_39"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/058-eval7-yamashita-seed-32-event-0023/eval7-yamashita-seed-32-event-0023/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 59,
+      "slug": "059-eval7-yamashita-seed-32-event-0046",
+      "event": {
+        "case": "eval7",
+        "seed": 32,
+        "origin_policy": "yamashita",
+        "ordinal": 46,
+        "sim_time_s": 80.5,
+        "receiver_id": "43",
+        "sender_id": "41",
+        "desired_path_id": "41_46"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/059-eval7-yamashita-seed-32-event-0046/eval7-yamashita-seed-32-event-0046/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 60,
+      "slug": "060-eval7-yamashita-seed-32-event-0079",
+      "event": {
+        "case": "eval7",
+        "seed": 32,
+        "origin_policy": "yamashita",
+        "ordinal": 79,
+        "sim_time_s": 91.3,
+        "receiver_id": "53",
+        "sender_id": "51",
+        "desired_path_id": "51_58"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/060-eval7-yamashita-seed-32-event-0079/eval7-yamashita-seed-32-event-0079/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 61,
+      "slug": "061-eval3-proposal-seed-28-event-0012",
+      "event": {
+        "case": "eval3",
+        "seed": 28,
+        "origin_policy": "proposal",
+        "ordinal": 12,
+        "sim_time_s": 50.2,
+        "receiver_id": "19",
+        "sender_id": "25",
+        "desired_path_id": "25_19"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/061-eval3-proposal-seed-28-event-0012/eval3-proposal-seed-28-event-0012/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 62,
+      "slug": "062-eval3-proposal-seed-28-event-0030",
+      "event": {
+        "case": "eval3",
+        "seed": 28,
+        "origin_policy": "proposal",
+        "ordinal": 30,
+        "sim_time_s": 58.5,
+        "receiver_id": "19",
+        "sender_id": "27",
+        "desired_path_id": "27_51"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/062-eval3-proposal-seed-28-event-0030/eval3-proposal-seed-28-event-0030/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 63,
+      "slug": "063-eval3-proposal-seed-28-event-0041",
+      "event": {
+        "case": "eval3",
+        "seed": 28,
+        "origin_policy": "proposal",
+        "ordinal": 41,
+        "sim_time_s": 61.9,
+        "receiver_id": "27",
+        "sender_id": "29",
+        "desired_path_id": "29_38"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/063-eval3-proposal-seed-28-event-0041/eval3-proposal-seed-28-event-0041/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 64,
+      "slug": "064-eval3-proposal-seed-28-event-0075",
+      "event": {
+        "case": "eval3",
+        "seed": 28,
+        "origin_policy": "proposal",
+        "ordinal": 75,
+        "sim_time_s": 80.6,
+        "receiver_id": "39",
+        "sender_id": "41",
+        "desired_path_id": "41_34"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/064-eval3-proposal-seed-28-event-0075/eval3-proposal-seed-28-event-0075/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 65,
+      "slug": "065-eval3-proposal-seed-29-event-0004",
+      "event": {
+        "case": "eval3",
+        "seed": 29,
+        "origin_policy": "proposal",
+        "ordinal": 4,
+        "sim_time_s": 31.1,
+        "receiver_id": "0",
+        "sender_id": "3",
+        "desired_path_id": "3_32"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/065-eval3-proposal-seed-29-event-0004/eval3-proposal-seed-29-event-0004/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 66,
+      "slug": "066-eval3-proposal-seed-29-event-0011",
+      "event": {
+        "case": "eval3",
+        "seed": 29,
+        "origin_policy": "proposal",
+        "ordinal": 11,
+        "sim_time_s": 42.5,
+        "receiver_id": "11",
+        "sender_id": "4",
+        "desired_path_id": "4_27"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/066-eval3-proposal-seed-29-event-0011/eval3-proposal-seed-29-event-0011/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 67,
+      "slug": "067-eval3-proposal-seed-29-event-0025",
+      "event": {
+        "case": "eval3",
+        "seed": 29,
+        "origin_policy": "proposal",
+        "ordinal": 25,
+        "sim_time_s": 68.0,
+        "receiver_id": "8",
+        "sender_id": "21",
+        "desired_path_id": "21_31"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/067-eval3-proposal-seed-29-event-0025/eval3-proposal-seed-29-event-0025/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 68,
+      "slug": "068-eval3-proposal-seed-29-event-0028",
+      "event": {
+        "case": "eval3",
+        "seed": 29,
+        "origin_policy": "proposal",
+        "ordinal": 28,
+        "sim_time_s": 72.2,
+        "receiver_id": "10",
+        "sender_id": "23",
+        "desired_path_id": "23_34"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/068-eval3-proposal-seed-29-event-0028/eval3-proposal-seed-29-event-0028/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 69,
+      "slug": "069-eval3-proposal-seed-30-event-0046",
+      "event": {
+        "case": "eval3",
+        "seed": 30,
+        "origin_policy": "proposal",
+        "ordinal": 46,
+        "sim_time_s": 69.5,
+        "receiver_id": "12",
+        "sender_id": "14",
+        "desired_path_id": "14_22"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/069-eval3-proposal-seed-30-event-0046/eval3-proposal-seed-30-event-0046/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 70,
+      "slug": "070-eval3-proposal-seed-30-event-0056",
+      "event": {
+        "case": "eval3",
+        "seed": 30,
+        "origin_policy": "proposal",
+        "ordinal": 56,
+        "sim_time_s": 76.3,
+        "receiver_id": "29",
+        "sender_id": "16",
+        "desired_path_id": "16_29"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/070-eval3-proposal-seed-30-event-0056/eval3-proposal-seed-30-event-0056/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 71,
+      "slug": "071-eval3-proposal-seed-30-event-0059",
+      "event": {
+        "case": "eval3",
+        "seed": 30,
+        "origin_policy": "proposal",
+        "ordinal": 59,
+        "sim_time_s": 77.5,
+        "receiver_id": "29",
+        "sender_id": "14",
+        "desired_path_id": "14_41"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/071-eval3-proposal-seed-30-event-0059/eval3-proposal-seed-30-event-0059/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 72,
+      "slug": "072-eval3-proposal-seed-30-event-0066",
+      "event": {
+        "case": "eval3",
+        "seed": 30,
+        "origin_policy": "proposal",
+        "ordinal": 66,
+        "sim_time_s": 79.3,
+        "receiver_id": "31",
+        "sender_id": "16",
+        "desired_path_id": "16_35"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/072-eval3-proposal-seed-30-event-0066/eval3-proposal-seed-30-event-0066/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 73,
+      "slug": "073-eval3-proposal-seed-31-event-0001",
+      "event": {
+        "case": "eval3",
+        "seed": 31,
+        "origin_policy": "proposal",
+        "ordinal": 1,
+        "sim_time_s": 18.1,
+        "receiver_id": "7",
+        "sender_id": "3",
+        "desired_path_id": "3_18"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/073-eval3-proposal-seed-31-event-0001/eval3-proposal-seed-31-event-0001/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 74,
+      "slug": "074-eval3-proposal-seed-31-event-0008",
+      "event": {
+        "case": "eval3",
+        "seed": 31,
+        "origin_policy": "proposal",
+        "ordinal": 8,
+        "sim_time_s": 65.6,
+        "receiver_id": "35",
+        "sender_id": "29",
+        "desired_path_id": "29_26"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/074-eval3-proposal-seed-31-event-0008/eval3-proposal-seed-31-event-0008/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 75,
+      "slug": "075-eval3-proposal-seed-31-event-0011",
+      "event": {
+        "case": "eval3",
+        "seed": 31,
+        "origin_policy": "proposal",
+        "ordinal": 11,
+        "sim_time_s": 68.6,
+        "receiver_id": "35",
+        "sender_id": "29",
+        "desired_path_id": "29_33"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/075-eval3-proposal-seed-31-event-0011/eval3-proposal-seed-31-event-0011/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 76,
+      "slug": "076-eval3-proposal-seed-31-event-0022",
+      "event": {
+        "case": "eval3",
+        "seed": 31,
+        "origin_policy": "proposal",
+        "ordinal": 22,
+        "sim_time_s": 94.1,
+        "receiver_id": "53",
+        "sender_id": "47",
+        "desired_path_id": "47_29"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/076-eval3-proposal-seed-31-event-0022/eval3-proposal-seed-31-event-0022/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 77,
+      "slug": "077-eval3-proposal-seed-32-event-0005",
+      "event": {
+        "case": "eval3",
+        "seed": 32,
+        "origin_policy": "proposal",
+        "ordinal": 5,
+        "sim_time_s": 75.7,
+        "receiver_id": "17",
+        "sender_id": "13",
+        "desired_path_id": "13_25"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/077-eval3-proposal-seed-32-event-0005/eval3-proposal-seed-32-event-0005/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 78,
+      "slug": "078-eval3-proposal-seed-32-event-0014",
+      "event": {
+        "case": "eval3",
+        "seed": 32,
+        "origin_policy": "proposal",
+        "ordinal": 14,
+        "sim_time_s": 92.1,
+        "receiver_id": "33",
+        "sender_id": "21",
+        "desired_path_id": "21_50"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/078-eval3-proposal-seed-32-event-0014/eval3-proposal-seed-32-event-0014/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 79,
+      "slug": "079-eval3-proposal-seed-32-event-0016",
+      "event": {
+        "case": "eval3",
+        "seed": 32,
+        "origin_policy": "proposal",
+        "ordinal": 16,
+        "sim_time_s": 93.1,
+        "receiver_id": "33",
+        "sender_id": "27",
+        "desired_path_id": "27_27"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/079-eval3-proposal-seed-32-event-0016/eval3-proposal-seed-32-event-0016/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 80,
+      "slug": "080-eval3-proposal-seed-32-event-0018",
+      "event": {
+        "case": "eval3",
+        "seed": 32,
+        "origin_policy": "proposal",
+        "ordinal": 18,
+        "sim_time_s": 93.7,
+        "receiver_id": "33",
+        "sender_id": "29",
+        "desired_path_id": "29_18"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/080-eval3-proposal-seed-32-event-0018/eval3-proposal-seed-32-event-0018/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 81,
+      "slug": "081-eval5-proposal-seed-28-event-0023",
+      "event": {
+        "case": "eval5",
+        "seed": 28,
+        "origin_policy": "proposal",
+        "ordinal": 23,
+        "sim_time_s": 34.9,
+        "receiver_id": "4",
+        "sender_id": "5",
+        "desired_path_id": "5_41"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/081-eval5-proposal-seed-28-event-0023/eval5-proposal-seed-28-event-0023/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 82,
+      "slug": "082-eval5-proposal-seed-28-event-0067",
+      "event": {
+        "case": "eval5",
+        "seed": 28,
+        "origin_policy": "proposal",
+        "ordinal": 67,
+        "sim_time_s": 54.4,
+        "receiver_id": "2",
+        "sender_id": "15",
+        "desired_path_id": "15_44"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/082-eval5-proposal-seed-28-event-0067/eval5-proposal-seed-28-event-0067/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 83,
+      "slug": "083-eval5-proposal-seed-28-event-0106",
+      "event": {
+        "case": "eval5",
+        "seed": 28,
+        "origin_policy": "proposal",
+        "ordinal": 106,
+        "sim_time_s": 65.7,
+        "receiver_id": "31",
+        "sender_id": "27",
+        "desired_path_id": "27_48"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/083-eval5-proposal-seed-28-event-0106/eval5-proposal-seed-28-event-0106/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 84,
+      "slug": "084-eval5-proposal-seed-28-event-0143",
+      "event": {
+        "case": "eval5",
+        "seed": 28,
+        "origin_policy": "proposal",
+        "ordinal": 143,
+        "sim_time_s": 92.0,
+        "receiver_id": "12",
+        "sender_id": "45",
+        "desired_path_id": "45_33"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/084-eval5-proposal-seed-28-event-0143/eval5-proposal-seed-28-event-0143/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 85,
+      "slug": "085-eval5-proposal-seed-29-event-0025",
+      "event": {
+        "case": "eval5",
+        "seed": 29,
+        "origin_policy": "proposal",
+        "ordinal": 25,
+        "sim_time_s": 35.6,
+        "receiver_id": "5",
+        "sender_id": "11",
+        "desired_path_id": "11_36"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/085-eval5-proposal-seed-29-event-0025/eval5-proposal-seed-29-event-0025/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 86,
+      "slug": "086-eval5-proposal-seed-29-event-0032",
+      "event": {
+        "case": "eval5",
+        "seed": 29,
+        "origin_policy": "proposal",
+        "ordinal": 32,
+        "sim_time_s": 37.8,
+        "receiver_id": "0",
+        "sender_id": "9",
+        "desired_path_id": "9_45"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/086-eval5-proposal-seed-29-event-0032/eval5-proposal-seed-29-event-0032/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 87,
+      "slug": "087-eval5-proposal-seed-29-event-0038",
+      "event": {
+        "case": "eval5",
+        "seed": 29,
+        "origin_policy": "proposal",
+        "ordinal": 38,
+        "sim_time_s": 40.7,
+        "receiver_id": "15",
+        "sender_id": "5",
+        "desired_path_id": "5_54"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/087-eval5-proposal-seed-29-event-0038/eval5-proposal-seed-29-event-0038/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 88,
+      "slug": "088-eval5-proposal-seed-29-event-0048",
+      "event": {
+        "case": "eval5",
+        "seed": 29,
+        "origin_policy": "proposal",
+        "ordinal": 48,
+        "sim_time_s": 62.9,
+        "receiver_id": "21",
+        "sender_id": "2",
+        "desired_path_id": "2_41"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/088-eval5-proposal-seed-29-event-0048/eval5-proposal-seed-29-event-0048/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 89,
+      "slug": "089-eval5-proposal-seed-30-event-0020",
+      "event": {
+        "case": "eval5",
+        "seed": 30,
+        "origin_policy": "proposal",
+        "ordinal": 20,
+        "sim_time_s": 28.5,
+        "receiver_id": "11",
+        "sender_id": "2",
+        "desired_path_id": "2_30"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/089-eval5-proposal-seed-30-event-0020/eval5-proposal-seed-30-event-0020/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 90,
+      "slug": "090-eval5-proposal-seed-30-event-0100",
+      "event": {
+        "case": "eval5",
+        "seed": 30,
+        "origin_policy": "proposal",
+        "ordinal": 100,
+        "sim_time_s": 56.9,
+        "receiver_id": "23",
+        "sender_id": "9",
+        "desired_path_id": "9_88"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/090-eval5-proposal-seed-30-event-0100/eval5-proposal-seed-30-event-0100/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 91,
+      "slug": "091-eval5-proposal-seed-30-event-0120",
+      "event": {
+        "case": "eval5",
+        "seed": 30,
+        "origin_policy": "proposal",
+        "ordinal": 120,
+        "sim_time_s": 75.6,
+        "receiver_id": "8",
+        "sender_id": "39",
+        "desired_path_id": "39_45"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/091-eval5-proposal-seed-30-event-0120/eval5-proposal-seed-30-event-0120/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 92,
+      "slug": "092-eval5-proposal-seed-30-event-0142",
+      "event": {
+        "case": "eval5",
+        "seed": 30,
+        "origin_policy": "proposal",
+        "ordinal": 142,
+        "sim_time_s": 85.8,
+        "receiver_id": "39",
+        "sender_id": "49",
+        "desired_path_id": "49_35"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/092-eval5-proposal-seed-30-event-0142/eval5-proposal-seed-30-event-0142/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 93,
+      "slug": "093-eval5-proposal-seed-31-event-0007",
+      "event": {
+        "case": "eval5",
+        "seed": 31,
+        "origin_policy": "proposal",
+        "ordinal": 7,
+        "sim_time_s": 50.3,
+        "receiver_id": "17",
+        "sender_id": "15",
+        "desired_path_id": "15_32"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/093-eval5-proposal-seed-31-event-0007/eval5-proposal-seed-31-event-0007/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 94,
+      "slug": "094-eval5-proposal-seed-31-event-0057",
+      "event": {
+        "case": "eval5",
+        "seed": 31,
+        "origin_policy": "proposal",
+        "ordinal": 57,
+        "sim_time_s": 69.4,
+        "receiver_id": "6",
+        "sender_id": "23",
+        "desired_path_id": "23_43"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/094-eval5-proposal-seed-31-event-0057/eval5-proposal-seed-31-event-0057/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 95,
+      "slug": "095-eval5-proposal-seed-31-event-0147",
+      "event": {
+        "case": "eval5",
+        "seed": 31,
+        "origin_policy": "proposal",
+        "ordinal": 147,
+        "sim_time_s": 93.4,
+        "receiver_id": "41",
+        "sender_id": "6",
+        "desired_path_id": "6_127"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/095-eval5-proposal-seed-31-event-0147/eval5-proposal-seed-31-event-0147/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 96,
+      "slug": "096-eval5-proposal-seed-31-event-0173",
+      "event": {
+        "case": "eval5",
+        "seed": 31,
+        "origin_policy": "proposal",
+        "ordinal": 173,
+        "sim_time_s": 98.3,
+        "receiver_id": "47",
+        "sender_id": "8",
+        "desired_path_id": "8_31"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/096-eval5-proposal-seed-31-event-0173/eval5-proposal-seed-31-event-0173/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 97,
+      "slug": "097-eval5-proposal-seed-32-event-0002",
+      "event": {
+        "case": "eval5",
+        "seed": 32,
+        "origin_policy": "proposal",
+        "ordinal": 2,
+        "sim_time_s": 22.2,
+        "receiver_id": "3",
+        "sender_id": "2",
+        "desired_path_id": "2_26"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/097-eval5-proposal-seed-32-event-0002/eval5-proposal-seed-32-event-0002/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 98,
+      "slug": "098-eval5-proposal-seed-32-event-0006",
+      "event": {
+        "case": "eval5",
+        "seed": 32,
+        "origin_policy": "proposal",
+        "ordinal": 6,
+        "sim_time_s": 76.3,
+        "receiver_id": "6",
+        "sender_id": "17",
+        "desired_path_id": "17_22"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/098-eval5-proposal-seed-32-event-0006/eval5-proposal-seed-32-event-0006/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 99,
+      "slug": "099-eval5-proposal-seed-32-event-0007",
+      "event": {
+        "case": "eval5",
+        "seed": 32,
+        "origin_policy": "proposal",
+        "ordinal": 7,
+        "sim_time_s": 77.3,
+        "receiver_id": "6",
+        "sender_id": "17",
+        "desired_path_id": "17_24"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/099-eval5-proposal-seed-32-event-0007/eval5-proposal-seed-32-event-0007/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 100,
+      "slug": "100-eval5-proposal-seed-32-event-0011",
+      "event": {
+        "case": "eval5",
+        "seed": 32,
+        "origin_policy": "proposal",
+        "ordinal": 11,
+        "sim_time_s": 82.8,
+        "receiver_id": "17",
+        "sender_id": "6",
+        "desired_path_id": "6_42"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/100-eval5-proposal-seed-32-event-0011/eval5-proposal-seed-32-event-0011/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 101,
+      "slug": "101-eval7-proposal-seed-28-event-0004",
+      "event": {
+        "case": "eval7",
+        "seed": 28,
+        "origin_policy": "proposal",
+        "ordinal": 4,
+        "sim_time_s": 43.8,
+        "receiver_id": "19",
+        "sender_id": "21",
+        "desired_path_id": "21_35"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/101-eval7-proposal-seed-28-event-0004/eval7-proposal-seed-28-event-0004/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 102,
+      "slug": "102-eval7-proposal-seed-28-event-0103",
+      "event": {
+        "case": "eval7",
+        "seed": 28,
+        "origin_policy": "proposal",
+        "ordinal": 103,
+        "sim_time_s": 75.9,
+        "receiver_id": "45",
+        "sender_id": "21",
+        "desired_path_id": "21_103"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/102-eval7-proposal-seed-28-event-0103/eval7-proposal-seed-28-event-0103/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 103,
+      "slug": "103-eval7-proposal-seed-28-event-0177",
+      "event": {
+        "case": "eval7",
+        "seed": 28,
+        "origin_policy": "proposal",
+        "ordinal": 177,
+        "sim_time_s": 89.0,
+        "receiver_id": "55",
+        "sender_id": "21",
+        "desired_path_id": "21_131"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/103-eval7-proposal-seed-28-event-0177/eval7-proposal-seed-28-event-0177/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 104,
+      "slug": "104-eval7-proposal-seed-28-event-0237",
+      "event": {
+        "case": "eval7",
+        "seed": 28,
+        "origin_policy": "proposal",
+        "ordinal": 237,
+        "sim_time_s": 99.9,
+        "receiver_id": "14",
+        "sender_id": "25",
+        "desired_path_id": "25_136"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/104-eval7-proposal-seed-28-event-0237/eval7-proposal-seed-28-event-0237/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 105,
+      "slug": "105-eval7-proposal-seed-29-event-0075",
+      "event": {
+        "case": "eval7",
+        "seed": 29,
+        "origin_policy": "proposal",
+        "ordinal": 75,
+        "sim_time_s": 66.7,
+        "receiver_id": "41",
+        "sender_id": "19",
+        "desired_path_id": "19_113"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/105-eval7-proposal-seed-29-event-0075/eval7-proposal-seed-29-event-0075/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 106,
+      "slug": "106-eval7-proposal-seed-29-event-0128",
+      "event": {
+        "case": "eval7",
+        "seed": 29,
+        "origin_policy": "proposal",
+        "ordinal": 128,
+        "sim_time_s": 75.2,
+        "receiver_id": "59",
+        "sender_id": "8",
+        "desired_path_id": "8_38"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/106-eval7-proposal-seed-29-event-0128/eval7-proposal-seed-29-event-0128/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 107,
+      "slug": "107-eval7-proposal-seed-29-event-0140",
+      "event": {
+        "case": "eval7",
+        "seed": 29,
+        "origin_policy": "proposal",
+        "ordinal": 140,
+        "sim_time_s": 79.1,
+        "receiver_id": "51",
+        "sender_id": "43",
+        "desired_path_id": "43_55"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/107-eval7-proposal-seed-29-event-0140/eval7-proposal-seed-29-event-0140/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 108,
+      "slug": "108-eval7-proposal-seed-29-event-0192",
+      "event": {
+        "case": "eval7",
+        "seed": 29,
+        "origin_policy": "proposal",
+        "ordinal": 192,
+        "sim_time_s": 97.2,
+        "receiver_id": "61",
+        "sender_id": "39",
+        "desired_path_id": "39_118"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/108-eval7-proposal-seed-29-event-0192/eval7-proposal-seed-29-event-0192/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 109,
+      "slug": "109-eval7-proposal-seed-30-event-0027",
+      "event": {
+        "case": "eval7",
+        "seed": 30,
+        "origin_policy": "proposal",
+        "ordinal": 27,
+        "sim_time_s": 46.3,
+        "receiver_id": "21",
+        "sender_id": "13",
+        "desired_path_id": "13_46"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/109-eval7-proposal-seed-30-event-0027/eval7-proposal-seed-30-event-0027/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 110,
+      "slug": "110-eval7-proposal-seed-30-event-0063",
+      "event": {
+        "case": "eval7",
+        "seed": 30,
+        "origin_policy": "proposal",
+        "ordinal": 63,
+        "sim_time_s": 63.7,
+        "receiver_id": "37",
+        "sender_id": "13",
+        "desired_path_id": "13_84"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/110-eval7-proposal-seed-30-event-0063/eval7-proposal-seed-30-event-0063/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 111,
+      "slug": "111-eval7-proposal-seed-30-event-0158",
+      "event": {
+        "case": "eval7",
+        "seed": 30,
+        "origin_policy": "proposal",
+        "ordinal": 158,
+        "sim_time_s": 89.9,
+        "receiver_id": "55",
+        "sender_id": "43",
+        "desired_path_id": "43_112"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/111-eval7-proposal-seed-30-event-0158/eval7-proposal-seed-30-event-0158/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 112,
+      "slug": "112-eval7-proposal-seed-30-event-0163",
+      "event": {
+        "case": "eval7",
+        "seed": 30,
+        "origin_policy": "proposal",
+        "ordinal": 163,
+        "sim_time_s": 90.5,
+        "receiver_id": "53",
+        "sender_id": "35",
+        "desired_path_id": "35_141"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/112-eval7-proposal-seed-30-event-0163/eval7-proposal-seed-30-event-0163/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 113,
+      "slug": "113-eval7-proposal-seed-31-event-0010",
+      "event": {
+        "case": "eval7",
+        "seed": 31,
+        "origin_policy": "proposal",
+        "ordinal": 10,
+        "sim_time_s": 44.9,
+        "receiver_id": "17",
+        "sender_id": "13",
+        "desired_path_id": "13_61"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/113-eval7-proposal-seed-31-event-0010/eval7-proposal-seed-31-event-0010/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 114,
+      "slug": "114-eval7-proposal-seed-31-event-0119",
+      "event": {
+        "case": "eval7",
+        "seed": 31,
+        "origin_policy": "proposal",
+        "ordinal": 119,
+        "sim_time_s": 71.6,
+        "receiver_id": "41",
+        "sender_id": "19",
+        "desired_path_id": "19_104"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/114-eval7-proposal-seed-31-event-0119/eval7-proposal-seed-31-event-0119/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 115,
+      "slug": "115-eval7-proposal-seed-31-event-0197",
+      "event": {
+        "case": "eval7",
+        "seed": 31,
+        "origin_policy": "proposal",
+        "ordinal": 197,
+        "sim_time_s": 80.8,
+        "receiver_id": "47",
+        "sender_id": "19",
+        "desired_path_id": "19_122"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/115-eval7-proposal-seed-31-event-0197/eval7-proposal-seed-31-event-0197/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 116,
+      "slug": "116-eval7-proposal-seed-31-event-0292",
+      "event": {
+        "case": "eval7",
+        "seed": 31,
+        "origin_policy": "proposal",
+        "ordinal": 292,
+        "sim_time_s": 99.4,
+        "receiver_id": "22",
+        "sender_id": "16",
+        "desired_path_id": "16_64"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/116-eval7-proposal-seed-31-event-0292/eval7-proposal-seed-31-event-0292/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 117,
+      "slug": "117-eval7-proposal-seed-32-event-0031",
+      "event": {
+        "case": "eval7",
+        "seed": 32,
+        "origin_policy": "proposal",
+        "ordinal": 31,
+        "sim_time_s": 71.9,
+        "receiver_id": "35",
+        "sender_id": "33",
+        "desired_path_id": "33_36"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/117-eval7-proposal-seed-32-event-0031/eval7-proposal-seed-32-event-0031/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 118,
+      "slug": "118-eval7-proposal-seed-32-event-0043",
+      "event": {
+        "case": "eval7",
+        "seed": 32,
+        "origin_policy": "proposal",
+        "ordinal": 43,
+        "sim_time_s": 81.8,
+        "receiver_id": "43",
+        "sender_id": "33",
+        "desired_path_id": "33_60"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/118-eval7-proposal-seed-32-event-0043/eval7-proposal-seed-32-event-0043/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 119,
+      "slug": "119-eval7-proposal-seed-32-event-0053",
+      "event": {
+        "case": "eval7",
+        "seed": 32,
+        "origin_policy": "proposal",
+        "ordinal": 53,
+        "sim_time_s": 83.3,
+        "receiver_id": "47",
+        "sender_id": "39",
+        "desired_path_id": "39_43"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/119-eval7-proposal-seed-32-event-0053/eval7-proposal-seed-32-event-0053/manifest.json",
+      "recovered_from_completed_artifact": true
+    },
+    {
+      "index": 120,
+      "slug": "120-eval7-proposal-seed-32-event-0054",
+      "event": {
+        "case": "eval7",
+        "seed": 32,
+        "origin_policy": "proposal",
+        "ordinal": 54,
+        "sim_time_s": 83.7,
+        "receiver_id": "47",
+        "sender_id": "39",
+        "desired_path_id": "39_45"
+      },
+      "exit_code": 0,
+      "event_manifest": "events/120-eval7-proposal-seed-32-event-0054/eval7-proposal-seed-32-event-0054/manifest.json",
+      "recovered_from_completed_artifact": true
+    }
+  ],
+  "recovery": {
+    "reason": "Parent SSH runner exited after dispatch; all 120 child event artifacts completed normally and were audited before aggregation recovery.",
+    "tool_git": {
+      "commit": "bfa7af90aefe9b0c123be845f2b40a6865c448b3",
+      "branch": null,
+      "dirty": false
+    },
+    "recovered_event_count": 120,
+    "original_runner_finished_event_count": 41,
+    "recovered_epoch": 1793951196.5761232
+  }
+}
