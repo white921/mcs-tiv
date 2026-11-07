@@ -1,11 +1,13 @@
 # オラクル整合v2のEval.7交通量スイープ
 
 - 台帳ID: `2026-11-07-oracle-v2-eval7-flow-sweep`
-- 状態: `planned`
+- 状態: `running`
 - 位置づけ: `development; reuse of previously observed inputs`
-- 開始予定日: 2026-11-07
+- 開始日時: 2026-11-07 15:22 JST
 - 実装ブランチ: `codex/oracle-v2-eval7-flow-sweep`
-- 実行ソースcommit: 起動後にmanifestのSHAを記録する
+- 実行ソースcommit: `d9d9a457af78a8a19a76daff5ec5e277021e3a0a`
+- Ubuntu unit: `mcs-oracle-v2-eval7-flow-sweep-20261107.service`
+- orchestrator SHA256: `f722a5d5da0ec578b5750a466d630cd96a8fd87ddd5ec785520bc5b99c8203f6`
 
 ## 目的
 
@@ -34,6 +36,10 @@
 4交通量は独立した実験ディレクトリとする。最大10 SUMOを守るため、5-worker batchを
 2本ずつ並行し、前半2本が正常終了した場合だけ後半2本を開始する。
 
+実行前にUbuntuのPython 3.15.1 / SUMO 1.28.0で全175 testが成功した。
+500/1000、seed 6、20秒stop-timeのsmokeも`exit_code: 0`、
+`source_unchanged: true`で完了し、交通量別固定入力とv2規則、必須artifact生成を確認した。
+
 ## 比較対象
 
 既存の`2026-11-01-eval7-flow-ratio-sweep`を数値の正本とする。
@@ -61,8 +67,8 @@
 
 ## 完了条件
 
-- [ ] 実行ソースcommitと入力SHAを記録
-- [ ] Ubuntu正式環境で全テストと単一seed smoke
+- [x] 実行ソースcommitと入力SHAを記録
+- [x] Ubuntu正式環境で全テストと単一seed smoke
 - [ ] 4 batch、20 runが`exit_code: 0`かつ`source_unchanged: true`
 - [ ] 必須artifact、runner/stdout/stderr/SUMOログを監査
 - [ ] 物理衝突と既知警告を確認
