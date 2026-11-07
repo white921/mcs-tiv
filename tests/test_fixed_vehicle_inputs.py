@@ -177,6 +177,7 @@ class FixedVehicleInputTests(unittest.TestCase):
     def test_batch_can_select_seed_five_without_changing_defaults(self):
         self.assertEqual(build_tasks(["eval3"], seeds=[5]), [("eval3", 5)])
         self.assertEqual(build_tasks(["eval3"], seeds=[6]), [("eval3", 6)])
+        self.assertEqual(build_tasks(["eval7"], seeds=[33]), [("eval7", 33)])
         self.assertEqual(
             build_tasks(["eval3"], seeds_per_case=2),
             [("eval3", 1), ("eval3", 2)],

@@ -111,7 +111,10 @@ CASES = {
         "folder": "merge", "script": "merge_agree2512.py", "alpha": "7",
         "flows": ["1000", "1000"], "bus_share": "0.25",
         "seeds": [1, 2, 3, 7, 11], "reference": 4.2084,
-        "holdout_seeds": [6, 8, 9, 10, 12],
+        "holdout_seeds": [
+            6, 8, 9, 10, 12,
+            33, 34, 35, 36, 37, 38, 39, 40, 41, 42,
+        ],
         "fixed_input": "fixed_inputs/thesis/eval7/seed-{seed}.jsonl",
     },
 }
