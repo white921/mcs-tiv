@@ -202,17 +202,36 @@ class FixedVehicleInputTests(unittest.TestCase):
                 self.assertEqual(counts["accepting"], 166)
 
     def test_eval7_flow_sweep_committed_files_all_validate(self):
-        paths = sorted(
-            (ROOT / "fixed_inputs" / "thesis" / "eval7-flow-sweep").glob(
-                "*/*.jsonl"
+        root = ROOT / "fixed_inputs" / "thesis" / "eval7-flow-sweep"
+        development_seeds = {6, 8, 9, 10, 12}
+        holdout_seeds = set(range(33, 43))
+        expected = {
+            root / f"requesting-{requesting}-accepting-1000" / f"seed-{seed}.jsonl"
+            for requesting in (300, 500, 700, 1000)
+            for seed in (
+                development_seeds | holdout_seeds
+                if requesting == 700 else development_seeds
             )
-        )
-        self.assertEqual(len(paths), 20)
-        for path in paths:
+        }
+        paths = set(root.glob("*/*.jsonl"))
+        self.assertEqual(paths, expected)
+        for path in sorted(paths):
             with self.subTest(path=path):
-                schedule = load_fixed_vehicle_input(path, prefix_duration_s=300)
+                requesting = int(path.parent.name.split("-")[1])
+                seed = int(path.stem.split("-")[1])
+                schedule = load_fixed_vehicle_input(
+                    path,
+                    expected_case="eval7",
+                    expected_seed=seed,
+                    expected_flows_vph={
+                        "requesting": requesting,
+                        "accepting": 1000,
+                    },
+                    expected_bus_share=0.25,
+                    prefix_duration_s=600,
+                )
                 self.assertEqual(schedule.metadata["case"], "eval7")
-                self.assertEqual(schedule.prefix_duration_s, 300.0)
+                self.assertEqual(schedule.prefix_duration_s, 600.0)
 
     def test_eval7_flow_sweep_keeps_mainline_fixed_and_merging_sets_nested(self):
         conditions = {
