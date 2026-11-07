@@ -24,6 +24,7 @@ class ResultLayoutTests(unittest.TestCase):
             "seeds": [1, 2, 3, 4, 5],
             "seeds_per_case": None,
             "duration": 600,
+            "eval7_flows": None,
         }
         values.update(updates)
         return argparse.Namespace(**values)
@@ -85,18 +86,31 @@ class ResultLayoutTests(unittest.TestCase):
             RUNNER.PRIORITY_HOLD_MANIFEST,
             {"mode": "off", "enabled": False})
 
-    def test_manifest_records_time_equivalent_loss_lambda(self):
+    def test_manifest_records_oracle_aligned_v2_rule(self):
         manifest = RUNNER.deceleration_prediction_manifest(
             self.args(deceleration_loss_lambda=1.25))
 
-        self.assertEqual(manifest["loss_lambda"], 1.25)
-        self.assertIn("accept iff M<=0", manifest["decision_formula"])
         self.assertEqual(
-            manifest["loss_scope"],
-            "detected followers excluding request and receiver vehicles")
+            manifest["decision_rule"], "oracle-aligned-reject-gated-v2")
+        self.assertEqual(manifest["reject_override_threshold_m"], 10.0)
+        self.assertIn("never overridden", manifest["decision_formula"])
         self.assertEqual(
-            manifest["excluded_loss_roles"],
-            ["request_vehicle", "receiver_vehicle"])
+            manifest["distance_scope"],
+            "request, receiver, and detected follower union")
+        self.assertEqual(
+            manifest["legacy_time_equivalent_loss_lambda_for_diagnostics"],
+            1.25)
+
+    def test_eval7_flow_override_selects_matching_fixed_input(self):
+        details = RUNNER.fixed_input_details(
+            "eval7", 6, 300, "fixed", prefix_duration=300,
+            flows=(500, 1000))
+
+        self.assertEqual(
+            details["relative_path"],
+            "fixed_inputs/thesis/eval7-flow-sweep/"
+            "requesting-500-accepting-1000/seed-6.jsonl")
+        self.assertEqual(details["prefix_duration_s"], 300.0)
 
 
 if __name__ == "__main__":
