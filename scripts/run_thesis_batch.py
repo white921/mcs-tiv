@@ -111,10 +111,10 @@ CASES = {
         "folder": "merge", "script": "merge_agree2512.py", "alpha": "7",
         "flows": ["1000", "1000"], "bus_share": "0.25",
         "seeds": [1, 2, 3, 7, 11], "reference": 4.2084,
-        "holdout_seeds": [
-            6, 8, 9, 10, 12,
-            33, 34, 35, 36, 37, 38, 39, 40, 41, 42,
-        ],
+        "holdout_seeds": [6, 8, 9, 10, 12],
+        "flow_sweep_holdout_seeds": {
+            ("700", "1000"): [33, 34, 35, 36, 37, 38, 39, 40, 41, 42],
+        },
         "fixed_input": "fixed_inputs/thesis/eval7/seed-{seed}.jsonl",
     },
 }
@@ -262,13 +262,17 @@ def fixed_input_details(
     }
 
 
-def build_tasks(case_names, seeds_per_case=None, seeds=None):
+def build_tasks(case_names, seeds_per_case=None, seeds=None, eval7_flows=None):
     """Build tasks from documented seeds, optionally selecting an explicit subset."""
     tasks = []
     for name in case_names:
         documented = CASES[name]["seeds"]
         if seeds is not None:
             allowed = set(documented) | set(CASES[name].get("holdout_seeds", ()))
+            if name == "eval7" and eval7_flows is not None:
+                flow_key = tuple(str(flow) for flow in eval7_flows)
+                allowed |= set(CASES[name].get(
+                    "flow_sweep_holdout_seeds", {}).get(flow_key, ()))
             unknown = [seed for seed in seeds if seed not in allowed]
             if unknown:
                 raise ValueError(f"{name} does not document seeds: {unknown}")
@@ -663,7 +667,8 @@ def main():
         parser.error("--paper must name an existing PDF")
     args.run_git_metadata = git_metadata()
     try:
-        tasks = build_tasks(args.cases, args.seeds_per_case, args.seeds)
+        tasks = build_tasks(
+            args.cases, args.seeds_per_case, args.seeds, args.eval7_flows)
     except ValueError as error:
         parser.error(str(error))
     if args.resume_checkpoint is not None:
