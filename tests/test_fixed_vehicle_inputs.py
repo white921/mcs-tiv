@@ -184,6 +184,10 @@ class FixedVehicleInputTests(unittest.TestCase):
             [("eval7", 33)],
         )
         self.assertEqual(
+            build_tasks(["eval7"], seeds=[43, 44, 45, 46, 47], eval7_flows=(500, 1000)),
+            [("eval7", seed) for seed in range(43, 48)],
+        )
+        self.assertEqual(
             build_tasks(["eval3"], seeds_per_case=2),
             [("eval3", 1), ("eval3", 2)],
         )
