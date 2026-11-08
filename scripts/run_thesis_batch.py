@@ -119,6 +119,27 @@ CASES = {
     },
 }
 
+DECISION_METHODS = {
+    "alw": "1",
+    "act": "2",
+    "spd20": "3",
+    "spd40": "4",
+    "utf": "5",
+    "tivte": "6",
+    "tivtep": "7",
+}
+
+
+def selected_decision_method(case, requested):
+    """Return the semantic method name and alpha used for one case."""
+    if requested == "documented":
+        alpha = case["alpha"]
+        name = next(
+            name for name, candidate in DECISION_METHODS.items()
+            if candidate == alpha)
+        return name, alpha
+    return requested, DECISION_METHODS[requested]
+
 
 def filesystem_component(value):
     """Return a readable, portable component for an experiment directory."""
@@ -144,7 +165,12 @@ def default_run_directory(args, now=None):
     else:
         now = now or datetime.datetime.now().astimezone()
         timestamp = now.strftime("%Y%m%dT%H%M%S%z")
-        method = "proposal" if args.deceleration_active else "yamashita"
+        if args.deceleration_active:
+            method = "proposal"
+        elif args.decision_method == "documented":
+            method = "yamashita"
+        else:
+            method = args.decision_method
         half_life = getattr(args, "deceleration_time_half_life", 0)
         if args.deceleration_active and half_life > 0:
             method += f"-weighted-{duration_label(half_life)}s"
@@ -323,6 +349,8 @@ def prepare_source(destination, case):
 def run_task(task, args):
     name, seed = task
     case = CASES[name]
+    decision_method, decision_alpha = selected_decision_method(
+        case, args.decision_method)
     destination = args.output / name / ("seed-" + str(seed))
     destination.mkdir(parents=True, exist_ok=False)
     source, initial_hashes = prepare_source(destination, case)
@@ -379,7 +407,7 @@ def run_task(task, args):
         if name == "eval7" and args.eval7_flows is not None
         else case["flows"]
     )
-    command = [args.python, "-u", case["script"], case["alpha"], str(seed),
+    command = [args.python, "-u", case["script"], decision_alpha, str(seed),
                *flows, "--nogui", "--quiet", "--duration", str(args.duration),
                "--bus-allocation", args.bus_allocation]
     fixed_input = fixed_input_details(
@@ -410,7 +438,8 @@ def run_task(task, args):
         "flows_vph": ({"requesting": int(flows[0]), "accepting": int(flows[1])}
                       if name == "eval7" else [int(flow) for flow in flows]),
         "input_duration": args.duration, "stop_time": args.stop_time or args.duration,
-        "paper_reference_mean_mps": case["reference"],
+        "paper_reference_mean_mps": (
+            case["reference"] if args.decision_method == "documented" else None),
         "bus_allocation": args.bus_allocation,
         "bus_share": case["bus_share"],
         "fixed_vehicle_input": ({
@@ -426,7 +455,8 @@ def run_task(task, args):
             "deceleration-propagation-rejection-wait"
             if args.deceleration_active and args.rejection_wait_cap > 0
             else "deceleration-propagation" if args.deceleration_active
-            else "thesis-tiv"),
+            else decision_method),
+        "decision_alpha": int(decision_alpha),
         "priority_hold": dict(PRIORITY_HOLD_MANIFEST),
         "agreement_lease": {
             "enabled": args.agreement_lease_seconds > 0,
@@ -535,6 +565,11 @@ def main():
         "--run-name",
         help="readable experiment directory name created under results/runs")
     parser.add_argument("--cases", choices=CASES, nargs="+", default=list(CASES))
+    parser.add_argument(
+        "--decision-method", choices=("documented", *DECISION_METHODS),
+        default="documented",
+        help=("baseline decision method; documented keeps each case's published "
+              "method (default)"))
     parser.add_argument("--workers", type=int, default=3,
                         help="independent SUMO tasks; use 3-4, not all CPU threads")
     parser.add_argument("--seeds-per-case", type=int,
@@ -638,6 +673,10 @@ def main():
         parser.error("prediction and checkpoint limits must be non-negative")
     if args.deceleration_time_half_life > 0 and not args.deceleration_active:
         parser.error("--deceleration-time-half-life requires --deceleration-active")
+    if args.deceleration_active and args.decision_method not in (
+            "documented", "tivtep"):
+        parser.error(
+            "--deceleration-active requires the documented TIVtep baseline")
     if args.rejection_wait_cap > 0 and not args.deceleration_active:
         parser.error("--rejection-wait-cap requires --deceleration-active")
     if (args.deceleration_loss_mode != "integrated" and
@@ -705,7 +744,11 @@ def main():
         "started_at": started_at.isoformat(),
         "started_epoch": started_at.timestamp(),
         "directory": str(args.output),
-        "method": "deceleration-propagation" if args.deceleration_active else "yamashita-tiv",
+        "method": (
+            "deceleration-propagation" if args.deceleration_active
+            else "yamashita-tiv" if args.decision_method == "documented"
+            else args.decision_method),
+        "requested_decision_method": args.decision_method,
         "deceleration_time_half_life_s": (
             args.deceleration_time_half_life
             if args.deceleration_active and args.deceleration_time_half_life > 0
