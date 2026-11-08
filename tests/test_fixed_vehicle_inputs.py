@@ -210,14 +210,14 @@ class FixedVehicleInputTests(unittest.TestCase):
     def test_eval7_flow_sweep_committed_files_all_validate(self):
         root = ROOT / "fixed_inputs" / "thesis" / "eval7-flow-sweep"
         development_seeds = {6, 8, 9, 10, 12}
-        holdout_seeds = set(range(33, 43))
+        holdout_seeds = {
+            500: set(range(43, 48)),
+            700: set(range(33, 43)),
+        }
         expected = {
             root / f"requesting-{requesting}-accepting-1000" / f"seed-{seed}.jsonl"
             for requesting in (300, 500, 700, 1000)
-            for seed in (
-                development_seeds | holdout_seeds
-                if requesting == 700 else development_seeds
-            )
+            for seed in development_seeds | holdout_seeds.get(requesting, set())
         }
         paths = set(root.glob("*/*.jsonl"))
         self.assertEqual(paths, expected)
