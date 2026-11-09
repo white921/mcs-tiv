@@ -48,7 +48,8 @@
 
 | 状態 | 開始日 | 実験 | 記録 |
 | --- | --- | --- | --- |
-| planned | 2026-11-09 | Eval.7・500/1000の3方式600秒holdout | [記録](2026-11-09-eval7-500-three-method-600s-holdout.md) |
+| completed | 2026-11-09 | Eval.7・500/1000の3方式600秒holdout | [記録](2026-11-09-eval7-500-three-method-600s-holdout.md) |
+| completed | 2026-11-08 | Eval.7・700/1000 UTF追加対照 | [記録](2026-11-08-eval7-utf-700-supplementary-baseline.md) |
 | planned | 2026-11-07 | Eval.7・700/1000積算方式の未使用seed独立holdout | [記録](2026-11-07-eval7-integrated-700-independent-holdout.md) |
 | completed | 2026-10-30 | Eval.3/5/7・交渉単位Accept/Reject反実仮ベンチマーク | [記録](2026-10-30-decision-oracle-benchmark.md) |
 | completed | 2026-10-31 | 後続車害のみ合成・未使用seed独立holdout | [記録](2026-10-31-decision-oracle-harm-only-holdout.md) |
