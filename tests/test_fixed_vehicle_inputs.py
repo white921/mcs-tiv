@@ -184,6 +184,14 @@ class FixedVehicleInputTests(unittest.TestCase):
             [("eval7", 33)],
         )
         self.assertEqual(
+            build_tasks(["eval7"], seeds=[33, 42], eval7_flows=(300, 1000)),
+            [("eval7", 33), ("eval7", 42)],
+        )
+        self.assertEqual(
+            build_tasks(["eval7"], seeds=[33, 42], eval7_flows=(1000, 1000)),
+            [("eval7", 33), ("eval7", 42)],
+        )
+        self.assertEqual(
             build_tasks(["eval7"], seeds=[43, 44, 45, 46, 47], eval7_flows=(500, 1000)),
             [("eval7", seed) for seed in range(43, 48)],
         )
@@ -215,8 +223,10 @@ class FixedVehicleInputTests(unittest.TestCase):
         root = ROOT / "fixed_inputs" / "thesis" / "eval7-flow-sweep"
         development_seeds = {6, 8, 9, 10, 12}
         holdout_seeds = {
+            300: set(range(33, 43)),
             500: set(range(43, 48)),
             700: set(range(33, 43)),
+            1000: set(range(33, 43)),
         }
         expected = {
             root / f"requesting-{requesting}-accepting-1000" / f"seed-{seed}.jsonl"
