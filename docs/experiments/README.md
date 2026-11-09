@@ -48,7 +48,7 @@
 
 | 状態 | 開始日 | 実験 | 記録 |
 | --- | --- | --- | --- |
-| planned | 2026-11-09 | Eval.7・300/1000の3方式600秒holdout | [記録](2026-11-09-eval7-300-three-method-600s-holdout.md) |
+| completed | 2026-11-09 | Eval.7・300/1000の3方式600秒holdout | [記録](2026-11-09-eval7-300-three-method-600s-holdout.md) |
 | planned | 2026-11-09 | Eval.7・1000/1000の3方式600秒holdout | [記録](2026-11-09-eval7-1000-three-method-600s-holdout.md) |
 | planned | 2026-11-09 | Eval.7・500/1000の3方式600秒holdout | [記録](2026-11-09-eval7-500-three-method-600s-holdout.md) |
 | completed | 2026-11-08 | Eval.7・700/1000 UTF追加対照 | [記録](2026-11-08-eval7-utf-700-supplementary-baseline.md) |
