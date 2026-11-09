@@ -202,6 +202,28 @@ class FixedVehicleInputTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not document"):
             build_tasks(["eval7"], seeds=[5])
 
+    def test_default_flow_holdout_seeds_use_flow_sweep_inputs(self):
+        for seed in range(33, 43):
+            with self.subTest(seed=seed):
+                details = fixed_input_details(
+                    "eval7", seed, 600, "fixed", flows=(1000, 1000)
+                )
+                self.assertEqual(
+                    details["relative_path"],
+                    "fixed_inputs/thesis/eval7-flow-sweep/"
+                    f"requesting-1000-accepting-1000/seed-{seed}.jsonl",
+                )
+                self.assertEqual(details["prefix_duration_s"], 600.0)
+
+    def test_default_eval7_seeds_keep_legacy_inputs(self):
+        details = fixed_input_details(
+            "eval7", 1, 600, "fixed", flows=(1000, 1000)
+        )
+        self.assertEqual(
+            details["relative_path"],
+            "fixed_inputs/thesis/eval7/seed-1.jsonl",
+        )
+
     def test_eval7_flow_sweep_records_preserve_requested_flows(self):
         for requesting in (300, 500, 700, 1000):
             with self.subTest(requesting=requesting):

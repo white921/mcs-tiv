@@ -244,7 +244,13 @@ def fixed_input_details(
     if (pattern is None and relative_path_override is None) or bus_allocation != "fixed":
         return None
     selected_flows = tuple(str(flow) for flow in (flows or CASES[name]["flows"]))
-    if name == "eval7" and selected_flows != tuple(CASES[name]["flows"]):
+    flow_sweep_seeds = CASES[name].get(
+        "flow_sweep_holdout_seeds", {}
+    ).get(selected_flows, ()) if name == "eval7" else ()
+    if name == "eval7" and (
+        selected_flows != tuple(CASES[name]["flows"])
+        or seed in flow_sweep_seeds
+    ):
         requesting, accepting = selected_flows
         pattern = (
             "fixed_inputs/thesis/eval7-flow-sweep/"
