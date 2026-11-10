@@ -35,7 +35,7 @@ CASES = {
 
 DURATION_S = 600.0
 BUS_SHARE = 0.25
-EVAL7_SWEEP_REQUESTING_FLOWS = (300, 500, 700, 1000)
+EVAL7_SWEEP_REQUESTING_FLOWS = (300, 500, 700, 1000, 1200)
 
 
 def build_vehicle_type_schedules(counts, rng):

@@ -192,6 +192,10 @@ class FixedVehicleInputTests(unittest.TestCase):
             [("eval7", 33), ("eval7", 42)],
         )
         self.assertEqual(
+            build_tasks(["eval7"], seeds=[33, 42], eval7_flows=(1200, 1000)),
+            [("eval7", 33), ("eval7", 42)],
+        )
+        self.assertEqual(
             build_tasks(["eval7"], seeds=[43, 44, 45, 46, 47], eval7_flows=(500, 1000)),
             [("eval7", seed) for seed in range(43, 48)],
         )
@@ -225,7 +229,7 @@ class FixedVehicleInputTests(unittest.TestCase):
         )
 
     def test_eval7_flow_sweep_records_preserve_requested_flows(self):
-        for requesting in (300, 500, 700, 1000):
+        for requesting in (300, 500, 700, 1000, 1200):
             with self.subTest(requesting=requesting):
                 records = generate_eval7_flow_sweep_records(6, requesting, 1000)
                 self.assertEqual(
@@ -249,11 +253,16 @@ class FixedVehicleInputTests(unittest.TestCase):
             500: set(range(43, 48)),
             700: set(range(33, 43)),
             1000: set(range(33, 43)),
+            1200: set(range(33, 43)),
         }
+        requesting_flows = (300, 500, 700, 1000, 1200)
         expected = {
             root / f"requesting-{requesting}-accepting-1000" / f"seed-{seed}.jsonl"
-            for requesting in (300, 500, 700, 1000)
-            for seed in development_seeds | holdout_seeds.get(requesting, set())
+            for requesting in requesting_flows
+            for seed in (
+                holdout_seeds.get(requesting, set())
+                | (development_seeds if requesting < 1200 else set())
+            )
         }
         paths = set(root.glob("*/*.jsonl"))
         self.assertEqual(paths, expected)
@@ -278,7 +287,7 @@ class FixedVehicleInputTests(unittest.TestCase):
     def test_eval7_flow_sweep_keeps_mainline_fixed_and_merging_sets_nested(self):
         conditions = {
             requesting: generate_eval7_flow_sweep_records(6, requesting, 1000)
-            for requesting in (300, 500, 700, 1000)
+            for requesting in (300, 500, 700, 1000, 1200)
         }
         accepting_streams = []
         requesting_times = []
@@ -315,7 +324,13 @@ class FixedVehicleInputTests(unittest.TestCase):
             ))
 
     def test_eval7_flow_sweep_balances_the_300_second_prefix(self):
-        expected_requesting = {300: 25, 500: 42, 700: 58, 1000: 83}
+        expected_requesting = {
+            300: 25,
+            500: 42,
+            700: 58,
+            1000: 83,
+            1200: 100,
+        }
         for seed in HOLDOUT_SEEDS:
             for requesting, expected_count in expected_requesting.items():
                 with self.subTest(seed=seed, requesting=requesting):
@@ -348,6 +363,15 @@ class FixedVehicleInputTests(unittest.TestCase):
             details["relative_path"],
             "fixed_inputs/thesis/eval7-flow-sweep/"
             "requesting-500-accepting-1000/seed-6.jsonl",
+        )
+
+        details = fixed_input_details(
+            "eval7", 33, 600, "fixed", flows=(1200, 1000)
+        )
+        self.assertEqual(
+            details["relative_path"],
+            "fixed_inputs/thesis/eval7-flow-sweep/"
+            "requesting-1200-accepting-1000/seed-33.jsonl",
         )
 
 
