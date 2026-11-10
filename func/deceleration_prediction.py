@@ -51,6 +51,18 @@ def _loss_lambda_from_environment():
 LOSS_LAMBDA = _loss_lambda_from_environment()
 
 
+def _loss_normalization_from_environment():
+    value = os.environ.get("MCS_DECELERATION_LOSS_NORMALIZATION", "sum")
+    if value not in ("sum", "sqrt-followers", "mean-followers"):
+        raise ValueError(
+            "MCS_DECELERATION_LOSS_NORMALIZATION must be sum, "
+            "sqrt-followers, or mean-followers")
+    return value
+
+
+LOSS_NORMALIZATION = _loss_normalization_from_environment()
+
+
 def _rejection_wait_cap_from_environment():
     value = float(os.environ.get("MCS_REJECTION_WAIT_CAP_S", "0"))
     if not math.isfinite(value) or value < 0:
@@ -433,6 +445,7 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_point,
         receiver_arrival_s=arrival_delay(
             receiver_planned, conflict_point, now),
         loss_lambda=LOSS_LAMBDA,
+        loss_normalization=LOSS_NORMALIZATION,
         rejection_wait_s=rejection_wait_s,
         time_half_life_s=TIME_HALF_LIFE_S,
         loss_mode=LOSS_MODE)
@@ -557,6 +570,13 @@ def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode
                     "loss_margin_s": result["loss_margin_s"],
                     "effective_loss_margin_s": result["effective_loss_margin_s"],
                     "negative_loss_credit_s": result["negative_loss_credit_s"],
+                    "loss_normalization": result["loss_normalization"],
+                    "loss_normalization_vehicle_count": result[
+                        "loss_normalization_vehicle_count"],
+                    "loss_normalization_divisor": result[
+                        "loss_normalization_divisor"],
+                    "normalized_effective_loss_margin_s": result[
+                        "normalized_effective_loss_margin_s"],
                     "weighted_loss_margin_s": result["weighted_loss_margin_s"],
                     "rejection_wait_s": result["rejection_wait_s"],
                     "rejection_wait_credit_s": result["rejection_wait_credit_s"],
@@ -616,6 +636,7 @@ def _write_audit():
             json.dump(evaluation_metrics.json_safe({
                 "mode": MODE,
                 "loss_lambda": LOSS_LAMBDA,
+                "loss_normalization": LOSS_NORMALIZATION,
                 "rejection_wait_cap_s": REJECTION_WAIT_CAP_S,
                 "rejection_wait_reset_gap_s": REJECTION_WAIT_RESET_GAP_S,
                 "counts": dict(COUNTS),

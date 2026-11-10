@@ -114,23 +114,29 @@ def time_equivalent_decision(
     request_arrival_s: float,
     receiver_arrival_s: float,
     loss_lambda: float = 1.0,
+    loss_normalization: str = "sum",
     rejection_wait_s: float = 0.0,
     time_half_life_s: float | None = None,
     loss_mode: str = "integrated",
 ) -> dict:
     """Compare Accept and Reject on one time-equivalent scale.
 
-    ``M = (t_request - t_receiver) + lambda *
-    max(loss_accept_seconds - loss_reject_seconds, 0) - rejection_wait``.
+    ``M = (t_request - t_receiver) + lambda * normalized_harm - wait``.
     ``M <= 0`` accepts.  The observed wait term only applies when both actors
     can reach the conflict point.  The signed predicted loss margin is still
     returned for diagnostics, but an uncertain predicted follower benefit
     cannot overturn an arrival-time preference for Reject.
     Distance losses are converted with each vehicle's positive finite allowed
-    speed, never its instantaneous speed.
+    speed, never its instantaneous speed. ``sum`` preserves the original
+    aggregate. ``sqrt-followers`` and ``mean-followers`` divide positive harm
+    by the square root of, or the full number of, affected followers so dense
+    queues do not increase the decision scale linearly.
     """
     if not math.isfinite(loss_lambda) or loss_lambda < 0:
         raise ValueError("loss lambda must be finite and non-negative")
+    if loss_normalization not in ("sum", "sqrt-followers", "mean-followers"):
+        raise ValueError(
+            "loss normalization must be sum, sqrt-followers, or mean-followers")
     rejection_wait_s = float(rejection_wait_s)
     if not math.isfinite(rejection_wait_s) or rejection_wait_s < 0:
         raise ValueError("rejection wait must be finite and non-negative")
@@ -173,7 +179,16 @@ def time_equivalent_decision(
     receiver_arrival_s = float(receiver_arrival_s)
     loss_margin_s = accept_loss_s - reject_loss_s
     effective_loss_margin_s = max(loss_margin_s, 0.0)
-    weighted_loss_margin_s = loss_lambda * effective_loss_margin_s
+    follower_count = len(vehicle_ids)
+    if loss_normalization == "sqrt-followers" and follower_count:
+        loss_normalization_divisor = math.sqrt(follower_count)
+    elif loss_normalization == "mean-followers" and follower_count:
+        loss_normalization_divisor = float(follower_count)
+    else:
+        loss_normalization_divisor = 1.0
+    normalized_effective_loss_margin_s = (
+        effective_loss_margin_s / loss_normalization_divisor)
+    weighted_loss_margin_s = loss_lambda * normalized_effective_loss_margin_s
     rejection_wait_credit_s = 0.0
     request_reached = math.isfinite(request_arrival_s)
     receiver_reached = math.isfinite(receiver_arrival_s)
@@ -222,6 +237,11 @@ def time_equivalent_decision(
         "effective_loss_margin_s": effective_loss_margin_s,
         "negative_loss_credit_s": min(loss_margin_s, 0.0),
         "loss_lambda": loss_lambda,
+        "loss_normalization": loss_normalization,
+        "loss_normalization_vehicle_count": follower_count,
+        "loss_normalization_divisor": loss_normalization_divisor,
+        "normalized_effective_loss_margin_s": (
+            normalized_effective_loss_margin_s),
         "loss_mode": loss_mode,
         "weighted_loss_margin_s": weighted_loss_margin_s,
         "rejection_wait_s": rejection_wait_s,

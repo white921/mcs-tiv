@@ -20,6 +20,7 @@ class ResultLayoutTests(unittest.TestCase):
             "deceleration_active": True,
             "deceleration_time_half_life": 0.0,
             "deceleration_loss_lambda": 1.0,
+            "deceleration_loss_normalization": "sum",
             "rejection_wait_cap": 0.0,
             "agreement_lease_seconds": 0.0,
             "merge_negotiation_lead_seconds": 0.0,
@@ -82,6 +83,7 @@ class ResultLayoutTests(unittest.TestCase):
             "MCS_DECELERATION_MODE": "active",
             "MCS_DECELERATION_TIME_HALF_LIFE_S": "99",
             "MCS_DECELERATION_LOSS_LAMBDA": "99",
+            "MCS_DECELERATION_LOSS_NORMALIZATION": "mean-followers",
             "MCS_REJECTION_WAIT_CAP_S": "99",
             "MCS_AGREEMENT_LEASE_S": "99",
             "MCS_MERGE_NEGOTIATION_LEAD_S": "99",
@@ -105,6 +107,7 @@ class ResultLayoutTests(unittest.TestCase):
             self.args(deceleration_loss_lambda=1.25))
 
         self.assertEqual(manifest["loss_lambda"], 1.25)
+        self.assertEqual(manifest["loss_normalization"], "sum")
         self.assertEqual(manifest["loss_mode"], "integrated")
         self.assertIn("accept iff M<=0", manifest["decision_formula"])
         self.assertEqual(
@@ -113,6 +116,17 @@ class ResultLayoutTests(unittest.TestCase):
         self.assertEqual(
             manifest["excluded_loss_roles"],
             ["request_vehicle", "receiver_vehicle"])
+
+    def test_manifest_records_loss_normalization(self):
+        for normalization, fragment in (
+            ("sqrt-followers", "sqrt(follower_count)"),
+            ("mean-followers", "/follower_count"),
+        ):
+            with self.subTest(normalization=normalization):
+                manifest = RUNNER.deceleration_prediction_manifest(
+                    self.args(deceleration_loss_normalization=normalization))
+                self.assertEqual(manifest["loss_normalization"], normalization)
+                self.assertIn(fragment, manifest["loss_aggregation"])
 
     def test_manifest_records_repeated_rejection_wait_formula(self):
         manifest = RUNNER.deceleration_prediction_manifest(

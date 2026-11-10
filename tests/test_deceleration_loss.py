@@ -173,6 +173,45 @@ class DecelerationLossTests(unittest.TestCase):
             bus["accept_time_equivalent_loss_s"],
             car["accept_time_equivalent_loss_s"] * 2)
 
+    def test_follower_count_normalization_scales_only_positive_harm(self):
+        def profile(vehicle_id, speed):
+            return loss.SpeedProfile(
+                vehicle_id, (0.0, 0.1, 0.2), (speed, speed, speed))
+
+        reference = {vehicle_id: profile(vehicle_id, 10)
+                     for vehicle_id in ("a", "b", "c", "d")}
+        accept = {vehicle_id: profile(vehicle_id, 5)
+                  for vehicle_id in reference}
+        allowed = {vehicle_id: 10 for vehicle_id in reference}
+        summed = loss.time_equivalent_decision(
+            reference, accept, reference, allowed,
+            request_arrival_s=0, receiver_arrival_s=0)
+        square_root = loss.time_equivalent_decision(
+            reference, accept, reference, allowed,
+            request_arrival_s=0, receiver_arrival_s=0,
+            loss_normalization="sqrt-followers")
+        mean = loss.time_equivalent_decision(
+            reference, accept, reference, allowed,
+            request_arrival_s=0, receiver_arrival_s=0,
+            loss_normalization="mean-followers")
+
+        self.assertAlmostEqual(
+            square_root["normalized_effective_loss_margin_s"],
+            summed["effective_loss_margin_s"] / 2)
+        self.assertAlmostEqual(
+            mean["normalized_effective_loss_margin_s"],
+            summed["effective_loss_margin_s"] / 4)
+        self.assertEqual(square_root["loss_normalization_vehicle_count"], 4)
+        self.assertEqual(mean["loss_normalization_divisor"], 4)
+
+    def test_unknown_loss_normalization_is_rejected(self):
+        reference = {"v": self.profile((10, 10, 10))}
+        with self.assertRaisesRegex(ValueError, "loss normalization"):
+            loss.time_equivalent_decision(
+                reference, reference, reference, {"v": 10},
+                request_arrival_s=1, receiver_arrival_s=2,
+                loss_normalization="unknown")
+
     def test_shadow_does_not_mutate_live_paths_or_decision_state(self):
         def path(veh, kind, speeds):
             return NS(vehID=veh, type=kind, pathID=veh + "_path",
