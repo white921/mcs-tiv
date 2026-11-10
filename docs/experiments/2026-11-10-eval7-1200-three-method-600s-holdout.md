@@ -1,13 +1,16 @@
 # Eval.7・1200/1000の3方式600秒stress test
 
 - 台帳ID: `2026-11-10-eval7-1200-three-method-600s-holdout`
-- 状態: `planned`
+- 状態: `running`
 - 位置づけ: `confirmatory stress test`
 - 計画日: 2026-11-10
 - 予定実験ディレクトリ:
   - `results/runs/eval7-1200-1000-integrated-lambda2-seeds33-42-600s-20261110T1200/`
   - `results/runs/eval7-1200-1000-utf-seeds33-42-600s-20261110T1200/`
   - `results/runs/eval7-1200-1000-yamashita-seeds33-42-600s-20261110T1200/`
+- 正式実行開始: 2026-11-10 12:01:52 JST
+- systemd user unit: `mcs-eval7-1200-shared15.service`
+- heartbeat: `eval-7-1200-1000-15`（30分間隔）
 
 ## 目的
 
@@ -60,7 +63,7 @@ Bus 92台で、前半300秒は合流側100台、本線側83台、Bus 46台であ
 
 ## 完了条件
 
-- [ ] 10秒smokeを正式結果と分離し、最大15、補充、起動順、方式別manifest完了を確認
+- [x] 10秒smokeを正式結果と分離し、最大15、補充、起動順、方式別manifest完了を確認
 - [ ] 3方式のexperiment manifestが`completed`
 - [ ] 30 runが存在し、全runが`exit_code: 0`かつ`source_unchanged: true`
 - [ ] source commit、開始時clean、固定入力hash、環境、方式パラメータが一致
@@ -71,8 +74,17 @@ Bus 92台で、前半300秒は合流側100台、本線側83台、Bus 46台であ
 
 ## 結果
 
-未実行。
+2026-11-10 12:01:52 JSTに正式30 runを開始した。初期投入は指定どおり
+integrated seed 33–42の10本、続いてUTF seed 33–37の5本で、共有queue記録上の
+同時SUMO数は15である。以後はsystemd user unitと30分heartbeatで監視する。
 
 ## 失敗・隔離履歴と制約
 
-正式実行前。smokeおよび正式実行の異常は発生時に追記し、不完全結果はpushしない。
+最初のpreflightでは`--sumo-home /usr/share/sumo`を指定したためSUMO 1.18.0を検出し、
+正式出力を作らず停止した。次のsmokeではPython仮想環境のrootを`SUMO_HOME`に指定し、
+15 runすべてが`ModuleNotFoundError: traci`で終了した。この失敗smokeは
+`mcs-tiv-eval7-1200-smoke-quarantine/20261110T1156-wrong-sumo-home/`へ隔離し、正式結果には
+混ぜていない。正しいSUMO 1.28.0のPython package rootへ修正した10秒smokeは30/30が
+`exit_code: 0`、`source_unchanged: true`、方式別manifest `completed`となった。起動順は
+integrated 10本→UTF 10本→山下10本、初期投入はintegrated 10本＋UTF 5本、最大同時数15、
+補充15回、最大補充遅延0.009198秒で、slot超過はなかった。正式実行では条件を変更していない。
