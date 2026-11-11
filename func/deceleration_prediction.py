@@ -63,6 +63,20 @@ def _loss_normalization_from_environment():
 LOSS_NORMALIZATION = _loss_normalization_from_environment()
 
 
+def _negative_loss_credit_weight_from_environment():
+    value = float(os.environ.get(
+        "MCS_DECELERATION_NEGATIVE_LOSS_CREDIT_WEIGHT", "0"))
+    if not math.isfinite(value) or not 0 <= value <= 1:
+        raise ValueError(
+            "MCS_DECELERATION_NEGATIVE_LOSS_CREDIT_WEIGHT must be finite "
+            "and between 0 and 1")
+    return value
+
+
+NEGATIVE_LOSS_CREDIT_WEIGHT = (
+    _negative_loss_credit_weight_from_environment())
+
+
 def _rejection_wait_cap_from_environment():
     value = float(os.environ.get("MCS_REJECTION_WAIT_CAP_S", "0"))
     if not math.isfinite(value) or value < 0:
@@ -446,6 +460,7 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_point,
             receiver_planned, conflict_point, now),
         loss_lambda=LOSS_LAMBDA,
         loss_normalization=LOSS_NORMALIZATION,
+        negative_loss_credit_weight=NEGATIVE_LOSS_CREDIT_WEIGHT,
         rejection_wait_s=rejection_wait_s,
         time_half_life_s=TIME_HALF_LIFE_S,
         loss_mode=LOSS_MODE)
@@ -570,6 +585,10 @@ def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode
                     "loss_margin_s": result["loss_margin_s"],
                     "effective_loss_margin_s": result["effective_loss_margin_s"],
                     "negative_loss_credit_s": result["negative_loss_credit_s"],
+                    "negative_loss_credit_weight": result[
+                        "negative_loss_credit_weight"],
+                    "credited_loss_margin_s": result[
+                        "credited_loss_margin_s"],
                     "loss_normalization": result["loss_normalization"],
                     "loss_normalization_vehicle_count": result[
                         "loss_normalization_vehicle_count"],
@@ -577,6 +596,8 @@ def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode
                         "loss_normalization_divisor"],
                     "normalized_effective_loss_margin_s": result[
                         "normalized_effective_loss_margin_s"],
+                    "normalized_credited_loss_margin_s": result[
+                        "normalized_credited_loss_margin_s"],
                     "weighted_loss_margin_s": result["weighted_loss_margin_s"],
                     "rejection_wait_s": result["rejection_wait_s"],
                     "rejection_wait_credit_s": result["rejection_wait_credit_s"],
@@ -637,6 +658,8 @@ def _write_audit():
                 "mode": MODE,
                 "loss_lambda": LOSS_LAMBDA,
                 "loss_normalization": LOSS_NORMALIZATION,
+                "negative_loss_credit_weight": (
+                    NEGATIVE_LOSS_CREDIT_WEIGHT),
                 "rejection_wait_cap_s": REJECTION_WAIT_CAP_S,
                 "rejection_wait_reset_gap_s": REJECTION_WAIT_RESET_GAP_S,
                 "counts": dict(COUNTS),

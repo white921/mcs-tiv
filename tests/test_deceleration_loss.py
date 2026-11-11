@@ -103,6 +103,44 @@ class DecelerationLossTests(unittest.TestCase):
         self.assertAlmostEqual(result["final_margin_s"], .25)
         self.assertEqual(result["decision"], "reject")
 
+    def test_negative_follower_benefit_can_be_half_credited_then_normalized(self):
+        def profile(vehicle_id, speed):
+            return loss.SpeedProfile(
+                vehicle_id, (0.0, 0.1, 0.2), (speed, speed, speed))
+
+        reference = {vehicle_id: profile(vehicle_id, 10)
+                     for vehicle_id in ("a", "b", "c", "d")}
+        accept = dict(reference)
+        reject = {vehicle_id: profile(vehicle_id, 5)
+                  for vehicle_id in reference}
+        allowed = {vehicle_id: 10 for vehicle_id in reference}
+
+        result = loss.time_equivalent_decision(
+            reference, accept, reject, allowed,
+            request_arrival_s=.15, receiver_arrival_s=0,
+            loss_lambda=2,
+            loss_normalization="sqrt-followers",
+            negative_loss_credit_weight=.5)
+
+        self.assertAlmostEqual(result["loss_margin_s"], -.4)
+        self.assertAlmostEqual(result["credited_loss_margin_s"], -.2)
+        self.assertAlmostEqual(
+            result["normalized_effective_loss_margin_s"], 0)
+        self.assertAlmostEqual(
+            result["normalized_credited_loss_margin_s"], -.1)
+        self.assertAlmostEqual(result["weighted_loss_margin_s"], -.2)
+        self.assertAlmostEqual(result["final_margin_s"], -.05)
+        self.assertEqual(result["decision"], "accept")
+
+    def test_negative_loss_credit_weight_is_bounded(self):
+        reference = {"v": self.profile((10, 10, 10))}
+        for value in (-.1, 1.1, math.nan):
+            with self.assertRaisesRegex(ValueError, "negative loss credit"):
+                loss.time_equivalent_decision(
+                    reference, reference, reference, {"v": 10},
+                    request_arrival_s=1, receiver_arrival_s=2,
+                    negative_loss_credit_weight=value)
+
     def test_observed_rejection_wait_can_reverse_a_repeated_reject(self):
         reference = {"v": self.profile((10, 10, 10))}
         neutral = {"v": self.profile((10, 10, 10))}

@@ -21,6 +21,7 @@ class ResultLayoutTests(unittest.TestCase):
             "deceleration_time_half_life": 0.0,
             "deceleration_loss_lambda": 1.0,
             "deceleration_loss_normalization": "sum",
+            "deceleration_negative_loss_credit_weight": 0.0,
             "rejection_wait_cap": 0.0,
             "agreement_lease_seconds": 0.0,
             "merge_negotiation_lead_seconds": 0.0,
@@ -68,6 +69,12 @@ class ResultLayoutTests(unittest.TestCase):
             self.args(deceleration_loss_mode="terminal-held"))
         self.assertIn("proposal-terminal-held", path.name)
 
+    def test_negative_loss_credit_is_named(self):
+        path = RUNNER.default_run_directory(self.args(
+            deceleration_loss_normalization="sqrt-followers",
+            deceleration_negative_loss_credit_weight=.5))
+        self.assertIn("sqrt-followers-negative-credit-0p5", path.name)
+
     def test_write_json_has_stable_trailing_newline(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "manifest.json"
@@ -84,6 +91,7 @@ class ResultLayoutTests(unittest.TestCase):
             "MCS_DECELERATION_TIME_HALF_LIFE_S": "99",
             "MCS_DECELERATION_LOSS_LAMBDA": "99",
             "MCS_DECELERATION_LOSS_NORMALIZATION": "mean-followers",
+            "MCS_DECELERATION_NEGATIVE_LOSS_CREDIT_WEIGHT": "1",
             "MCS_REJECTION_WAIT_CAP_S": "99",
             "MCS_AGREEMENT_LEASE_S": "99",
             "MCS_MERGE_NEGOTIATION_LEAD_S": "99",
@@ -108,6 +116,7 @@ class ResultLayoutTests(unittest.TestCase):
 
         self.assertEqual(manifest["loss_lambda"], 1.25)
         self.assertEqual(manifest["loss_normalization"], "sum")
+        self.assertEqual(manifest["negative_loss_credit_weight"], 0.0)
         self.assertEqual(manifest["loss_mode"], "integrated")
         self.assertIn("accept iff M<=0", manifest["decision_formula"])
         self.assertEqual(
@@ -127,6 +136,15 @@ class ResultLayoutTests(unittest.TestCase):
                     self.args(deceleration_loss_normalization=normalization))
                 self.assertEqual(manifest["loss_normalization"], normalization)
                 self.assertIn(fragment, manifest["loss_aggregation"])
+
+    def test_manifest_records_half_negative_loss_credit_formula(self):
+        manifest = RUNNER.deceleration_prediction_manifest(self.args(
+            deceleration_loss_normalization="sqrt-followers",
+            deceleration_negative_loss_credit_weight=.5))
+
+        self.assertEqual(manifest["negative_loss_credit_weight"], .5)
+        self.assertIn("min(loss_margin,0)", manifest["decision_formula"])
+        self.assertIn("sqrt(follower_count)", manifest["loss_aggregation"])
 
     def test_manifest_records_repeated_rejection_wait_formula(self):
         manifest = RUNNER.deceleration_prediction_manifest(

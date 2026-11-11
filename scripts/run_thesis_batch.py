@@ -49,6 +49,7 @@ CONTROLLED_MCS_ENV = {
     "MCS_DECELERATION_MODE",
     "MCS_DECELERATION_LOSS_LAMBDA",
     "MCS_DECELERATION_LOSS_NORMALIZATION",
+    "MCS_DECELERATION_NEGATIVE_LOSS_CREDIT_WEIGHT",
     "MCS_DECELERATION_LOSS_MODE",
     "MCS_DECELERATION_TIME_HALF_LIFE_S",
     "MCS_AGREEMENT_LEASE_S",
@@ -185,6 +186,10 @@ def default_run_directory(args, now=None):
         normalization = getattr(args, "deceleration_loss_normalization", "sum")
         if args.deceleration_active and normalization != "sum":
             method += f"-{normalization}"
+        negative_credit = getattr(
+            args, "deceleration_negative_loss_credit_weight", 0.0)
+        if args.deceleration_active and negative_credit > 0:
+            method += f"-negative-credit-{duration_label(negative_credit)}"
         cases = "-".join(args.cases)
         if args.seeds is not None:
             seeds = "seeds-" + "-".join(str(seed) for seed in args.seeds)
@@ -215,12 +220,16 @@ def deceleration_prediction_manifest(args):
     if not args.deceleration_active:
         return None
     wait_cap = getattr(args, "rejection_wait_cap", 0.0)
+    negative_credit = getattr(
+        args, "deceleration_negative_loss_credit_weight", 0.0)
     formula = (
-        "M=(t_request-t_receiver)+lambda*normalized_positive_loss_margin; "
+        "M=(t_request-t_receiver)+lambda*normalized("
+        "max(loss_margin,0)+negative_credit_weight*min(loss_margin,0)); "
         "accept iff M<=0")
     if wait_cap > 0:
         formula = (
-            "M=(t_request-t_receiver)+lambda*normalized_positive_loss_margin-"
+            "M=(t_request-t_receiver)+lambda*normalized("
+            "max(loss_margin,0)+negative_credit_weight*min(loss_margin,0))-"
             "min(consecutive_pair_rejection_wait,wait_cap); accept iff M<=0")
     return {
         "horizon_s": 10.0,
@@ -231,10 +240,13 @@ def deceleration_prediction_manifest(args):
         "decision_formula": formula,
         "loss_lambda": args.deceleration_loss_lambda,
         "loss_normalization": args.deceleration_loss_normalization,
+        "negative_loss_credit_weight": negative_credit,
         "loss_aggregation": {
-            "sum": "sum(positive follower harm)",
-            "sqrt-followers": "sum(positive follower harm)/sqrt(follower_count)",
-            "mean-followers": "sum(positive follower harm)/follower_count",
+            "sum": "credited signed follower margin",
+            "sqrt-followers": (
+                "credited signed follower margin/sqrt(follower_count)"),
+            "mean-followers": (
+                "credited signed follower margin/follower_count"),
         }[args.deceleration_loss_normalization],
         "rejection_wait_cap_s": wait_cap,
         "rejection_wait_reset_gap_s": 2.0 if wait_cap > 0 else None,
@@ -389,6 +401,9 @@ def run_task(task, args):
                MCS_DECELERATION_LOSS_NORMALIZATION=(
                    args.deceleration_loss_normalization
                    if args.deceleration_active else "sum"),
+               MCS_DECELERATION_NEGATIVE_LOSS_CREDIT_WEIGHT=str(
+                   args.deceleration_negative_loss_credit_weight
+                   if args.deceleration_active else 0.0),
                MCS_REJECTION_WAIT_CAP_S=str(
                    args.rejection_wait_cap if args.deceleration_active else 0.0),
                MCS_AGREEMENT_LEASE_S=str(args.agreement_lease_seconds),
@@ -625,8 +640,12 @@ def main():
     parser.add_argument(
         "--deceleration-loss-normalization",
         choices=("sum", "sqrt-followers", "mean-followers"), default="sum",
-        help=("aggregate positive follower harm as a raw sum (default), "
+        help=("aggregate the credited follower margin as a raw sum (default), "
               "divide by sqrt(follower count), or take the per-follower mean"))
+    parser.add_argument(
+        "--deceleration-negative-loss-credit-weight", type=float, default=0.0,
+        help=("credit this fraction of negative Accept-minus-Reject follower "
+              "loss; 0 preserves positive-harm-only and 1 is fully signed"))
     parser.add_argument(
         "--rejection-wait-cap", type=float, default=0.0,
         help="maximum observed repeated-rejection wait credit in seconds; 0 disables it")
@@ -672,6 +691,11 @@ def main():
     if (not math.isfinite(args.deceleration_loss_lambda) or
             args.deceleration_loss_lambda < 0):
         parser.error("--deceleration-loss-lambda must be finite and non-negative")
+    if (not math.isfinite(args.deceleration_negative_loss_credit_weight) or
+            not 0 <= args.deceleration_negative_loss_credit_weight <= 1):
+        parser.error(
+            "--deceleration-negative-loss-credit-weight must be finite and "
+            "between 0 and 1")
     if (not math.isfinite(args.rejection_wait_cap) or
             args.rejection_wait_cap < 0):
         parser.error("--rejection-wait-cap must be finite and non-negative")
@@ -704,6 +728,11 @@ def main():
             not args.deceleration_active):
         parser.error(
             "--deceleration-loss-normalization requires --deceleration-active")
+    if (args.deceleration_negative_loss_credit_weight > 0 and
+            not args.deceleration_active):
+        parser.error(
+            "--deceleration-negative-loss-credit-weight requires "
+            "--deceleration-active")
     if args.deceleration_active and args.decision_method not in (
             "documented", "tivtep"):
         parser.error(
@@ -788,6 +817,9 @@ def main():
             args.deceleration_loss_lambda if args.deceleration_active else None),
         "deceleration_loss_normalization": (
             args.deceleration_loss_normalization
+            if args.deceleration_active else None),
+        "deceleration_negative_loss_credit_weight": (
+            args.deceleration_negative_loss_credit_weight
             if args.deceleration_active else None),
         "rejection_wait_cap_s": (
             args.rejection_wait_cap if args.deceleration_active else None),
