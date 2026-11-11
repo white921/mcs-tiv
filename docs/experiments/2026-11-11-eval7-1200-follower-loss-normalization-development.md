@@ -12,7 +12,7 @@
 合流側速度と流出台数を悪化させた。監査では、後続車損失が追従車数にほぼ比例して
 増えるため、混雑時に到着時間差を圧倒してRejectへ偏ることを確認した。
 
-このdevelopmentでは、正の後続車害をそのまま合計する現行方式に対し、次の2案を
+このdevelopmentでは、正の後続車害をそのまま合計する現行方式に対し、まず次の2案を
 順番に評価する。
 
 1. `sqrt-followers`: 正の後続車害の合計を追従車数の平方根で除す。
@@ -20,6 +20,16 @@
 
 平方根正規化は車群全体への影響を残しつつ密度依存を弱める案、平均化は密度依存を
 除く強いアブレーションである。結果を見て係数や条件を変更しない。
+
+その後、既存方式が負の損失差（Acceptの方がRejectより後続車に良いという予測）を
+一切判定へ反映しない非対称性を議論した。これは上記2案の実行開始後に選んだ追加の
+development案であり、事前規定した独立検証ではない。第3案として次を評価する。
+
+3. `sqrt-followers + half-signed`: 損失差を`m=L_accept-L_reject`として、
+   `arrival + lambda * [max(m,0) + 0.5*min(m,0)] / sqrt(n)`を用いる。
+
+負の予測を全面的には信用せず半分だけ加点し、平方根正規化によって追従車数への線形な
+依存も抑える。到着不能時のhard gate、lambda=2、予測時間、固定入力は変更しない。
 
 ## 固定条件
 
@@ -31,9 +41,10 @@
 - Python: 3.15.1
 - SUMO: 1.28.0
 - integrated loss、lambda=2、half-life=0
-- 方式ごとに10 runを同時実行し、2方式は順番に実行する
+- 方式ごとに10 runを同時実行し、3方式は順番に実行する
 - マシン全体の同時run上限: 15（本バッチは最大10）
 - UTF・Yamashitaは再実行せず、既存の正常終了結果を比較対象にする
+- 第3案は先行2方式の完了後に開始し、同時実行しない
 
 ## 実行ソース
 
@@ -46,6 +57,19 @@
   `source_unchanged: true`、source SHA一致、衝突0を確認
 - smoke監査: `sqrt-followers`は除数`√n`、`mean-followers`は除数`n`を記録し、
   正規化前後の損失と最終判断余裕がmanifest・監査JSONへ保存された
+
+### sqrt-followers + half-signed追加ソース
+
+- source commit: `c1d6066c1959417d9fe95f04582026c484443127`
+- source branch: `codex/eval7-1200-sqrt-half-signed-development`
+- 変更内容: 負の損失差の採用率を0–1で指定するCLI・環境変数・監査項目を追加
+- 互換性: 既定値`0`は従来の`max(m,0)`を変更しない
+- 実行設定: `--deceleration-loss-normalization sqrt-followers`、
+  `--deceleration-negative-loss-credit-weight 0.5`
+- 事前検証: ローカルfocused test 44件、sgnlabのPython 3.15.1による全159 testが成功
+- smoke: seed 33・20秒を正式結果とは別ディレクトリで実行し、`exit_code: 0`、
+  `source_unchanged: true`、source SHA一致、衝突0を確認。manifestと監査JSONに
+  `sqrt-followers`、負側係数`0.5`、新しい判定式が記録された
 
 ## 予定結果ディレクトリとbranch
 
@@ -61,11 +85,18 @@
 - result branch: `codex/eval7-1200-mean-normalization-results`
 - result commit: 未作成
 
+### sqrt-followers + half-signed
+
+- result directory: `results/runs/eval7-1200-integrated-lambda2-sqrt-followers-half-signed-seeds33-42-600s-development-20261111/`
+- result branch: `codex/eval7-1200-sqrt-half-signed-results`
+- result commit: 未作成
+
 smokeはsource worktree内の別ディレクトリへ保存し、正式結果branchへ含めない。
 
 ## 比較と採否
 
 既存1200/1000のintegrated `sum`、UTF alpha=5、Yamashita TIVtepとseed対応で比較する。
+追加案はさらに`sqrt-followers`、`mean-followers`ともseed対応で比較する。
 全車・合流側・本線側速度、停止時間、急減速時間、流出台数、承諾率、物理衝突に加え、
 前半／後半300秒と終了時残留車両・挿入待ちを確認する。平均速度だけで採否を決めず、
 合流側改善と本線側負担、処理台数、安全指標の同時改善を重視する。
