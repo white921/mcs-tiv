@@ -79,6 +79,29 @@ class GlobalSlotExecutor(concurrent.futures.ThreadPoolExecutor):
         self._reserved_runs = 0
         self._max_machine_sumo = 0
         self._violation = None
+        self._monitor_stop = threading.Event()
+        self._monitor_thread = threading.Thread(
+            target=self._monitor_machine_sumo, daemon=True)
+        self._monitor_thread.start()
+
+    def _monitor_machine_sumo(self):
+        previous = None
+        while not self._monitor_stop.wait(.25):
+            total, owned = sumo_processes(self.output)
+            with self._reservation:
+                self._max_machine_sumo = max(self._max_machine_sumo, total)
+                if total > self.machine_limit:
+                    self._violation = (
+                        f"machine-wide SUMO count {total} exceeded "
+                        f"{self.machine_limit}")
+                    self._reservation.notify_all()
+            if total != previous:
+                append_event(
+                    self.output, "machine_sumo_count",
+                    total_sumo=total, owned_sumo=owned,
+                    machine_limit=self.machine_limit,
+                )
+                previous = total
 
     def _reserve(self):
         with self._reservation:
@@ -132,6 +155,8 @@ class GlobalSlotExecutor(concurrent.futures.ThreadPoolExecutor):
 
     def shutdown(self, wait=True, *, cancel_futures=False):
         super().shutdown(wait=wait, cancel_futures=cancel_futures)
+        self._monitor_stop.set()
+        self._monitor_thread.join(timeout=2)
         append_event(
             self.output, "global_slot_executor_finished",
             max_machine_sumo_processes=self._max_machine_sumo,
