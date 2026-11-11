@@ -41,10 +41,10 @@ development案であり、事前規定した独立検証ではない。第3案�
 - Python: 3.15.1
 - SUMO: 1.28.0
 - integrated loss、lambda=2、half-life=0
-- 方式ごとに10 runを同時実行し、3方式は順番に実行する
+- 1方式につき最大10 run。方式間はマシン全体の空き枠を共有する
 - マシン全体の同時run上限: 15（本バッチは最大10）
 - UTF・Yamashitaは再実行せず、既存の正常終了結果を比較対象にする
-- 第3案は先行2方式の完了後に開始し、同時実行しない
+- 第3案は先行方式の未使用枠へ投入し、マシン全体で常に最大15 runを守る
 
 ## 実行ソース
 
@@ -60,16 +60,21 @@ development案であり、事前規定した独立検証ではない。第3案�
 
 ### sqrt-followers + half-signed追加ソース
 
-- source commit: `c1d6066c1959417d9fe95f04582026c484443127`
+- source commit: `ef191fa75664b9ec03bd68afb99f48167de7be11`
 - source branch: `codex/eval7-1200-sqrt-half-signed-development`
-- 変更内容: 負の損失差の採用率を0–1で指定するCLI・環境変数・監査項目を追加
+- 変更内容: 負の損失差の採用率を0–1で指定するCLI・環境変数・監査項目と、
+  マシン全体の空き枠へ待機seedを投入するwork-conservingラッパーを追加
 - 互換性: 既定値`0`は従来の`max(m,0)`を変更しない
 - 実行設定: `--deceleration-loss-normalization sqrt-followers`、
   `--deceleration-negative-loss-credit-weight 0.5`
-- 事前検証: ローカルfocused test 44件、sgnlabのPython 3.15.1による全159 testが成功
+- 事前検証: ローカルfocused test 47件、sgnlabのPython 3.15.1による全162 testが成功
 - smoke: seed 33・20秒を正式結果とは別ディレクトリで実行し、`exit_code: 0`、
   `source_unchanged: true`、source SHA一致、衝突0を確認。manifestと監査JSONに
   `sqrt-followers`、負側係数`0.5`、新しい判定式が記録された
+- global-slot smoke: seed 33・5秒が`exit_code: 0`、`source_unchanged: true`で完了。
+  slot予約・解放・マシン全体のSUMO数を専用JSONLへ記録し、slot超過なしを確認
+- 正式開始: 2026-11-11 13:34 JST。先行mean-followersが7本実行中だったため、
+  第3案の先頭8本を投入してマシン全体を15本に保った。以後も空き枠へ待機seedを投入する
 
 ## 予定結果ディレクトリとbranch
 
