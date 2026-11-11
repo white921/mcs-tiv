@@ -2,7 +2,7 @@
 
 ## 状態
 
-- `running`
+- `completed`
 - 開始日: 2026-11-11
 - 区分: development（既存の1200/1000結果と同じseedを使うため、独立検証ではない）
 
@@ -82,19 +82,22 @@ development案であり、事前規定した独立検証ではない。第3案�
 
 - result directory: `results/runs/eval7-1200-integrated-lambda2-sqrt-followers-seeds33-42-600s-development-20261111/`
 - result branch: `codex/eval7-1200-sqrt-normalization-results`
-- result commit: 未作成
+- result commit: `05ce55be9c7918ba632c0a4258ad4fd77a5f639e`
+- original dedicated commit / tree: `e78c9c67237489b30ae96e88ded621e86f6ae07d` / `42590dd6c192d8cddc2ba3bf38ff6e9ef407e9ee`
 
 ### mean-followers
 
 - result directory: `results/runs/eval7-1200-integrated-lambda2-mean-followers-seeds33-42-600s-development-20261111/`
 - result branch: `codex/eval7-1200-mean-normalization-results`
-- result commit: 未作成
+- result commit: `2c23c74e4f13f16cc03ff296d4d8fe6f707d8c2d`
+- original dedicated commit / tree: `d40261b03005bdfdd1d5ec1bacac9a14084ac66d` / `4fd40cd944360d9fbd8675b1ea769b1588a3b2d6`
 
 ### sqrt-followers + half-signed
 
 - result directory: `results/runs/eval7-1200-integrated-lambda2-sqrt-followers-half-signed-seeds33-42-600s-development-20261111/`
 - result branch: `codex/eval7-1200-sqrt-half-signed-results`
-- result commit: 未作成
+- result commit: `772d14988a2f9ec917d9f0728d6db1d25df2126e`
+- original dedicated commit / tree: `ed30ae040bef69adb66c4aa64c580a3d39dcfd5c` / `c58e289e3ec86c29febd7409bf37b6494e65234c`
 
 smokeはsource worktree内の別ディレクトリへ保存し、正式結果branchへ含めない。
 
@@ -110,6 +113,84 @@ smokeはsource worktree内の別ディレクトリへ保存し、正式結果bra
 独立した効果確認とは解釈しない。採用候補が得られた場合は、別seedまたは別条件での
 独立検証を必要とする。
 
-## 結果・監査・結論
+## 結果
 
-実行完了後に追記する。
+### 10 seed平均
+
+| 方式 | 全車速度 [m/s] | 合流側速度 [m/s] | 本線側速度 [m/s] | 停止時間 [s] | 急減速時間 [s] | 流出台数 | 未挿入 | 残留 | 承諾率 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 従来sum | 4.0418 | 1.4994 | **9.9349** | 7997.61 | 4.75 | 200.3 | 128.1 | 37.6 | 17.68% |
+| UTF | 4.0960 | 2.1502 | 7.6782 | 6265.70 | 9.72 | 217.7 | 106.5 | 41.8 | — |
+| 山下 | 4.3448 | 2.2464 | 8.6169 | 4971.47 | 9.24 | 221.5 | 102.5 | 42.0 | 50.26% |
+| sqrt-followers | **4.3834** | 2.0966 | 9.1021 | 5217.05 | 4.66 | 220.8 | 107.8 | **37.4** | 21.22% |
+| mean-followers | 4.3584 | **2.5658** | 7.4108 | **3935.56** | 8.58 | **232.7** | **91.4** | 41.9 | **61.31%** |
+| sqrt + half-signed | 3.9986 | 1.9161 | 8.3208 | 7654.35 | **4.16** | 200.1 | 126.2 | 39.7 | 26.24% |
+
+全方式・全seedで物理衝突は0だった。これは本条件で観測されなかったことだけを示す。
+
+### 20万回の対応percentile bootstrap
+
+主要な対応差は次の通り。区間は95% percentile intervalである。
+
+| 比較 | 全車速度差 [m/s] | 合流側速度差 [m/s] | 本線側速度差 [m/s] | 流出台数差 |
+| --- | ---: | ---: | ---: | ---: |
+| sqrt − sum | +0.3416 `[+0.0714,+0.6198]` | +0.5972 `[+0.2748,+0.9533]` | -0.8329 `[-1.3194,-0.2925]` | +20.5 `[+9.5,+33.1]` |
+| sqrt − UTF | +0.2874 `[-0.0467,+0.6038]` | -0.0536 `[-0.5084,+0.4387]` | +1.4239 `[+0.4719,+2.2493]` | +3.1 `[-11.9,+19.2]` |
+| sqrt − 山下 | +0.0386 `[-0.2197,+0.2804]` | -0.1498 `[-0.4962,+0.2206]` | +0.4851 `[-0.2572,+1.1209]` | -0.7 `[-12.3,+11.8]` |
+| mean − sum | +0.3166 `[+0.0346,+0.5786]` | +1.0665 `[+0.6833,+1.4440]` | -2.5242 `[-3.0335,-1.9729]` | +32.4 `[+19.9,+45.1]` |
+| mean − UTF | +0.2624 `[+0.0395,+0.4872]` | +0.4156 `[+0.0398,+0.8607]` | -0.2674 `[-1.2586,+0.4917]` | +15.0 `[+3.7,+29.2]` |
+| mean − 山下 | +0.0136 `[-0.2531,+0.2544]` | +0.3194 `[+0.0012,+0.6386]` | -1.2062 `[-1.7622,-0.6962]` | +11.2 `[+0.5,+22.3]` |
+| half-signed − sum | -0.0432 `[-0.9378,+0.5715]` | +0.4167 `[-0.1072,+0.8982]` | -1.6141 `[-3.2067,-0.5342]` | -0.2 `[-47.0,+30.7]` |
+
+mean-followersは従来sumより全車・合流側速度、停止時間、流出台数を改善した一方、
+本線側速度を2.52 m/s低下させ、急減速時間を3.83秒増やした。sqrt-followersは
+本線側低下を0.83 m/sに抑えつつ、従来sumより全車・合流側速度と流出台数を改善した。
+したがって正規化はReject偏重を弱めたが、平均化は本線保護を弱め過ぎる。
+
+half-signedはseed 39で全車速度0.5369 m/s、流出台数19、未挿入289、停止時間
+28628.8秒、承諾率70.30%となり、両流入が崩壊した。他9 seedの全車速度は
+4.08–4.70 m/sだったため、平均とbootstrap区間はこの単一seedの強い影響を受ける。
+負側0.5の採用は承諾率を上げたが、過剰承諾による破局的状態を防げず、採用候補から外す。
+
+### 前半・後半300秒
+
+| 方式 | 期間 | 全車速度 | 合流側速度 | 本線側速度 | 停止時間 | 急減速時間 | 流出台数 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| sqrt | 0–300秒 | 4.8054 | 2.6816 | 8.7220 | 2133.05 | 3.64 | 103.1 |
+| sqrt | 300–600秒 | 4.0314 | 1.6303 | 9.5932 | 3051.34 | 1.52 | 117.7 |
+| mean | 0–300秒 | 4.7588 | 3.0607 | 7.4739 | 1619.93 | 5.86 | 106.8 |
+| mean | 300–600秒 | 4.0364 | 2.1729 | 7.4441 | 2286.09 | 4.25 | 125.9 |
+| sqrt + half-signed | 0–300秒 | 4.4871 | 2.5618 | 8.0695 | 3025.63 | 3.74 | 94.9 |
+| sqrt + half-signed | 300–600秒 | 3.5957 | 1.4017 | 8.6861 | 4598.66 | 0.96 | 105.2 |
+
+## 監査・保存
+
+- 30/30 runが`exit_code: 0`、`source_unchanged: true`、開始時clean
+- source commit、固定入力hash、Python 3.15.1、SUMO 1.28.0、方式設定一致
+- 必須artifact、全ログ、10 checkpoint/run、物理衝突0、重大traceback/fatalなし
+- half-signedのマシン全体最大SUMO数は15、slot超過なし
+- 診断JSONLとcheckpointを可逆圧縮し、復元SHA-256と行数を全項目で検証
+  - sqrt: 21,882,134,476 → 2,286,584,330 B（1330項目、分割10ファイル）
+  - mean: 21,400,431,473 → 2,283,806,259 B（1330項目、分割10ファイル）
+  - half-signed: 20,969,687,071 → 2,138,339,258 B（1330項目、分割9ファイル）
+
+GitHubへの一括pushはHTTP 500で切断されたため、seedを累積する一時commit chainで
+objectを段階転送した。正式branchのcarrier commitは元の専用commitとtree SHAが完全一致し、
+一時refは削除した。結果内容の変更やrerunはない。
+
+監査ファイルSHA-256（`post-run` / `compression` / `storage-split`）:
+
+- sqrt: `c7fc3a40ae1893e6b0c6f06ba460ff8a8a58b1dfcdcc6ea43317b2ca3e036cf9` / `0b76e5dcea8b0803b4df558fa42c1a6af2f3d0213508d7b4884e356917237eab` / `bad6bf7ef0cd9a5ee3dd3f627a1f200821f60c7951c942f451637be4a05c1e50`
+- mean: `af18a985e390e3cc0047a25748d0ab3bbb06113826d6817504d7dde366c35081` / `a9c60223607402ea6dbccc31eb0ddec68b09554c47d56746a3ea7252862f0b7c` / `a5d16a8f78dee557bb1cfec86ad867b9f67a64ba94296af05dc4bbd2a902f41d`
+- half-signed: `7edf2f9f6689391e60c3ab960bcbd820548489fe90ce9758376684cc206c2102` / `ed4155cc3955bbc3ecd953fddc3d57629a8cc0301d51aa11fd1fb9ba652794c2` / `05d20291864cc04344a5dea9449d816d4151eb3fbaac5fcbb3cc0580558a9631`
+
+## 結論と制約
+
+1200/1000の同一10 seed developmentでは、sqrt-followersが正規化なしのReject偏重を
+緩和し、本線保護を一部残しながら合流側と処理台数を改善した。mean-followersは処理性能を
+さらに改善したが本線側負担が大きい。sqrt + half-signedはseed 39で破局的状態を生じた。
+
+よって次の独立検証候補は`sqrt-followers`とし、half-signedは採用しない。mean-followersは
+公平性重視の比較対象として残せるが、現行提案の置換候補とはしない。本結果は同じseedを
+見ながら案を追加したadaptive developmentであり、一般的優越性や独立した効果確認を
+主張しない。採用判断には別seedでの事前固定検証が必要である。
