@@ -49,8 +49,13 @@
 - source branch: `codex/eval7-sqrt-flow-sweep-development`
 - runner: `scripts/run_thesis_sqrt_flow_queue.py`
 - 事前テスト: 共有queue / global-slot / flow-queueのfocused test 10件成功
+- 実行環境のPython 3.15.1で兦166 test成功
+- 300・500・700・1000の各交通量で代表seedの10秒smokeを実行し、4/4 runが
+  `exit_code: 0`、`source_unchanged: true`、`sqrt-followers`、負側係数0で完了
 - 実行時は各result worktreeが上記の同一source commitでcleanであること、
   固定入力hash、Python/SUMO version、起動前SUMO数0をpreflightで監査する。
+- 正式開始: 2026-11-11 22:06 JST
+- 初期起動: 300の10本 + 500の5本。SUMO 15 processを確認
 
 ## 予定結果ディレクトリ
 
