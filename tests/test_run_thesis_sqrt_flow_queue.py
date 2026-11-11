@@ -25,18 +25,19 @@ class SqrtFlowQueueTests(unittest.TestCase):
              *((500, seed) for seed in range(43, 48))],
         )
 
-    def test_remaining_queue_is_700_then_1000(self):
+    def test_remaining_queue_is_additional_500_then_700_then_1000(self):
         tasks = QUEUE.build_ordered_tasks()
         self.assertEqual(
             tasks[15:],
-            [*((700, seed) for seed in range(33, 43)),
+            [*((500, seed) for seed in (6, 8, 9, 10, 12)),
+             *((700, seed) for seed in range(33, 43)),
              *((1000, seed) for seed in range(33, 43))],
         )
 
-    def test_queue_has_exactly_35_unique_tasks(self):
+    def test_queue_has_exactly_40_unique_tasks(self):
         tasks = QUEUE.build_ordered_tasks()
-        self.assertEqual(len(tasks), 35)
-        self.assertEqual(len(set(tasks)), 35)
+        self.assertEqual(len(tasks), 40)
+        self.assertEqual(len(set(tasks)), 40)
 
 
 if __name__ == "__main__":

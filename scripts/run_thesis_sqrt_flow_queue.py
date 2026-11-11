@@ -4,8 +4,9 @@
 Each traffic flow writes one normal thesis experiment directory in its own
 clean Git worktree.  The queue is ordered 300, 500, 700, then 1000 veh/h on
 the requesting side, so the initial 15 slots contain all ten 300-flow runs
-and all five 500-flow runs.  Finished slots are filled immediately from the
-remaining 700- and 1000-flow tasks.
+and the five 500-flow holdout runs.  Finished slots are filled immediately
+from the five additional 500-flow development runs, then the 700- and
+1000-flow tasks.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from types import SimpleNamespace
 FLOW_ORDER = (300, 500, 700, 1000)
 FLOW_SEEDS = {
     300: tuple(range(33, 43)),
-    500: tuple(range(43, 48)),
+    500: (43, 44, 45, 46, 47, 6, 8, 9, 10, 12),
     700: tuple(range(33, 43)),
     1000: tuple(range(33, 43)),
 }
