@@ -24,6 +24,8 @@ sensorRange = 200 # [m]
 commRange = 200 # [m]
 maxPathLen = 10.0 # max path time [s]
 LANE_WIDTH = 3.2 # [m]
+MAIN_LANE_CENTER_LINES = (-8.0, -4.8)
+MERGE_TARGET_CENTER_LINES = (-4.8,)
 
 timeStep = 0.1 # [s]
 predTime = 10.0 # [s]
@@ -207,7 +209,7 @@ class CAV:
             # check collision among own planned path and other PLANNED paths
             collision_list_planned, _ = self.checkPathCollision(self.plannedPath, self.receivedPaths, s_type="planned")
             if len(collision_list_planned) > 0:
-                if abs([-8.0, -4.8, -1.6][self.lane] - self.pos_y) > 0.5 and self.status == "lanechange": #車線変更開始後は止まらない
+                if abs(MAIN_LANE_CENTER_LINES[self.lane] - self.pos_y) > 0.5 and self.status == "lanechange": #車線変更開始後は止まらない
                     pass
                 else:
                     print("my planned path collide")
@@ -833,7 +835,7 @@ class CAV:
                 self.leader = realLeader[0]  
 
         if self.leader and self.leadPath: #前方車両に追従走行
-            center_lines = [-8.0, -4.8, -1.6]
+            center_lines = MAIN_LANE_CENTER_LINES
             #前方車両が既に停止している場合
             if traci.vehicle.getSpeed(self.leader) < 0.1:
 
@@ -874,7 +876,7 @@ class CAV:
                     duration = round(leadPath.t[-1] - self.simTime, 2)
                     target_speed = leadPath.s_d[-1]
                     target_pos = leadPath.x[-1]
-                    center_lines = [-8.0, -4.8, -1.6]
+                    center_lines = MAIN_LANE_CENTER_LINES
                     c_s = self.pos_x
 
                     # 安全のためのマージン
@@ -893,7 +895,7 @@ class CAV:
         # 停止、追従経路が生成できない場合には追いつけないものと判断し自由走行を行う
         if len(path_candidates) == 0:
             self.status = "free"
-            center_lines = [-8.0, -4.8, -1.6]
+            center_lines = MAIN_LANE_CENTER_LINES
             path_candidates = generate_frenet_frame(objects=ob, c_s=self.pos_x, c_s_d=self.speed, c_s_dd=self.accel, c_d=self.pos_y,\
                                                 target_speed=maxSpeed, mode="free", route=self.route, center_lines=[center_lines[self.lane]], simTime=self.simTime, vehInstance=self)
             
@@ -918,8 +920,6 @@ class CAV:
 
 
     def generateDesiredPath(self, ob):
-        center_lines = [[-4.8], [-1.6, -8.0], [-4.8]]
-
         if self.plannedPath:            
             count = round((self.simTime - self.plannedPath.t[0]) / timeStep)
             c_d_d = self.plannedPath.d_d[count]
@@ -929,7 +929,7 @@ class CAV:
             c_d_dd = 0.0
 
         path_candidates = generate_frenet_frame(objects=ob, c_s=self.pos_x, c_s_d=self.speed, c_s_dd=self.accel, c_d=self.pos_y, c_d_d=c_d_d, c_d_dd=c_d_dd,\
-                                                target_speed=maxSpeed, mode="free", route=self.route, center_lines=center_lines[self.lane], simTime=self.simTime, vehInstance=self)
+                                                target_speed=maxSpeed, mode="free", route=self.route, center_lines=MERGE_TARGET_CENTER_LINES, simTime=self.simTime, vehInstance=self)
         for path in path_candidates:
             path.isLaneChange = True
 
