@@ -47,8 +47,10 @@ JSONのキー順や集計の浮動小数点丸め差は正規化した意味内�
 | 削除後branch | `codex/lane2-removal-equivalence` |
 | 削除後source | `6fafc9d2e` |
 | 制御コード整合source | `12ec44e78a` |
+| 正式反映後smoke source | `85336cd3dc123af2b9d431c04bcb52c10cfba15d` |
 | 60秒削除前 | `baseline/results/runs/lane2-equivalence-smoke3-baseline-integrated-r1000-a1000-seed6-60s-20261112/` |
 | 60秒削除後 | `without-lane2/results/runs/lane2-equivalence-smoke3-without-lane2-integrated-r1000-a1000-seed6-60s-20261112/` |
+| 60秒正式反映後 | `without-lane2/results/runs/lane2-removal-rollout-smoke-integrated-r1000-a1000-seed6-60s-20261112/` |
 | 600秒削除前 | `baseline/results/runs/lane2-equivalence-full-baseline-integrated-r1000-a1000-seed6-600s-20261112/` |
 | 600秒削除後 | `without-lane2/results/runs/lane2-equivalence-full-without-lane2-integrated-r1000-a1000-seed6-600s-20261112/` |
 | 結果commit | 未作成 |
@@ -135,3 +137,10 @@ FCD、vehicle-state trace、checkpointは記録していない。軌跡自体の
 `func/cav_merge2512_bus.py`を2車線モデルに統一した。
 方式選択より前の共有ネットワーク・車両制御への変更なので、山下手法と提案手法の
 双方に同じ条件として適用される。判定式そのものは変更していない。
+
+正式反映後に同じintegrated lambda=2・1000/1000・seed 6で60秒smokeを再実行し、
+`exit_code: 0`、`source_unchanged: true`を確認した。全車平均速度は
+`9.787487194111787 m/s`で反映前と同じだった。`evaluation-metrics.json`、
+`tiv-audit.json`、`deceleration-audit.json`、`prediction-events.jsonl`、
+`physical-collisions.jsonl`は反映前の削除後smokeとSHA-256がそれぞれ一致し、
+物理衝突は0だった。結果ディレクトリは診断用のためcommit・pushしていない。
