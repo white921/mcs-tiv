@@ -18,7 +18,10 @@ JSONのキー順や集計の浮動小数点丸め差は正規化した意味内�
   `main_2` lane定義を削除。
 - 終端junction `J1`の`incLanes`から`main_2`を削除。
 - `main_0` / `main_1`のID、index、中心座標、速度、長さは変更しない。
-- 制御コード、固定入力、判定式は変更しない。
+- 比較実験時点では制御コード、固定入力、判定式は変更しない。
+- 等価性確認後、現行車・バス制御の本線中心線定数をlane 0/1だけにし、
+  希望軌道の行先をlane 1に固定した。現行ランナーの未使用lane 2出発状態も
+  削除した。旧checkpointの3要素出発時刻配列は先頭2要素を読むため互換性を保つ。
 
 ## 実行条件
 
@@ -43,6 +46,7 @@ JSONのキー順や集計の浮動小数点丸め差は正規化した意味内�
 | 削除前source | `55ca81999d21d43e8fb0930309d58e34bf9e5f66` |
 | 削除後branch | `codex/lane2-removal-equivalence` |
 | 削除後source | `6fafc9d2e` |
+| 制御コード整合source | `12ec44e78a` |
 | 60秒削除前 | `baseline/results/runs/lane2-equivalence-smoke3-baseline-integrated-r1000-a1000-seed6-60s-20261112/` |
 | 60秒削除後 | `without-lane2/results/runs/lane2-equivalence-smoke3-without-lane2-integrated-r1000-a1000-seed6-60s-20261112/` |
 | 600秒削除前 | `baseline/results/runs/lane2-equivalence-full-baseline-integrated-r1000-a1000-seed6-600s-20261112/` |
@@ -123,3 +127,11 @@ lane2削除は、静的にはlane 0/1だけを使う現行Eval.7の到達可能�
 FCD、vehicle-state trace、checkpointは記録していない。軌跡自体の別artifact比較ではないが、
 完走時の交通指標と判定系列は一致している。結果は手元のMac環境での
 診断であり、Ubuntu正式結果の再実行や結果コミット、pushは行っていない。
+
+## 正式反映
+
+等価性確認後、共有するEval.7ネットワークと現行の
+`merge/merge_agree2512.py`、`func/cav_merge2512.py`、
+`func/cav_merge2512_bus.py`を2車線モデルに統一した。
+方式選択より前の共有ネットワーク・車両制御への変更なので、山下手法と提案手法の
+双方に同じ条件として適用される。判定式そのものは変更していない。
