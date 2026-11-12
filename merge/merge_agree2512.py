@@ -54,7 +54,6 @@ alpha = 0.0
 
 departTime_lane0 = []
 departTime_lane1 = []
-departTime_lane2 = []
 vehicleType_lane0 = deque()
 vehicleType_lane1 = deque()
 
@@ -70,7 +69,6 @@ count_accepted = [0, 0, 0, 0]
 
 
 count_Distribution = False
-
 
 def build_vehicle_type_schedules(lane_counts, target_bus_share):
     total = sum(lane_counts)
@@ -92,7 +90,7 @@ def build_vehicle_type_schedules(lane_counts, target_bus_share):
 def set_environment(inflow_0=750, inflow_1=750):
     global vehicle_instance
     global veh_id
-    global departTime_lane0, departTime_lane1, departTime_lane2, vehicleType_lane0, vehicleType_lane1
+    global departTime_lane0, departTime_lane1, vehicleType_lane0, vehicleType_lane1
 
     #合流地点を示すための障害物
     traci.vehicle.add(vehID="stone", routeID="main", typeID="CAV_0", departLane="0", departPos="305.0", departSpeed="0")
@@ -106,7 +104,6 @@ def set_environment(inflow_0=750, inflow_1=750):
     # 車両の合流時刻を決定
     departTime_lane0 = sorted(random.sample(range(int(simulation_time/2.0)), k_0))
     departTime_lane1 = sorted(random.sample(range(int(simulation_time/2.0)), k_1))
-    # departTime_lane2 = sorted(random.sample(range(int(simulation_time/2.0)), k))
 
     #departTime_lane0 = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
     #SdepartTime_lane1 = [2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]    
@@ -115,17 +112,15 @@ def set_environment(inflow_0=750, inflow_1=750):
     departTime_lane0 = [round((n*2.0), 1)+0.1 for n in departTime_lane0]
     departTime_lane1 = [round((n*2.0), 1)+0.1 for n in departTime_lane1]
     vehicleType_lane0, vehicleType_lane1 = build_vehicle_type_schedules([k_0, k_1], bus_share)
-    # departTime_lane2 = [round((n*2.0), 1)+0.1 for n in departTime_lane2]
 
     print(departTime_lane0)
     print(departTime_lane1)
-    # print(departTime_lane2)
 
 
 def add_vehicle(alpha):
     global veh_id
     global veh_id_bus
-    global departTime_lane0, departTime_lane1, departTime_lane2, vehicleType_lane0, vehicleType_lane1
+    global departTime_lane0, departTime_lane1, vehicleType_lane0, vehicleType_lane1
     sumo_time = traci.simulation.getTime()
 
     alpha = float(alpha)
