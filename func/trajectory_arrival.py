@@ -1,10 +1,11 @@
 """Shared conflict-region and trajectory-arrival helpers.
 
-The negotiation trigger already proves that the request and receiver
-trajectories overlap within the transmitted prediction horizon. Yamashita TIV
-and the proposal therefore share the same detected conflict region and measure
-the first entry of each trajectory into that region. A missing entry is an
-inconsistent negotiation event, not an infinite arrival time.
+The negotiation trigger already proves that the request and receiver safety
+regions overlap within the transmitted prediction horizon. Yamashita TIV and
+the proposal therefore share one region that contains both vehicle positions
+at the detected overlap time and measure the first entry of each trajectory
+into that region. A missing entry is an inconsistent negotiation event, not an
+infinite arrival time.
 """
 from __future__ import annotations
 
@@ -67,10 +68,12 @@ def conflict_region(
     """Build the shared region certified by one trajectory-conflict event.
 
     ``collision`` is the first conflict reported by ``checkPathCollision``.
-    Its point is on the receiver trajectory for sender-side calculation. The
-    longitudinal radius uses the larger event speed, so the request position
-    that caused the original safe-region overlap is also inside this region.
-    The plain dictionary can be transmitted in an MCM and logged as JSON.
+    Its point is on the receiver trajectory, while a safety-region overlap
+    does not require the request vehicle centre to reach that same point.  The
+    shared region is therefore centred between the two vehicle positions at
+    the detected event and expanded along the receiver heading until both
+    positions are inside.  The plain dictionary can be transmitted in an MCM
+    and logged as JSON.
     """
     try:
         center_x = float(collision["collide_x"])
@@ -108,6 +111,18 @@ def conflict_region(
         heading_dx, heading_dy = 1.0, 0.0
     heading_rad = math.atan2(heading_dy, heading_dx)
 
+    request_x = float(request_path.x[request_index])
+    request_y = float(request_path.y[request_index])
+    receiver_x = float(receiver_path.x[receiver_index])
+    receiver_y = float(receiver_path.y[receiver_index])
+    center_x = (request_x + receiver_x) / 2.0
+    center_y = (request_y + receiver_y) / 2.0
+    cosine, sine = math.cos(heading_rad), math.sin(heading_rad)
+    half_dx = (request_x - receiver_x) / 2.0
+    half_dy = (request_y - receiver_y) / 2.0
+    event_longitudinal_separation = abs(half_dx * cosine + half_dy * sine)
+    event_lateral_separation = abs(-half_dx * sine + half_dy * cosine)
+
     return {
         "schema_version": 1,
         "center_x_m": center_x,
@@ -116,8 +131,10 @@ def conflict_region(
         "longitudinal_radius_m": max(
             float(vehicle_length_m),
             max(request_speed, receiver_speed) * float(headway_s),
+            event_longitudinal_separation,
         ),
-        "lateral_radius_m": float(vehicle_width_m),
+        "lateral_radius_m": max(
+            float(vehicle_width_m), event_lateral_separation),
         "detected_delay_s": detected_delay_s,
         "horizon_s": HORIZON_S,
     }

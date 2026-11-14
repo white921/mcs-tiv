@@ -27,8 +27,8 @@ class TrajectoryArrivalTests(unittest.TestCase):
 
         region = arrival.conflict_region(request, receiver, collision, 0.0)
 
-        self.assertAlmostEqual(arrival.arrival_delay(request, region, 0.0), 4.5)
-        self.assertAlmostEqual(arrival.arrival_delay(receiver, region, 0.0), 3.5)
+        self.assertAlmostEqual(arrival.arrival_delay(request, region, 0.0), 4.0)
+        self.assertAlmostEqual(arrival.arrival_delay(receiver, region, 0.0), 3.0)
         self.assertEqual(region["horizon_s"], 10.0)
         self.assertTrue(math.isfinite(arrival.arrival_delay(request, region, 0.0)))
         self.assertTrue(math.isfinite(arrival.arrival_delay(receiver, region, 0.0)))
@@ -46,8 +46,27 @@ class TrajectoryArrivalTests(unittest.TestCase):
         region = arrival.conflict_region(request, receiver, collision, 0.0)
 
         self.assertAlmostEqual(region["heading_rad"], math.pi / 2)
-        self.assertAlmostEqual(arrival.arrival_delay(request, region, 0.0), 4.5)
-        self.assertAlmostEqual(arrival.arrival_delay(receiver, region, 0.0), 3.5)
+        self.assertAlmostEqual(arrival.arrival_delay(request, region, 0.0), 4.0)
+        self.assertAlmostEqual(arrival.arrival_delay(receiver, region, 0.0), 3.0)
+
+    def test_region_contains_both_centres_when_safety_areas_overlap_at_a_distance(self):
+        times = [index / 10 for index in range(101)]
+        request = path([8 * value for value in times], [0.0] * 101, times)
+        receiver = path([20 + 8 * value for value in times], [1.0] * 101, times)
+        collision = {
+            "collide_x": 60.0,
+            "collide_y": 1.0,
+            "duration": 5.0,
+        }
+
+        region = arrival.conflict_region(request, receiver, collision, 0.0)
+
+        self.assertEqual(region["center_x_m"], 50.0)
+        self.assertEqual(region["center_y_m"], 0.5)
+        self.assertTrue(math.isfinite(
+            arrival.arrival_delay(request, region, 0.0)))
+        self.assertTrue(math.isfinite(
+            arrival.arrival_delay(receiver, region, 0.0)))
 
     def test_missing_region_entry_is_an_inconsistent_event(self):
         stopped = path([0.0] * 101, [0.0] * 101)
