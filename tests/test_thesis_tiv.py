@@ -21,6 +21,18 @@ def path(veh="1", kind="planned", speed=10, y=0):
               y=[y] * 101, s_d=[speed] * 101, negotiationID=["2"])
 
 
+def region(x=20, y=0):
+    return {
+        "schema_version": 1,
+        "center_x_m": x,
+        "center_y_m": y,
+        "heading_rad": 0.0,
+        "longitudinal_radius_m": 0.01,
+        "lateral_radius_m": 0.01,
+        "horizon_s": 10.0,
+    }
+
+
 def vehicle(veh="1"):
     return NS(id=veh, typeID="Car", alpha=7, angle=90, simTime=0,
               pos_x=0, pos_y=0, receivedPaths=[], plannedPath=path(veh),
@@ -234,11 +246,13 @@ class ThesisTIVTests(unittest.TestCase):
 
     def test_formula_own_vehicle_and_performance(self):
         v = vehicle()
-        result = tiv.score(v, v.plannedPath, (20, 0), 10, 3)
+        result = tiv.score(v, v.plannedPath, region(), 10, 3)
         self.assertAlmostEqual(result["value"], 2 - .1 * 10 + .1 * 3)
-        self.assertAlmostEqual(tiv.score(v, v.plannedPath, (20, 0), 10, 1)["value"], 1.1)
+        self.assertAlmostEqual(
+            tiv.score(v, v.plannedPath, region(), 10, 1)["value"], 1.1)
         v.alpha = 6
-        self.assertAlmostEqual(tiv.score(v, v.plannedPath, (20, 0), 10, 3)["value"], 1)
+        self.assertAlmostEqual(
+            tiv.score(v, v.plannedPath, region(), 10, 3)["value"], 1)
 
     def test_actual_followers_unique_planned_terminal_speed(self):
         v = vehicle()
@@ -280,23 +294,29 @@ class ThesisTIVTests(unittest.TestCase):
     def test_arrival_absolute_time_not_raw_index(self):
         p = path()
         p.t = [t + 5 for t in p.t]
-        self.assertAlmostEqual(tiv.arrival_delay(p, (20, 0), 5.1), 1.9)
+        self.assertAlmostEqual(tiv.arrival_delay(p, region(), 5.1), 1.9)
 
-    def test_unreachable_not_fictitious_arrival(self):
-        self.assertEqual(tiv.arrival_delay(path(speed=0), (20, 0), 0), math.inf)
-        self.assertEqual(tiv.arrival_delay(path(), (200, 0), 0), math.inf)
+    def test_missing_arrival_is_an_inconsistent_negotiation_event(self):
+        with self.assertRaisesRegex(ValueError, "does not enter"):
+            tiv.arrival_delay(path(speed=0), region(), 0)
+        with self.assertRaisesRegex(ValueError, "does not enter"):
+            tiv.arrival_delay(path(), region(200), 0)
 
     def test_packet_is_computed_by_sender_and_immutable(self):
         sender = vehicle()
         desired = path(kind="desired")
         sender.desiredPaths = [desired]
         sender.checkPathCollision = Mock(return_value=(
-            [{"collideID": "2", "collide_x": 20, "collide_y": 0}], []))
+            [{"collideID": "2", "collide_x": 20, "collide_y": 0,
+              "duration": 2.0, "path": path("2")}], []))
         server = []
         api = traci()
         tiv.send_mcm(sender, server, api)
         packet = server[1]
-        self.assertAlmostEqual(packet.tiv_by_receiver["2"]["value"], 1.3)
+        self.assertAlmostEqual(
+            packet.tiv_by_receiver["2"]["arrival_delay"], 0.5)
+        self.assertAlmostEqual(packet.tiv_by_receiver["2"]["value"], -0.2)
+        self.assertEqual(packet.tiv_by_receiver["2"]["region"]["schema_version"], 1)
         self.assertEqual(packet.road_id, "sender-road")
         self.assertEqual(packet.lane_id, "sender-road_1")
         self.assertEqual(packet.lane_index, 1)
@@ -312,6 +332,7 @@ class ThesisTIVTests(unittest.TestCase):
         v = vehicle("2")
         desired = path("1", "desired")
         desired.tiv_by_receiver = {"2": {"value": desired_value, "point": (20, 0),
+                                       "region": region(),
                                        "sender": "1", "path_id": desired.pathID,
                                        "sent_at": -.1}}
         v.generateAlterPath = Mock(return_value=[path("2", "alter")])
@@ -419,11 +440,13 @@ class ThesisTIVTests(unittest.TestCase):
                 {"path": desired, "collide_x": 20.0, "collide_y": 0}))
         self.assertIsNone(v._mcs_agreement_lease)
 
-    def test_two_unreachable_paths_not_accepted(self):
+    def test_inconsistent_arrival_defers_without_synthetic_decision(self):
         v, _, collisions = self.decision(math.inf)
         v.plannedPath = path("2", speed=0)
         tiv.judge_yield(v, collisions, [], traci())
-        self.assertEqual(v.count_refuse_utility, 1)
+        self.assertEqual(v.count_refuse_utility, 0)
+        self.assertEqual(v.count_accept_utility, 0)
+        self.assertIsNone(v.alter_straight_path)
 
     def test_merge_selector_tuple(self):
         v, _, collisions = self.decision()

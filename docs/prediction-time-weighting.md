@@ -1,5 +1,10 @@
 # Prediction time weighting
 
+> Historical experiment note. The current normalized convex formula uses a
+> uniform 10-second integral and no longer exposes
+> `--deceleration-time-half-life`. Reproduce the commands below only from the
+> source commit recorded by the corresponding experiment manifest.
+
 This experiment changes only how the proposed deceleration-propagation method
 integrates its existing 10-second speed profiles. Agreement-hold experiments
 belong on a separate improvement branch and are not part of this baseline.

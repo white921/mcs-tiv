@@ -18,13 +18,10 @@ class ResultLayoutTests(unittest.TestCase):
         values = {
             "run_name": None,
             "deceleration_active": True,
-            "deceleration_time_half_life": 0.0,
-            "deceleration_loss_lambda": 1.0,
-            "rejection_wait_cap": 0.0,
+            "deceleration_convex_lambda": RUNNER.DEFAULT_CONVEX_LAMBDA,
             "agreement_lease_seconds": 0.0,
             "merge_negotiation_lead_seconds": 0.0,
             "two_stage_merge_negotiation": False,
-            "deceleration_loss_mode": "integrated",
             "cases": ["eval3"],
             "seeds": [1, 2, 3, 4, 5],
             "seeds_per_case": None,
@@ -52,21 +49,6 @@ class ResultLayoutTests(unittest.TestCase):
         self.assertEqual(path.parent, ROOT / "results" / "runs")
         self.assertEqual(path.name, "Eval.3-提案-seed-1-5")
 
-    def test_weighted_run_directory_records_half_life(self):
-        now = datetime.datetime(
-            2026, 10, 26, 15, 30, 0,
-            tzinfo=datetime.timezone(datetime.timedelta(hours=9)))
-
-        path = RUNNER.default_run_directory(
-            self.args(deceleration_time_half_life=3.0), now=now)
-
-        self.assertIn("proposal-weighted-3s", path.name)
-
-    def test_terminal_loss_ablation_is_named(self):
-        path = RUNNER.default_run_directory(
-            self.args(deceleration_loss_mode="terminal-held"))
-        self.assertIn("proposal-terminal-held", path.name)
-
     def test_write_json_has_stable_trailing_newline(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "manifest.json"
@@ -80,6 +62,7 @@ class ResultLayoutTests(unittest.TestCase):
             "PATH": "/usr/bin",
             "MCS_PRIORITY_HOLD_MODE": "conditional",
             "MCS_DECELERATION_MODE": "active",
+            "MCS_DECELERATION_CONVEX_LAMBDA": "0.25",
             "MCS_DECELERATION_TIME_HALF_LIFE_S": "99",
             "MCS_DECELERATION_LOSS_LAMBDA": "99",
             "MCS_REJECTION_WAIT_CAP_S": "99",
@@ -100,26 +83,25 @@ class ResultLayoutTests(unittest.TestCase):
             RUNNER.PRIORITY_HOLD_MANIFEST,
             {"mode": "off", "enabled": False})
 
-    def test_manifest_records_time_equivalent_loss_lambda(self):
-        manifest = RUNNER.deceleration_prediction_manifest(
-            self.args(deceleration_loss_lambda=1.25))
+    def test_manifest_records_default_normalized_convex_formula(self):
+        manifest = RUNNER.deceleration_prediction_manifest(self.args())
 
-        self.assertEqual(manifest["loss_lambda"], 1.25)
-        self.assertEqual(manifest["loss_mode"], "integrated")
+        self.assertAlmostEqual(manifest["convex_lambda"], 80 / 81)
+        self.assertTrue(manifest["legacy_threshold_equivalent"])
+        self.assertEqual(manifest["legacy_raw_threshold_formula"], "A+2B")
+        self.assertAlmostEqual(manifest["time_weight"], 1 / 81)
+        self.assertAlmostEqual(manifest["follower_weight"], 80 / 81)
         self.assertIn("accept iff M<=0", manifest["decision_formula"])
+        self.assertEqual(manifest["maximum_followers"], 40)
         self.assertEqual(
-            manifest["loss_scope"],
+            manifest["maximum_followers_basis"]["same_direction_lanes"], 2)
+        self.assertEqual(manifest["score_bounds"], [-1.0, 1.0])
+        self.assertEqual(
+            manifest["follower_scope"],
             "detected followers excluding request and receiver vehicles")
         self.assertEqual(
-            manifest["excluded_loss_roles"],
+            manifest["excluded_follower_roles"],
             ["request_vehicle", "receiver_vehicle"])
-
-    def test_manifest_records_repeated_rejection_wait_formula(self):
-        manifest = RUNNER.deceleration_prediction_manifest(
-            self.args(deceleration_loss_lambda=2.0, rejection_wait_cap=10.0))
-
-        self.assertEqual(manifest["rejection_wait_cap_s"], 10.0)
-        self.assertIn("consecutive_pair_rejection_wait", manifest["decision_formula"])
 
 
 if __name__ == "__main__":

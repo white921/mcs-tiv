@@ -9,7 +9,10 @@ import deceleration_prediction
 import decision_oracle
 import diagnostic_trace
 import evaluation_metrics
-from trajectory_arrival import arrival_delay as shared_arrival_delay
+from trajectory_arrival import (
+    arrival_delay as shared_arrival_delay,
+    conflict_region as shared_conflict_region,
+)
 
 COUNTS = Counter()
 EXAMPLES = []
@@ -534,13 +537,9 @@ def position_at(path, now):
     return path.x[index], path.y[index]
 
 
-def arrival_delay(path, point, now):
-    """Nearest 2D time sample; unreached finite horizon is +infinity.
-
-    Sampling and unreachable-point handling are implementation assumptions,
-    not parameters explicitly defined in the paper.
-    """
-    return shared_arrival_delay(path, point, now)
+def arrival_delay(path, region, now):
+    """Return first entry into the shared detected conflict region."""
+    return shared_arrival_delay(path, region, now)
 
 
 def environmental_term(vehicle, own_path, maximum_speed):
@@ -566,9 +565,9 @@ def environmental_term(vehicle, own_path, maximum_speed):
     return total
 
 
-def score(vehicle, path, point, maximum_speed, maximum_acceleration):
+def score(vehicle, path, region, maximum_speed, maximum_acceleration):
     horizon = transmitted_path(path, vehicle.simTime)
-    dt = arrival_delay(horizon, point, vehicle.simTime)
+    dt = arrival_delay(horizon, region, vehicle.simTime)
     environment = environmental_term(vehicle, horizon, maximum_speed)
     performance = .1 * maximum_acceleration if vehicle.alpha == 7 else 0.0
     return {"value": dt - .1 * environment + performance,
@@ -593,14 +592,19 @@ def send_mcm(vehicle, server, traci):
         packet = transmitted_path(desired, vehicle.simTime, lane_context)
         packet.tiv_by_receiver = {}
         for conflict in conflicts:
-            point = (conflict["collide_x"], conflict["collide_y"])
-            value = score(vehicle, desired, point, vmax, amax)
+            region = shared_conflict_region(
+                desired, conflict["path"], conflict, vehicle.simTime,
+                vehicle_length_m=getattr(vehicle, "length", 5.0),
+                vehicle_width_m=getattr(vehicle, "width", 1.8),
+                headway_s=1.5,
+            )
+            point = (region["center_x_m"], region["center_y_m"])
+            value = score(vehicle, desired, region, vmax, amax)
             packet.tiv_by_receiver[str(conflict["collideID"])] = {
-                **value, "point": point, "sent_at": vehicle.simTime,
+                **value, "point": point, "region": region,
+                "sent_at": vehicle.simTime,
                 "sender": vehicle.id, "path_id": desired.pathID}
             COUNTS["sender_tiv_calculations"] += 1
-            if not math.isfinite(value["value"]):
-                COUNTS["sender_unreached_conflict"] += 1
         if len(packet.tiv_by_receiver) > 1:
             COUNTS["multi_receiver_desired_packets"] += 1
         server.append(packet)
@@ -704,25 +708,30 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
         received_packet = getattr(desired, "tiv_by_receiver", {}).get(
             str(vehicle.id)) or getattr(desired, "tiv_by_receiver", {}).get(
                 vehicle.id)
-        if "collide_x" in collision and "collide_y" in collision:
-            point = (collision["collide_x"], collision["collide_y"])
-        else:
-            point = (received_packet or {}).get("point")
-        deceleration_prediction.record_shadow(
-            vehicle, desired, vehicle.alter_straight_path, vehicle.simTime,
-            point)
         lease_accept = agreement_lease_accepts(vehicle, desired, collision)
+        region = (received_packet or {}).get("region")
+        if not lease_accept and region is None:
+            diagnostic_trace.record_negotiation(
+                vehicle, desired, "deferred",
+                reason="missing_sender_conflict_region", collision=collision)
+            vehicle.alter_straight_path = None
+            COUNTS["missing_sender_conflict_region"] += 1
+            continue
+        if region is not None:
+            deceleration_prediction.record_shadow(
+                vehicle, desired, vehicle.alter_straight_path, vehicle.simTime,
+                region)
         accept = (True if lease_accept else
                   deceleration_prediction.active_decision(
                       vehicle, desired, vehicle.alter_straight_path,
-                      vehicle.simTime, point))
+                      vehicle.simTime, region))
         yamashita_accept = None
         if lease_accept:
             planned = {"value": None, "source": "agreement-lease"}
             received = {"value": None, "source": "agreement-lease"}
             prediction_method = "agreement-lease"
         elif accept is None:
-            received = getattr(desired, "tiv_by_receiver", {}).get(vehicle.id)
+            received = received_packet
             if received is None:
                 # No receiver-side fallback; retry on the next MCM.
                 diagnostic_trace.record_negotiation(
@@ -733,32 +742,53 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
                 continue
             if received["sender"] != desired.vehID or received["path_id"] != desired.pathID:
                 raise ValueError("TIV belongs to a different trajectory")
-            planned = score(vehicle, vehicle.plannedPath, received["point"],
-                            traci.vehicle.getAllowedSpeed(vehicle.id),
-                            traci.vehicletype.getAccel(vehicle.typeID))
-            # Fig.4.2 says >=; two unreachable paths are not an arrival-time tie.
-            accept = bool(math.isfinite(received["value"])
-                          and planned["value"] >= received["value"])
+            try:
+                planned = score(
+                    vehicle, vehicle.plannedPath, received["region"],
+                    traci.vehicle.getAllowedSpeed(vehicle.id),
+                    traci.vehicletype.getAccel(vehicle.typeID))
+            except ValueError as error:
+                diagnostic_trace.record_negotiation(
+                    vehicle, desired, "deferred",
+                    reason="inconsistent_conflict_region", collision=collision,
+                    details={"error": str(error)})
+                vehicle.alter_straight_path = None
+                COUNTS["inconsistent_conflict_region"] += 1
+                continue
+            # Figure 4.2 accepts equality.
+            accept = planned["value"] >= received["value"]
             yamashita_accept = accept
             prediction_method = "thesis-tiv-fallback"
         else:
             # Measure the TIV decision on exactly the same event.  It is
             # audit-only: the proposal decision above remains authoritative.
-            received_tiv = getattr(desired, "tiv_by_receiver", {}).get(vehicle.id)
+            received_tiv = received_packet
             if received_tiv is not None:
-                planned_tiv = score(vehicle, vehicle.plannedPath, received_tiv["point"],
-                                    traci.vehicle.getAllowedSpeed(vehicle.id),
-                                    traci.vehicletype.getAccel(vehicle.typeID))
-                tiv_accept = bool(math.isfinite(received_tiv["value"])
-                                  and planned_tiv["value"] >= received_tiv["value"])
-                yamashita_accept = tiv_accept
-                deceleration_prediction.record_tiv_comparison(accept, tiv_accept)
+                try:
+                    planned_tiv = score(
+                        vehicle, vehicle.plannedPath, received_tiv["region"],
+                        traci.vehicle.getAllowedSpeed(vehicle.id),
+                        traci.vehicletype.getAccel(vehicle.typeID))
+                except ValueError:
+                    deceleration_prediction.COUNTS[
+                        "tiv_comparison_inconsistent_conflict_region"] += 1
+                else:
+                    tiv_accept = planned_tiv["value"] >= received_tiv["value"]
+                    yamashita_accept = tiv_accept
+                    deceleration_prediction.record_tiv_comparison(
+                        accept, tiv_accept)
             else:
                 deceleration_prediction.COUNTS["tiv_comparison_unavailable"] += 1
             COUNTS["deceleration_active_decisions"] += 1
-            planned = {"value": None, "source": "deceleration-propagation"}
-            received = {"value": None, "source": "deceleration-propagation"}
-            prediction_method = "deceleration-propagation"
+            planned = {
+                "value": None,
+                "source": "normalized-deceleration-propagation",
+            }
+            received = {
+                "value": None,
+                "source": "normalized-deceleration-propagation",
+            }
+            prediction_method = "normalized-deceleration-propagation"
         target_event = ORACLE_TARGET_EVENT == ORACLE_EVENT_COUNT + 1
         proposal_choice = None
         proposal_evaluation = None
@@ -766,7 +796,7 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
             try:
                 proposal_evaluation = deceleration_prediction.evaluate(
                     vehicle, desired, vehicle.alter_straight_path,
-                    vehicle.simTime, point)
+                    vehicle.simTime, region)
             except (AttributeError, IndexError, TypeError, ValueError,
                     ZeroDivisionError):
                 proposal_evaluation = None
@@ -776,7 +806,7 @@ def judge_yield(vehicle, collisions, obstacles, traci, merge=False):
         # receiver MCM trajectory.  Record it for baseline runs and proposal
         # fallbacks; the active proposal has already registered its richer
         # queue prediction above.
-        if prediction_method != "deceleration-propagation":
+        if prediction_method != "normalized-deceleration-propagation":
             try:
                 tiv_profiles = deceleration_prediction.direct_tiv_profiles(
                     vehicle, desired, vehicle.alter_straight_path,

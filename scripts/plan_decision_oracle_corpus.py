@@ -64,7 +64,8 @@ def selected_events(trace, count):
         # ``no_feasible_alternative`` never reach the forceable boundary and
         # therefore cannot be replayed as an Accept/Reject pair.
         if record.get("reason") not in {
-                "thesis-tiv-fallback", "deceleration-propagation"}:
+                "thesis-tiv-fallback", "deceleration-propagation",
+                "normalized-deceleration-propagation"}:
             continue
         decision_ordinal += 1
         identity = (

@@ -48,6 +48,7 @@
 
 | 状態 | 開始日 | 実験 | 記録 |
 | --- | --- | --- | --- |
+| completed | 2026-11-14 | 正規化凸結合式・山下手法ペアsmoke | [記録](2026-11-14-normalized-convex-paired-smoke.md) |
 | completed | 2026-11-12 | Eval.7の未使用lane2削除の等価性確認 | [記録](2026-11-12-lane2-removal-equivalence.md) |
 | completed | 2026-11-11 | Eval.7・1200/1000の後続車損失正規化development | [記録](2026-11-11-eval7-1200-follower-loss-normalization-development.md) |
 | completed | 2026-11-10 | Eval.7・1200/1000の3方式600秒stress test | [記録](2026-11-10-eval7-1200-three-method-600s-holdout.md) |

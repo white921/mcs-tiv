@@ -23,8 +23,9 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import decision_oracle  # noqa: E402
 import mcs_checkpoint  # noqa: E402
 from run_thesis_batch import (  # noqa: E402
-    CASES, clean_experiment_environment, fixed_input_details, git_metadata,
-    prepare_source, source_hashes, write_json,
+    CASES, DEFAULT_CONVEX_LAMBDA, clean_experiment_environment,
+    fixed_input_details, git_metadata, prepare_source, source_hashes,
+    write_json,
 )
 
 
@@ -74,8 +75,8 @@ def common_env(args, source):
         MCS_TIV_IMPLEMENTATION="thesis",
         MCS_DECELERATION_MODE=("active" if args.origin_policy == "proposal"
                                else "off"),
-        MCS_DECELERATION_LOSS_LAMBDA=str(args.deceleration_loss_lambda),
-        MCS_DECELERATION_TIME_HALF_LIFE_S="0.0",
+        MCS_DECELERATION_CONVEX_LAMBDA=str(
+            args.deceleration_convex_lambda),
     )
 
 
@@ -218,8 +219,9 @@ def main():
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--duration", type=float, default=300.0)
     parser.add_argument(
-        "--deceleration-loss-lambda", type=float, default=1.0,
-        help="proposal-origin loss weight needed to reproduce its natural run")
+        "--deceleration-convex-lambda", type=float,
+        default=DEFAULT_CONVEX_LAMBDA,
+        help="proposal-origin convex weight needed to reproduce its natural run")
     parser.add_argument("--event-ordinal", type=int, required=True)
     parser.add_argument("--event-time", type=float, required=True)
     parser.add_argument("--receiver-id")
@@ -230,9 +232,9 @@ def main():
         parser.error("output directory already exists")
     if args.event_ordinal < 1:
         parser.error("event ordinal must be positive")
-    if (not math.isfinite(args.deceleration_loss_lambda) or
-            args.deceleration_loss_lambda < 0):
-        parser.error("--deceleration-loss-lambda must be finite and non-negative")
+    if (not math.isfinite(args.deceleration_convex_lambda) or
+            not 0 <= args.deceleration_convex_lambda <= 1):
+        parser.error("--deceleration-convex-lambda must lie in [0, 1]")
     run_git = (json.loads(args.git_metadata_json.read_text(encoding="utf-8"))
                if args.git_metadata_json is not None else git_metadata())
 

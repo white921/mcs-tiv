@@ -227,6 +227,7 @@ def display_method(experiment_id: str, method: str) -> str:
         return "全交渉合意保持"
     return {
         "deceleration-propagation": "提案手法",
+        "normalized-deceleration-propagation": "提案手法",
         "thesis-tiv": "山下手法",
     }.get(method, method or "方式不明")
 

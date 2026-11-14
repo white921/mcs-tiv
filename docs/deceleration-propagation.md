@@ -7,16 +7,27 @@
 
 ## 実装済み
 
-- 速度差を区間積分して、単位mの符号付き距離損失を得る純粋関数。
-- 距離損失を各車両の交渉時点の許容速度で割り、秒相当へ換算する。
+- 後続車両 `i` の影響を
+  `I_i = (1/T_pred) ∫((v_reject-v_accept)/v_allowed_i)dt` で符号付き積分する。
+  `I_i > 0` はAcceptの方が後続車両を遅くするためReject側、
+  `I_i < 0` はAccept側の影響を表す。
+  積分に使う予測速度は許容範囲 `[0, v_allowed_i]` に制限し、
+  軌道生成の離散化による微小な上限超過を正規化範囲に反映させない。
 - 到着時間項で直接評価する要求車・受入判断車は距離損失の集計から除外し、
   損失項は検出できた後続車だけを対象にする。
-- 判断値は `M = (t_request - t_receiver) + lambda *
-  max(T_loss_accept - T_loss_reject, 0)`。`M <= 0`なら承諾、`M > 0`なら拒否する。
-  符号付き損失差は監査ログに残すが、予測上の後続車便益（負の損失差）で
-  到着時間項が拒否を選ぶ判断を反転させない。
-  `lambda`は実験条件として明示する。到着時間項は直接2台、距離損失換算後の
-  項は後続車群を表すため、同じ秒単位でも意味と集計対象は異なる。
+- `T_pred=10 s`、幾何学的な最大後続車両数 `N_max=40` とし、
+  `Z_time=(t_request-t_receiver)/T_pred`、`Z_follow=ΣI_i/N_max` と正規化する。
+- 判断値は凸結合
+  `M=(1-lambda)Z_time+lambda Z_follow`。`M <= 0`ならAccept、
+  `M > 0`ならRejectとする。正規化前の到着時間差を `A`、
+  後続車影響の合計を `B` とすると `Z_time=A/10`、
+  `Z_follow=B/400` である。旧式 `A+2B` と同じ判断境界にするため、
+  既定値を `lambda=80/81`とする。このとき新式は
+  `(A+2B)/810` となり、`M` の範囲は `[-1,1]`である。
+- 要求車両が送信した同一の軌道競合領域に対して、要求軌道と受信車両の
+  現行走行軌道が初めて進入する時間を測る。交渉開始は10秒以内の軌道競合を
+  前提とするため、進入時間が得られないイベントは無限大に置き換えず、
+  競合情報の不整合として判断を保留する。
 - MCMの終端速度保持（既存`extendPath`と同じ速度側の規則）で、0.1秒刻み
   101点の評価窓を構成する。
 - 地図定義の道路ID・車線ID・車線番号・車線内進行位置を車両状態とMCM軌道に保持する。
@@ -31,13 +42,14 @@
   2ケースを評価するフック。
 - JSON監査ログ（`MCS_DECELERATION_AUDIT`）と、未対応理由のカウンタ。監査ログには
   `accept_follower_ids`、`reject_follower_ids`、`union_follower_ids`、
-  `loss_vehicle_ids`、`excluded_loss_vehicle_ids`も残す。
+  `follower_vehicle_ids`、`excluded_follower_vehicle_ids`も残す。
 
 `shadow`は実車状態、TraCI、経路、乱数、TIVtepの判定を変更しない。
 拒否ケースは両車の交渉前`planned`を維持する。
 
-`active`は評価が成功した交渉だけ上記の時間換算判断を使う。要求軌道が
-衝突点へ到達不能なら拒否する。許容速度が欠落、非有限、または0以下なら
+`active`は評価が成功した交渉だけ上記の正規化判断を使う。
+競合領域への到着が10秒以内に確認できない、または許容速度が欠落、
+非有限、または0以下なら
 既存TIVtepへ安全にフォールバック
 する。したがって、提案手法を使ったSUMO評価と、影響を隔離した比較評価の
 両方を同じランナーで行える。
@@ -70,11 +82,12 @@ T字路Eval.3は、隔離コピー・seedごとの監査ログ・実行manifest�
 python3 scripts/run_thesis_batch.py \
   --sumo-home /path/to/sumo --python python3 \
   --run-name eval3-proposal-600s --cases eval3 --workers 1 \
-  --deceleration-active --deceleration-loss-lambda 1
+  --deceleration-active --deceleration-convex-lambda 0.9876543209876543
 ```
 
 各`seed-*`の`manifest.json`に平均速度、`deceleration-audit.json`に各交渉の
-損失・判断・後続車数が残る。active実装と標準診断ログはT字路Eval.3、
+`Z_time`、`Z_follow`、車両別 `I_i`、判断、後続車数が残る。
+active実装と標準診断ログはT字路Eval.3、
 十字路Eval.5、合流Eval.7に対応している。ケース間の結果は別の実験フォルダーか、
 同じバッチ内の別Evalフォルダーとして保存する。
 

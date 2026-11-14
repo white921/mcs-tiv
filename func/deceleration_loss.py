@@ -11,6 +11,12 @@ import math
 from typing import Iterable, Mapping, Sequence
 
 
+# With Z_time=A/10 and Z_follow=B/(10*40), this value makes the
+# normalized convex score exactly (A + 2B) / 810. It therefore preserves the
+# zero threshold of the former raw-term coefficient ratio 1:2.
+DEFAULT_CONVEX_LAMBDA = 80 / 81
+
+
 @dataclass(frozen=True)
 class SpeedProfile:
     """Absolute-time speed samples for one vehicle."""
@@ -229,4 +235,130 @@ def time_equivalent_decision(
         "final_margin_s": final_margin_s,
         "vehicle_loss_details": details,
         "decision": decision,
+    }
+
+
+def normalized_follower_effect(
+    accept: SpeedProfile,
+    reject: SpeedProfile,
+    allowed_speed_mps: float,
+    *,
+    horizon_s: float,
+) -> float:
+    """Return one follower's signed Accept effect in ``[-1, 1]``.
+
+    Positive values mean Reject preserves more speed than Accept and therefore
+    push the decision toward Reject. Negative values mean Accept benefits the
+    follower. The fixed allowed speed and prediction horizon make the integral
+    dimensionless without discarding the number of affected vehicles.
+    """
+    if accept.vehicle_id != reject.vehicle_id:
+        raise ValueError("cannot compare profiles for different vehicles")
+    if accept.times != reject.times:
+        raise ValueError("comparison profiles must use the same time grid")
+    allowed_speed_mps = float(allowed_speed_mps)
+    horizon_s = float(horizon_s)
+    if not math.isfinite(allowed_speed_mps) or allowed_speed_mps <= 0:
+        raise ValueError("allowed speed must be positive and finite")
+    if not math.isfinite(horizon_s) or horizon_s <= 0:
+        raise ValueError("prediction horizon must be positive and finite")
+    profile_horizon = accept.times[-1] - accept.times[0]
+    if not math.isclose(profile_horizon, horizon_s, abs_tol=1e-6):
+        raise ValueError("speed profile must cover the full prediction horizon")
+    combined_speeds = (*accept.speeds, *reject.speeds)
+    if any(not math.isfinite(speed) for speed in combined_speeds):
+        raise ValueError("predicted speeds must be finite")
+
+    # The legal speed interval is part of the normalization definition. MCM
+    # trajectories can overshoot their limit by a few centimetres per second
+    # through planner discretization; using the bounded physical speed keeps
+    # I_i in [-1, 1] without introducing an empirical tolerance parameter.
+    bounded_accept = SpeedProfile(
+        accept.vehicle_id,
+        accept.times,
+        tuple(min(allowed_speed_mps, max(0.0, speed))
+              for speed in accept.speeds),
+    )
+    bounded_reject = SpeedProfile(
+        reject.vehicle_id,
+        reject.times,
+        tuple(min(allowed_speed_mps, max(0.0, speed))
+              for speed in reject.speeds),
+    )
+    effect = (distance_loss(bounded_reject, bounded_accept)
+              / (allowed_speed_mps * horizon_s))
+    if not -1.0 - 1e-9 <= effect <= 1.0 + 1e-9:
+        raise ValueError("normalized follower effect lies outside [-1, 1]")
+    return max(-1.0, min(1.0, effect))
+
+
+def normalized_convex_decision(
+    accept: Mapping[str, SpeedProfile],
+    reject: Mapping[str, SpeedProfile],
+    allowed_speeds: Mapping[str, float],
+    *,
+    request_arrival_s: float,
+    receiver_arrival_s: float,
+    convex_lambda: float = DEFAULT_CONVEX_LAMBDA,
+    horizon_s: float = 10.0,
+    maximum_followers: int = 40,
+) -> dict:
+    """Combine normalized arrival priority and total follower impact.
+
+    ``Z_time = (t_request - t_receiver) / T_pred`` and
+    ``Z_follow = sum(I_i) / N_max``. The final score is the convex combination
+    ``M = (1-lambda) Z_time + lambda Z_follow`` and ``M <= 0`` accepts.
+    """
+    vehicle_ids = set(accept)
+    if vehicle_ids != set(reject) or vehicle_ids != set(allowed_speeds):
+        raise ValueError(
+            "accept, reject and allowed speeds must cover identical vehicle IDs")
+    if isinstance(maximum_followers, bool) or not isinstance(maximum_followers, int):
+        raise ValueError("maximum followers must be an integer")
+    if maximum_followers <= 0:
+        raise ValueError("maximum followers must be positive")
+    if len(vehicle_ids) > maximum_followers:
+        raise ValueError("follower count exceeds the geometric maximum")
+    horizon_s = float(horizon_s)
+    convex_lambda = float(convex_lambda)
+    request_arrival_s = float(request_arrival_s)
+    receiver_arrival_s = float(receiver_arrival_s)
+    if not math.isfinite(horizon_s) or horizon_s <= 0:
+        raise ValueError("prediction horizon must be positive and finite")
+    if not math.isfinite(convex_lambda) or not 0 <= convex_lambda <= 1:
+        raise ValueError("convex lambda must lie in [0, 1]")
+    for name, value in (
+        ("request", request_arrival_s),
+        ("receiver", receiver_arrival_s),
+    ):
+        if not math.isfinite(value) or not 0 <= value <= horizon_s + 1e-6:
+            raise ValueError(
+                f"{name} arrival must be finite and within the prediction horizon")
+
+    effects = {
+        vehicle_id: normalized_follower_effect(
+            accept[vehicle_id], reject[vehicle_id],
+            allowed_speeds[vehicle_id], horizon_s=horizon_s)
+        for vehicle_id in sorted(vehicle_ids)
+    }
+    z_time = (request_arrival_s - receiver_arrival_s) / horizon_s
+    z_follow = sum(effects.values()) / maximum_followers
+    score = (1.0 - convex_lambda) * z_time + convex_lambda * z_follow
+    if not all(-1.0 - 1e-9 <= value <= 1.0 + 1e-9
+               for value in (z_time, z_follow, score)):
+        raise ValueError("normalized decision score lies outside [-1, 1]")
+    return {
+        "request_arrival_s": request_arrival_s,
+        "receiver_arrival_s": receiver_arrival_s,
+        "prediction_horizon_s": horizon_s,
+        "z_time": max(-1.0, min(1.0, z_time)),
+        "follower_effects": effects,
+        "follower_effect_sum": sum(effects.values()),
+        "maximum_followers": maximum_followers,
+        "z_follow": max(-1.0, min(1.0, z_follow)),
+        "convex_lambda": convex_lambda,
+        "time_weight": 1.0 - convex_lambda,
+        "follower_weight": convex_lambda,
+        "normalized_margin": max(-1.0, min(1.0, score)),
+        "decision": "accept" if score <= 0 else "reject",
     }

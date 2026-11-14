@@ -34,7 +34,7 @@ class DecisionOracleCorpusTests(unittest.TestCase):
                  "receiver_id": "2", "sender_id": "1",
                  "desired_path_id": "1_1"},
                 {"event": "decision", "sim_time": 3.0,
-                 "reason": "deceleration-propagation",
+                 "reason": "normalized-deceleration-propagation",
                  "receiver_id": "4", "sender_id": "3",
                  "desired_path_id": "3_1"},
             ]
@@ -61,15 +61,16 @@ class DecisionOracleCorpusTests(unittest.TestCase):
                 args, ROOT, 10.0)
             self.assertIn("--no-save", command)
 
-    def test_proposal_origin_replay_uses_explicit_loss_lambda(self):
+    def test_proposal_origin_replay_uses_explicit_convex_lambda(self):
         args = NS(
             sumo_home=Path("/tmp/sumo"), origin_policy="proposal",
-            deceleration_loss_lambda=2.0)
+            deceleration_convex_lambda=2 / 3)
 
         with mock.patch.dict(os.environ, {}, clear=True):
             env = run_decision_oracle.common_env(args, ROOT)
 
-        self.assertEqual(env["MCS_DECELERATION_LOSS_LAMBDA"], "2.0")
+        self.assertEqual(
+            env["MCS_DECELERATION_CONVEX_LAMBDA"], str(2 / 3))
 
     def test_boundary_identity_uses_boundary_request_field_names(self):
         request = {

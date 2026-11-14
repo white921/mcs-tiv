@@ -90,13 +90,10 @@ def base_method_args(args, runner, output, method):
         sumo_home=args.sumo_home,
         decision_method=("utf" if method == "utf" else "tivtep"),
         deceleration_active=(method == "integrated"),
-        deceleration_time_half_life=0.0,
-        deceleration_loss_lambda=2.0,
-        rejection_wait_cap=0.0,
+        deceleration_convex_lambda=runner.DEFAULT_CONVEX_LAMBDA,
         agreement_lease_seconds=0.0,
         merge_negotiation_lead_seconds=0.0,
         two_stage_merge_negotiation=False,
-        deceleration_loss_mode="integrated",
         diagnostic_traces=True,
         checkpoint_interval=60.0,
         python=str(args.python),
@@ -121,16 +118,14 @@ def method_manifest(args, method, method_args, tasks, started_at):
         "started_epoch": started_at.timestamp(),
         "directory": str(method_args.output),
         "method": {
-            "integrated": "deceleration-propagation",
+            "integrated": "normalized-deceleration-propagation",
             "utf": "utf",
             "yamashita": "yamashita-tivtep",
         }[method],
         "requested_decision_method": method_args.decision_method,
-        "deceleration_time_half_life_s": (
-            0.0 if method == "integrated" else None
-        ),
-        "deceleration_loss_lambda": 2.0 if method == "integrated" else None,
-        "deceleration_loss_mode": "integrated" if method == "integrated" else None,
+        "deceleration_convex_lambda": (
+            method_args.deceleration_convex_lambda
+            if method == "integrated" else None),
         "cases": ["eval7"],
         "eval7_flows_vph": {
             "requesting": args.eval7_flows[0],

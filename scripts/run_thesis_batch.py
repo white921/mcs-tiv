@@ -32,6 +32,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "func"))
+from deceleration_loss import DEFAULT_CONVEX_LAMBDA  # noqa: E402
 from fixed_vehicle_inputs import load_fixed_vehicle_input  # noqa: E402
 
 SPEED = re.compile(r"^all_speed\s*:\s*(\S+)\s*$", re.MULTILINE)
@@ -47,6 +48,9 @@ CONTROLLED_MCS_ENV = {
     "MCS_CONFLICT_AUDIT",
     "MCS_DECELERATION_AUDIT",
     "MCS_DECELERATION_MODE",
+    "MCS_DECELERATION_CONVEX_LAMBDA",
+    # Retired proposal switches are also scrubbed so old shell state cannot
+    # silently describe or influence a new normalized-formula run.
     "MCS_DECELERATION_LOSS_LAMBDA",
     "MCS_DECELERATION_LOSS_MODE",
     "MCS_DECELERATION_TIME_HALF_LIFE_S",
@@ -174,12 +178,6 @@ def default_run_directory(args, now=None):
             method = "yamashita"
         else:
             method = args.decision_method
-        half_life = getattr(args, "deceleration_time_half_life", 0)
-        if args.deceleration_active and half_life > 0:
-            method += f"-weighted-{duration_label(half_life)}s"
-        loss_mode = getattr(args, "deceleration_loss_mode", "integrated")
-        if args.deceleration_active and loss_mode != "integrated":
-            method += f"-{loss_mode}"
         cases = "-".join(args.cases)
         if args.seeds is not None:
             seeds = "seeds-" + "-".join(str(seed) for seed in args.seeds)
@@ -209,29 +207,33 @@ def deceleration_prediction_manifest(args):
     """Return the complete active-proposal condition recorded per run."""
     if not args.deceleration_active:
         return None
-    wait_cap = getattr(args, "rejection_wait_cap", 0.0)
-    formula = (
-        "M=(t_request-t_receiver)+lambda*"
-        "max(accept_time_loss-reject_time_loss,0); accept iff M<=0")
-    if wait_cap > 0:
-        formula = (
-            "M=(t_request-t_receiver)+lambda*"
-            "max(accept_time_loss-reject_time_loss,0)-"
-            "min(consecutive_pair_rejection_wait,wait_cap); accept iff M<=0")
     return {
         "horizon_s": 10.0,
-        "time_weighting": (
-            "uniform" if args.deceleration_time_half_life == 0
-            else "exponential-half-life"),
-        "time_half_life_s": (args.deceleration_time_half_life or None),
-        "decision_formula": formula,
-        "loss_lambda": args.deceleration_loss_lambda,
-        "rejection_wait_cap_s": wait_cap,
-        "rejection_wait_reset_gap_s": 2.0 if wait_cap > 0 else None,
-        "loss_mode": args.deceleration_loss_mode,
-        "loss_scope": "detected followers excluding request and receiver vehicles",
-        "excluded_loss_roles": ["request_vehicle", "receiver_vehicle"],
-        "distance_to_time_speed": "per-vehicle allowed speed at negotiation",
+        "maximum_followers": 40,
+        "maximum_followers_basis": {
+            "communication_range_m": 200.0,
+            "vehicle_length_m": 5.0,
+            "minimum_gap_m": 5.0,
+            "same_direction_lanes": 2,
+        },
+        "decision_formula": (
+            "M=(1-lambda)*Z_time+lambda*Z_follow; accept iff M<=0"),
+        "z_time": "(t_request-t_receiver)/10s",
+        "z_follow": "sum(I_i)/40",
+        "follower_effect": (
+            "I_i=integral_0^10s((v_reject-v_accept)/v_allowed_i)dt/10s"),
+        "convex_lambda": args.deceleration_convex_lambda,
+        "default_convex_lambda": DEFAULT_CONVEX_LAMBDA,
+        "legacy_raw_threshold_formula": "A+2B",
+        "legacy_threshold_equivalent": math.isclose(
+            args.deceleration_convex_lambda, DEFAULT_CONVEX_LAMBDA,
+            abs_tol=1e-12),
+        "time_weight": 1 - args.deceleration_convex_lambda,
+        "follower_weight": args.deceleration_convex_lambda,
+        "follower_scope": (
+            "detected followers excluding request and receiver vehicles"),
+        "excluded_follower_roles": ["request_vehicle", "receiver_vehicle"],
+        "score_bounds": [-1.0, 1.0],
     }
 
 
@@ -366,20 +368,14 @@ def run_task(task, args):
                MPLBACKEND="Agg", OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1",
                MCS_TIV_IMPLEMENTATION="thesis",
                MCS_DECELERATION_MODE=("active" if args.deceleration_active else "off"),
-               MCS_DECELERATION_TIME_HALF_LIFE_S=str(
-                   args.deceleration_time_half_life if args.deceleration_active else 0.0),
-               MCS_DECELERATION_LOSS_LAMBDA=str(
-                   args.deceleration_loss_lambda if args.deceleration_active else 1.0),
-               MCS_REJECTION_WAIT_CAP_S=str(
-                   args.rejection_wait_cap if args.deceleration_active else 0.0),
+               MCS_DECELERATION_CONVEX_LAMBDA=str(
+                   args.deceleration_convex_lambda
+                   if args.deceleration_active else DEFAULT_CONVEX_LAMBDA),
                MCS_AGREEMENT_LEASE_S=str(args.agreement_lease_seconds),
                MCS_MERGE_NEGOTIATION_LEAD_S=str(
                    args.merge_negotiation_lead_seconds),
                MCS_TWO_STAGE_MERGE_NEGOTIATION=(
                    "1" if args.two_stage_merge_negotiation else "0"),
-               MCS_DECELERATION_LOSS_MODE=(
-                   args.deceleration_loss_mode if args.deceleration_active
-                   else "integrated"),
                MCS_TIV_AUDIT=str(destination / "tiv-audit.json"),
                MCS_EVALUATION_AUDIT=str(destination / "evaluation-metrics.json"),
                MCS_PHYSICAL_COLLISION_AUDIT=str(
@@ -455,9 +451,7 @@ def run_task(task, args):
             "prefix_sha256_scope": "canonical vehicle JSONL records with depart_time_s < prefix_duration_s",
         } if fixed_input is not None else None),
         "decision_method": (
-            "deceleration-propagation-rejection-wait"
-            if args.deceleration_active and args.rejection_wait_cap > 0
-            else "deceleration-propagation" if args.deceleration_active
+            "normalized-deceleration-propagation" if args.deceleration_active
             else decision_method),
         "decision_alpha": int(decision_alpha),
         "priority_hold": dict(PRIORITY_HOLD_MANIFEST),
@@ -598,14 +592,10 @@ def main():
     parser.add_argument("--deceleration-active", action="store_true",
                         help="use the proposed deceleration-propagation rule")
     parser.add_argument(
-        "--deceleration-time-half-life", type=float, default=0.0,
-        help="exponential future-loss half-life in seconds; 0 keeps uniform 10 s weighting")
-    parser.add_argument(
-        "--deceleration-loss-lambda", type=float, default=1.0,
-        help="weight on Accept-minus-Reject time-equivalent loss (default: 1.0)")
-    parser.add_argument(
-        "--rejection-wait-cap", type=float, default=0.0,
-        help="maximum observed repeated-rejection wait credit in seconds; 0 disables it")
+        "--deceleration-convex-lambda", type=float,
+        default=DEFAULT_CONVEX_LAMBDA,
+        help=("convex weight on normalized follower impact in [0,1]; "
+              "default 80/81 preserves the former raw A+2B threshold"))
     parser.add_argument(
         "--agreement-lease-seconds", type=float, default=0.0,
         help="reuse a feasible Accept for the same sender/conflict region; 0 disables it")
@@ -615,11 +605,6 @@ def main():
     parser.add_argument(
         "--two-stage-merge-negotiation", action="store_true",
         help="decide early but defer yielding and lane change until the legacy 200 m trigger")
-    parser.add_argument(
-        "--deceleration-loss-mode", choices=("integrated", "terminal-held"),
-        default="integrated",
-        help=("integrate the full 10 s speed deficit, or use only the 10 s "
-              "terminal deficit held across the horizon for an ablation"))
     parser.add_argument("--diagnostic-traces", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="write replay/FCD/negotiation diagnostics (default: enabled)")
@@ -643,14 +628,9 @@ def main():
             parser.error("--eval7-flows values must be between 0 and 1800 veh/h")
     if args.stop_time is not None and not 0 < args.stop_time <= args.duration:
         parser.error("--stop-time must be in (0, --duration]")
-    if not args.deceleration_time_half_life >= 0:
-        parser.error("--deceleration-time-half-life must be non-negative")
-    if (not math.isfinite(args.deceleration_loss_lambda) or
-            args.deceleration_loss_lambda < 0):
-        parser.error("--deceleration-loss-lambda must be finite and non-negative")
-    if (not math.isfinite(args.rejection_wait_cap) or
-            args.rejection_wait_cap < 0):
-        parser.error("--rejection-wait-cap must be finite and non-negative")
+    if (not math.isfinite(args.deceleration_convex_lambda) or
+            not 0 <= args.deceleration_convex_lambda <= 1):
+        parser.error("--deceleration-convex-lambda must lie in [0, 1]")
     if (not math.isfinite(args.agreement_lease_seconds) or
             args.agreement_lease_seconds < 0):
         parser.error("--agreement-lease-seconds must be finite and non-negative")
@@ -672,22 +652,12 @@ def main():
         parser.error(
             "two-stage merge negotiation cannot be combined with an "
             "agreement lease")
-    if min(args.deceleration_time_half_life, args.checkpoint_interval) < 0:
-        parser.error("prediction and checkpoint limits must be non-negative")
-    if args.deceleration_time_half_life > 0 and not args.deceleration_active:
-        parser.error("--deceleration-time-half-life requires --deceleration-active")
+    if args.checkpoint_interval < 0:
+        parser.error("checkpoint interval must be non-negative")
     if args.deceleration_active and args.decision_method not in (
             "documented", "tivtep"):
         parser.error(
             "--deceleration-active requires the documented TIVtep baseline")
-    if args.rejection_wait_cap > 0 and not args.deceleration_active:
-        parser.error("--rejection-wait-cap requires --deceleration-active")
-    if (args.deceleration_loss_mode != "integrated" and
-            not args.deceleration_active):
-        parser.error("--deceleration-loss-mode requires --deceleration-active")
-    if (args.deceleration_loss_mode == "terminal-held" and
-            args.deceleration_time_half_life > 0):
-        parser.error("terminal-held loss cannot use --deceleration-time-half-life")
     if args.fixed_input_override is not None:
         if len(args.cases) != 1 or args.seeds is None:
             parser.error("--fixed-input-override requires one --cases value and explicit --seeds")
@@ -748,24 +718,17 @@ def main():
         "started_epoch": started_at.timestamp(),
         "directory": str(args.output),
         "method": (
-            "deceleration-propagation" if args.deceleration_active
+            "normalized-deceleration-propagation" if args.deceleration_active
             else "yamashita-tiv" if args.decision_method == "documented"
             else args.decision_method),
         "requested_decision_method": args.decision_method,
-        "deceleration_time_half_life_s": (
-            args.deceleration_time_half_life
-            if args.deceleration_active and args.deceleration_time_half_life > 0
-            else None),
-        "deceleration_loss_lambda": (
-            args.deceleration_loss_lambda if args.deceleration_active else None),
-        "rejection_wait_cap_s": (
-            args.rejection_wait_cap if args.deceleration_active else None),
+        "deceleration_convex_lambda": (
+            args.deceleration_convex_lambda
+            if args.deceleration_active else None),
         "agreement_lease_seconds": args.agreement_lease_seconds,
         "merge_negotiation_lead_seconds": (
             args.merge_negotiation_lead_seconds),
         "two_stage_merge_negotiation": args.two_stage_merge_negotiation,
-        "deceleration_loss_mode": (
-            args.deceleration_loss_mode if args.deceleration_active else None),
         "cases": list(args.cases),
         "eval7_flows_vph": ({
             "requesting": args.eval7_flows[0],

@@ -1,9 +1,11 @@
-"""Read-only counterfactual evaluator for deceleration propagation.
+"""Counterfactual evaluator for the normalized deceleration proposal.
 
 This module never writes a live CAV or TraCI state. It takes the MCM paths
 available at one negotiation, reconstructs the CAV planner's 10-second grid,
 and propagates each changed leading trajectory to vehicles following it.
-``shadow`` records the result only.
+The final decision combines normalized conflict-region arrival difference and
+the signed integral of follower speed differences. ``shadow`` records the
+result only.
 """
 from __future__ import annotations
 
@@ -14,7 +16,11 @@ import math
 import os
 from collections import Counter
 
-from deceleration_loss import SpeedProfile, time_equivalent_decision
+from deceleration_loss import (
+    DEFAULT_CONVEX_LAMBDA,
+    SpeedProfile,
+    normalized_convex_decision,
+)
 import evaluation_metrics
 from trajectory_arrival import arrival_delay
 
@@ -31,48 +37,19 @@ MERGE_TOLERANCE = 1.6
 ALIGNMENT_COSINE = math.cos(math.radians(30.0))
 
 
-def _time_half_life_from_environment():
-    value = float(os.environ.get("MCS_DECELERATION_TIME_HALF_LIFE_S", "0"))
-    if not math.isfinite(value) or value < 0:
-        raise ValueError("MCS_DECELERATION_TIME_HALF_LIFE_S must be non-negative")
-    return value or None
-
-
-TIME_HALF_LIFE_S = _time_half_life_from_environment()
-
-
-def _loss_lambda_from_environment():
-    value = float(os.environ.get("MCS_DECELERATION_LOSS_LAMBDA", "1"))
-    if not math.isfinite(value) or value < 0:
-        raise ValueError("MCS_DECELERATION_LOSS_LAMBDA must be finite and non-negative")
-    return value
-
-
-LOSS_LAMBDA = _loss_lambda_from_environment()
-
-
-def _rejection_wait_cap_from_environment():
-    value = float(os.environ.get("MCS_REJECTION_WAIT_CAP_S", "0"))
-    if not math.isfinite(value) or value < 0:
-        raise ValueError("MCS_REJECTION_WAIT_CAP_S must be finite and non-negative")
-    return value
-
-
-REJECTION_WAIT_CAP_S = _rejection_wait_cap_from_environment()
-REJECTION_WAIT_RESET_GAP_S = 2 * REPLAN_INTERVAL
-
-
-def _loss_mode_from_environment():
-    value = os.environ.get("MCS_DECELERATION_LOSS_MODE", "integrated")
-    if value not in ("integrated", "terminal-held"):
+def _convex_lambda_from_environment():
+    value = float(os.environ.get(
+        "MCS_DECELERATION_CONVEX_LAMBDA", str(DEFAULT_CONVEX_LAMBDA)))
+    if not math.isfinite(value) or not 0 <= value <= 1:
         raise ValueError(
-            "MCS_DECELERATION_LOSS_MODE must be integrated or terminal-held")
-    if value == "terminal-held" and TIME_HALF_LIFE_S is not None:
-        raise ValueError("terminal-held loss does not support time weighting")
+            "MCS_DECELERATION_CONVEX_LAMBDA must lie in [0, 1]")
     return value
 
 
-LOSS_MODE = _loss_mode_from_environment()
+CONVEX_LAMBDA = _convex_lambda_from_environment()
+# 200 m communication range / (5 m vehicle + 5 m minimum gap) = 20
+# followers per lane; the lane-closure model has two same-direction lanes.
+MAXIMUM_FOLLOWERS = 40
 
 COUNTS = Counter()
 RECORDS = []
@@ -80,7 +57,6 @@ RECORDS = []
 # proposal decision for that one planning interval so the 0.1 s SUMO loop does
 # not repeatedly negotiate the very same desired path.
 ACTIVE_DECISION_UNTIL = {}
-REJECTION_WAIT_EPISODES = {}
 MODE = os.environ.get("MCS_DECELERATION_MODE", "off")
 if MODE not in ("off", "shadow", "active"):
     raise ValueError("MCS_DECELERATION_MODE must be off, shadow, or active")
@@ -93,33 +69,6 @@ def configure(mode):
         raise ValueError("MCS_DECELERATION_MODE must be off, shadow, or active")
     MODE = mode
     ACTIVE_DECISION_UNTIL.clear()
-    REJECTION_WAIT_EPISODES.clear()
-
-
-def _rejection_wait(receiver, desired, now):
-    """Return current repeated-rejection wait without changing live state."""
-    key = (str(receiver.id), str(desired.vehID))
-    episode = REJECTION_WAIT_EPISODES.get(key)
-    if (episode is None or now < episode["started_at"] or
-            now - episode["last_seen_at"] > REJECTION_WAIT_RESET_GAP_S):
-        return key, 0.0, False
-    wait_s = max(0.0, now - episode["started_at"])
-    return key, min(wait_s, REJECTION_WAIT_CAP_S), True
-
-
-def _update_rejection_wait(key, now, rejected, continued):
-    """Advance or clear one observed sender/receiver rejection episode."""
-    if REJECTION_WAIT_CAP_S <= 0:
-        return
-    if not rejected:
-        REJECTION_WAIT_EPISODES.pop(key, None)
-        return
-    if continued:
-        REJECTION_WAIT_EPISODES[key]["last_seen_at"] = now
-    else:
-        REJECTION_WAIT_EPISODES[key] = {
-            "started_at": now, "last_seen_at": now,
-        }
 
 
 def active_decision_is_locked(receiver, desired, now):
@@ -259,6 +208,11 @@ def _latest_planned(receiver):
     for path in receiver.receivedPaths:
         if getattr(path, "type", None) != "planned" or not getattr(path, "t", None):
             continue
+        # Eval.7 publishes the lane-closure stone as a synthetic planned path.
+        # It is a fixed obstacle, not a following vehicle whose traffic impact
+        # belongs in Z_follow.
+        if str(getattr(path, "vehID", "")) == "stone":
+            continue
         previous = latest.get(str(path.vehID))
         if previous is None or path.t[0] > previous.t[0]:
             latest[str(path.vehID)] = path
@@ -362,8 +316,7 @@ def _case_profiles(roots, candidates, now):
     return profiles
 
 
-def _evaluate_detail(receiver, desired, alternative, now, conflict_point,
-                     rejection_wait_s=0.0):
+def _evaluate_detail(receiver, desired, alternative, now, conflict_region):
     """Return the comparison and both case profiles for instrumentation."""
     sender_id, receiver_id = str(desired.vehID), str(receiver.id)
     candidates = _latest_planned(receiver)
@@ -410,32 +363,30 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_point,
         accept.setdefault(vehicle_id, baseline)
         reject.setdefault(vehicle_id, baseline)
 
-    if conflict_point is None or len(conflict_point) != 2:
-        raise ValueError("conflict point is unavailable")
+    if not isinstance(conflict_region, dict):
+        raise ValueError("shared conflict region is unavailable")
     # Arrival time already evaluates the two negotiating actors directly.
-    # The loss term is therefore restricted to other vehicles whose following
+    # The follower term is therefore restricted to other vehicles whose following
     # motion changes under Accept or Reject.  This avoids counting the sender
     # and receiver once in arrival priority and again in aggregate delay.
-    loss_vehicle_ids = union_ids - actor_ids
+    follower_vehicle_ids = union_ids - actor_ids
     allowed_speeds = {}
-    for vehicle_id in loss_vehicle_ids:
+    for vehicle_id in follower_vehicle_ids:
         value = getattr(candidates[vehicle_id], "allowed_speed_mps", None)
         if value is None:
             raise ValueError(
                 "allowed speed is unavailable for vehicle " + vehicle_id)
         allowed_speeds[vehicle_id] = value
-    result = time_equivalent_decision(
-        {vehicle_id: reference[vehicle_id] for vehicle_id in loss_vehicle_ids},
-        {vehicle_id: accept[vehicle_id] for vehicle_id in loss_vehicle_ids},
-        {vehicle_id: reject[vehicle_id] for vehicle_id in loss_vehicle_ids},
+    result = normalized_convex_decision(
+        {vehicle_id: accept[vehicle_id] for vehicle_id in follower_vehicle_ids},
+        {vehicle_id: reject[vehicle_id] for vehicle_id in follower_vehicle_ids},
         allowed_speeds,
-        request_arrival_s=arrival_delay(desired, conflict_point, now),
+        request_arrival_s=arrival_delay(desired, conflict_region, now),
         receiver_arrival_s=arrival_delay(
-            receiver_planned, conflict_point, now),
-        loss_lambda=LOSS_LAMBDA,
-        rejection_wait_s=rejection_wait_s,
-        time_half_life_s=TIME_HALF_LIFE_S,
-        loss_mode=LOSS_MODE)
+            receiver_planned, conflict_region, now),
+        convex_lambda=CONVEX_LAMBDA,
+        horizon_s=HORIZON,
+        maximum_followers=MAXIMUM_FOLLOWERS)
     terminal_speed_details = {
         vehicle_id: {
             "reference_terminal_mps": reference[vehicle_id].speeds[-1],
@@ -445,7 +396,7 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_point,
                 accept[vehicle_id].speeds[-1] -
                 reject[vehicle_id].speeds[-1]),
         }
-        for vehicle_id in sorted(loss_vehicle_ids)
+        for vehicle_id in sorted(follower_vehicle_ids)
     }
     maximum_terminal_difference = max(
         (abs(item["accept_minus_reject_mps"])
@@ -454,8 +405,8 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_point,
     )
     union_follower_ids = accept_follower_ids | reject_follower_ids
     result = {**result, "vehicle_ids": sorted(union_ids),
-              "loss_vehicle_ids": sorted(loss_vehicle_ids),
-              "excluded_loss_vehicle_ids": sorted(actor_ids),
+              "follower_vehicle_ids": sorted(follower_vehicle_ids),
+              "excluded_follower_vehicle_ids": sorted(actor_ids),
               "accept_follower_ids": sorted(accept_follower_ids),
               "reject_follower_ids": sorted(reject_follower_ids),
               "union_follower_ids": sorted(union_follower_ids),
@@ -464,17 +415,13 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_point,
               "maximum_accept_reject_terminal_speed_difference_mps": (
                   maximum_terminal_difference),
               "replan_interval_s": REPLAN_INTERVAL,
-              "time_weighting": ("uniform" if TIME_HALF_LIFE_S is None
-                                 else "exponential-half-life"),
-              "time_half_life_s": TIME_HALF_LIFE_S,
-              "loss_mode": LOSS_MODE,
               "follower_replans": len(union_follower_ids) * int(HORIZON / REPLAN_INTERVAL)}
     return result, accept, reject
 
 
-def evaluate(receiver, desired, alternative, now, conflict_point):
+def evaluate(receiver, desired, alternative, now, conflict_region):
     """Evaluate accept/reject with every detectable following queue."""
-    return _evaluate_detail(receiver, desired, alternative, now, conflict_point)[0]
+    return _evaluate_detail(receiver, desired, alternative, now, conflict_region)[0]
 
 
 def direct_tiv_profiles(receiver, desired, alternative, now, decision):
@@ -499,16 +446,14 @@ def direct_tiv_profiles(receiver, desired, alternative, now, decision):
             for vehicle_id, path in roots.items()}
 
 
-def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode,
-                       rejection_wait_s=0.0):
+def _record_evaluation(receiver, desired, alternative, now, conflict_region, mode):
     """Evaluate and audit a proposal decision without mutating vehicle state."""
     if MODE != mode:
         return None
     COUNTS[mode + "_attempts"] += 1
     try:
         result, accept_profiles, reject_profiles = _evaluate_detail(
-            receiver, desired, alternative, now, conflict_point,
-            rejection_wait_s=rejection_wait_s)
+            receiver, desired, alternative, now, conflict_region)
     except (AttributeError, IndexError, TypeError, ValueError, ZeroDivisionError) as error:
         COUNTS[mode + "_unsupported"] += 1
         record = {"time": now, "receiver": str(receiver.id),
@@ -523,45 +468,30 @@ def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode
             evaluation_metrics.register_prediction(
                 now, result["decision"], result["follower_count"], chosen_profiles,
                 metadata={
-                    "method": (
-                        "deceleration-propagation-rejection-wait"
-                        if REJECTION_WAIT_CAP_S > 0
-                        else "deceleration-propagation"),
+                    "method": "normalized-deceleration-propagation",
                     "predictor": "10s-kinematic-following",
                     "receiver_id": str(receiver.id), "sender_id": str(desired.vehID),
                     "desired_path_id": str(desired.pathID),
                     "alternative_path_id": str(alternative.pathID),
                     "actor_vehicle_ids": actor_ids,
-                    "loss_vehicle_ids": result["loss_vehicle_ids"],
-                    "excluded_loss_vehicle_ids": result["excluded_loss_vehicle_ids"],
+                    "excluded_follower_vehicle_ids": result[
+                        "excluded_follower_vehicle_ids"],
                     "follower_vehicle_ids": sorted(set(chosen_profiles) - set(actor_ids)),
                     "accept_follower_ids": result["accept_follower_ids"],
                     "reject_follower_ids": result["reject_follower_ids"],
                     "union_follower_ids": result["union_follower_ids"],
                     "prediction_scope": "sender_receiver_and_detected_followers",
-                    "time_weighting": result["time_weighting"],
-                    "time_half_life_s": result["time_half_life_s"],
-                    "loss_mode": result["loss_mode"],
-                    "accept_loss_m": result["accept_loss_m"],
-                    "reject_loss_m": result["reject_loss_m"],
-                    "decision_margin_m": result["reject_minus_accept_m"],
                     "request_arrival_s": result["request_arrival_s"],
                     "receiver_arrival_s": result["receiver_arrival_s"],
-                    "request_arrival_reached": result["request_arrival_reached"],
-                    "receiver_arrival_reached": result["receiver_arrival_reached"],
-                    "arrival_status": result["arrival_status"],
-                    "decision_basis": result["decision_basis"],
-                    "arrival_margin_s": result["arrival_margin_s"],
-                    "accept_time_equivalent_loss_s": result["accept_time_equivalent_loss_s"],
-                    "reject_time_equivalent_loss_s": result["reject_time_equivalent_loss_s"],
-                    "loss_margin_s": result["loss_margin_s"],
-                    "effective_loss_margin_s": result["effective_loss_margin_s"],
-                    "negative_loss_credit_s": result["negative_loss_credit_s"],
-                    "weighted_loss_margin_s": result["weighted_loss_margin_s"],
-                    "rejection_wait_s": result["rejection_wait_s"],
-                    "rejection_wait_credit_s": result["rejection_wait_credit_s"],
-                    "final_margin_s": result["final_margin_s"],
-                    "loss_lambda": result["loss_lambda"],
+                    "z_time": result["z_time"],
+                    "z_follow": result["z_follow"],
+                    "follower_effects": result["follower_effects"],
+                    "maximum_followers": result["maximum_followers"],
+                    "prediction_horizon_s": result["prediction_horizon_s"],
+                    "normalized_margin": result["normalized_margin"],
+                    "convex_lambda": result["convex_lambda"],
+                    "time_weight": result["time_weight"],
+                    "follower_weight": result["follower_weight"],
                 })
         record = {"time": now, "receiver": str(receiver.id), "sender": str(desired.vehID),
                   "desired_path_id": desired.pathID, "alternative_path_id": alternative.pathID,
@@ -572,29 +502,22 @@ def _record_evaluation(receiver, desired, alternative, now, conflict_point, mode
     return record
 
 
-def record_shadow(receiver, desired, alternative, now, conflict_point):
+def record_shadow(receiver, desired, alternative, now, conflict_region):
     """Record a full 10-second comparison and leave the TIV decision intact."""
     return _record_evaluation(
-        receiver, desired, alternative, now, conflict_point, "shadow")
+        receiver, desired, alternative, now, conflict_region, "shadow")
 
 
-def active_decision(receiver, desired, alternative, now, conflict_point):
+def active_decision(receiver, desired, alternative, now, conflict_region):
     """Return the proposed decision, or ``None`` if prediction is unavailable.
 
     Keeping the unavailable case as ``None`` lets the caller retain the
     baseline TIV rule rather than creating an unsafe synthetic decision.
     """
-    wait_key, rejection_wait_s, continued = _rejection_wait(
-        receiver, desired, now)
     record = _record_evaluation(
-        receiver, desired, alternative, now, conflict_point, "active",
-        rejection_wait_s=rejection_wait_s)
+        receiver, desired, alternative, now, conflict_region, "active")
     if record is None or record["status"] != "evaluated":
         return None
-    rejected = record["decision"] == "reject"
-    _update_rejection_wait(wait_key, now, rejected, continued)
-    if rejected and rejection_wait_s > 0:
-        COUNTS["repeated_rejection_wait_applied"] += 1
     key = (str(receiver.id), str(desired.vehID), str(desired.pathID))
     ACTIVE_DECISION_UNTIL[key] = now + REPLAN_INTERVAL
     return record["decision"] == "accept"
@@ -615,9 +538,9 @@ def _write_audit():
         with open(destination, "w") as stream:
             json.dump(evaluation_metrics.json_safe({
                 "mode": MODE,
-                "loss_lambda": LOSS_LAMBDA,
-                "rejection_wait_cap_s": REJECTION_WAIT_CAP_S,
-                "rejection_wait_reset_gap_s": REJECTION_WAIT_RESET_GAP_S,
+                "convex_lambda": CONVEX_LAMBDA,
+                "prediction_horizon_s": HORIZON,
+                "maximum_followers": MAXIMUM_FOLLOWERS,
                 "counts": dict(COUNTS),
                 "records": RECORDS,
             }), stream, indent=2,

@@ -14,6 +14,17 @@ class DecelerationLossTests(unittest.TestCase):
     def profile(self, speeds):
         return loss.SpeedProfile("v", (0.0, 0.1, 0.2), tuple(speeds))
 
+    def region(self, center_x=40.0):
+        return {
+            "schema_version": 1,
+            "center_x_m": center_x,
+            "center_y_m": 0.0,
+            "heading_rad": 0.0,
+            "longitudinal_radius_m": 200.0,
+            "lateral_radius_m": 200.0,
+            "horizon_s": 10.0,
+        }
+
     def test_integrates_intermediate_deceleration_not_only_terminal_speed(self):
         reference = self.profile((10, 10, 10))
         slow_middle = self.profile((10, 0, 10))
@@ -38,6 +49,126 @@ class DecelerationLossTests(unittest.TestCase):
         reference = self.profile((5, 5, 5))
         faster = self.profile((6, 6, 6))
         self.assertAlmostEqual(loss.distance_loss(reference, faster), -.2)
+
+    def test_normalized_follower_effect_integrates_signed_relative_speed(self):
+        times = tuple(index / 10 for index in range(101))
+        accept = loss.SpeedProfile("v", times, (5.0,) * 101)
+        reject = loss.SpeedProfile("v", times, (10.0,) * 101)
+
+        effect = loss.normalized_follower_effect(
+            accept, reject, 10.0, horizon_s=10.0)
+
+        self.assertAlmostEqual(effect, 0.5)
+
+    def test_normalized_follower_effect_bounds_planner_speed_overshoot(self):
+        times = tuple(index / 10 for index in range(101))
+        accept = loss.SpeedProfile("v", times, (10.2,) * 101)
+        reject = loss.SpeedProfile("v", times, (0.0,) * 101)
+
+        effect = loss.normalized_follower_effect(
+            accept, reject, 10.0, horizon_s=10.0)
+
+        self.assertAlmostEqual(effect, -1.0)
+
+    def test_normalized_convex_formula_keeps_vehicle_count_effect(self):
+        times = tuple(index / 10 for index in range(101))
+
+        def profile(vehicle_id, speed):
+            return loss.SpeedProfile(vehicle_id, times, (speed,) * 101)
+
+        one = loss.normalized_convex_decision(
+            {"1": profile("1", 5.0)},
+            {"1": profile("1", 10.0)},
+            {"1": 10.0},
+            request_arrival_s=5.0,
+            receiver_arrival_s=5.0,
+            convex_lambda=2 / 3,
+        )
+        two = loss.normalized_convex_decision(
+            {"1": profile("1", 5.0), "2": profile("2", 5.0)},
+            {"1": profile("1", 10.0), "2": profile("2", 10.0)},
+            {"1": 10.0, "2": 10.0},
+            request_arrival_s=5.0,
+            receiver_arrival_s=5.0,
+            convex_lambda=2 / 3,
+        )
+
+        self.assertAlmostEqual(one["z_follow"], 0.5 / 40)
+        self.assertAlmostEqual(two["z_follow"], 1.0 / 40)
+        self.assertAlmostEqual(two["normalized_margin"], 2 * one["normalized_margin"])
+
+    def test_normalized_convex_formula_has_known_bounds_and_weight_ratio(self):
+        times = tuple(index / 10 for index in range(101))
+
+        def profiles(speed):
+            return {
+                str(index): loss.SpeedProfile(
+                    str(index), times, (speed,) * 101)
+                for index in range(40)
+            }
+
+        allowed = {str(index): 10.0 for index in range(40)}
+        maximum = loss.normalized_convex_decision(
+            profiles(0.0), profiles(10.0), allowed,
+            request_arrival_s=10.0,
+            receiver_arrival_s=0.0,
+            convex_lambda=2 / 3,
+        )
+        minimum = loss.normalized_convex_decision(
+            profiles(10.0), profiles(0.0), allowed,
+            request_arrival_s=0.0,
+            receiver_arrival_s=10.0,
+            convex_lambda=2 / 3,
+        )
+
+        self.assertAlmostEqual(maximum["z_time"], 1.0)
+        self.assertAlmostEqual(maximum["z_follow"], 1.0)
+        self.assertAlmostEqual(maximum["normalized_margin"], 1.0)
+        self.assertEqual(maximum["decision"], "reject")
+        self.assertAlmostEqual(minimum["normalized_margin"], -1.0)
+        self.assertEqual(minimum["decision"], "accept")
+        self.assertAlmostEqual(maximum["time_weight"], 1 / 3)
+        self.assertAlmostEqual(maximum["follower_weight"], 2 / 3)
+
+    def test_default_lambda_preserves_old_raw_a_plus_2b_threshold(self):
+        times = tuple(index / 10 for index in range(101))
+        accept = loss.SpeedProfile("v", times, (5.0,) * 101)
+        reject = loss.SpeedProfile("v", times, (10.0,) * 101)
+
+        result = loss.normalized_convex_decision(
+            {"v": accept}, {"v": reject}, {"v": 10.0},
+            request_arrival_s=0.0,
+            receiver_arrival_s=5.0,
+        )
+
+        # A=-5 s and B=5 s, so old A+2B=5. The normalized score must be
+        # the same raw margin multiplied by one positive constant, 1/810.
+        self.assertAlmostEqual(result["convex_lambda"], 80 / 81)
+        self.assertAlmostEqual(result["normalized_margin"], 5 / 810)
+        self.assertEqual(result["decision"], "reject")
+
+    def test_normalized_convex_formula_rejects_invalid_model_inputs(self):
+        times = tuple(index / 10 for index in range(101))
+        profile = loss.SpeedProfile("v", times, (10.0,) * 101)
+        with self.assertRaisesRegex(ValueError, "arrival"):
+            loss.normalized_convex_decision(
+                {"v": profile}, {"v": profile}, {"v": 10.0},
+                request_arrival_s=math.inf, receiver_arrival_s=2.0)
+        with self.assertRaisesRegex(ValueError, "lambda"):
+            loss.normalized_convex_decision(
+                {"v": profile}, {"v": profile}, {"v": 10.0},
+                request_arrival_s=1.0, receiver_arrival_s=2.0,
+                convex_lambda=2.0)
+        too_many = {
+            str(index): loss.SpeedProfile(
+                str(index), times, (10.0,) * 101)
+            for index in range(41)
+        }
+        with self.assertRaisesRegex(ValueError, "geometric maximum"):
+            loss.normalized_convex_decision(
+                too_many, too_many,
+                {vehicle_id: 10.0 for vehicle_id in too_many},
+                request_arrival_s=1.0, receiver_arrival_s=2.0)
 
     def test_time_half_life_downweights_distant_loss(self):
         reference = self.profile((10, 10, 10))
@@ -188,7 +319,7 @@ class DecelerationLossTests(unittest.TestCase):
         prediction.configure("shadow")
         before = (list(receiver_planned.s_d), list(desired.s_d), receiver.status)
         record = prediction.record_shadow(
-            receiver, desired, alternative, 0.0, (40.0, 0.0))
+            receiver, desired, alternative, 0.0, self.region())
         self.assertEqual(record["status"], "evaluated")
         self.assertEqual(before, (receiver_planned.s_d, desired.s_d, receiver.status))
         prediction.configure("off")
@@ -206,9 +337,19 @@ class DecelerationLossTests(unittest.TestCase):
         receiver = NS(id="b", plannedPath=planned, receivedPaths=[old, new])
         prediction.configure("shadow")
         record = prediction.record_shadow(
-            receiver, desired, alternative, 1.0, (40.0, 0.0))
+            receiver, desired, alternative, 1.0, self.region())
         self.assertEqual(record["status"], "evaluated")
         prediction.configure("off")
+
+    def test_synthetic_lane_closure_stone_is_not_a_follower_candidate(self):
+        stone = NS(
+            vehID="stone", type="planned", pathID="stone",
+            t=[0.0, 5.0, 10.0], s_d=[0.0, 0.0, 0.0],
+            x=[300.0, 300.0, 300.0], y=[0.0, 0.0, 0.0],
+        )
+        receiver = NS(receivedPaths=[stone])
+
+        self.assertEqual(prediction._latest_planned(receiver), {})
 
     def test_shadow_propagates_lead_deceleration_to_a_follower(self):
         def path(veh, kind, x0, speeds):
@@ -225,14 +366,15 @@ class DecelerationLossTests(unittest.TestCase):
         receiver = NS(id="b", plannedPath=receiver_planned,
                       receivedPaths=[sender_planned, follower])
         result = prediction.evaluate(
-            receiver, desired, alternative, 0.0, (40.0, 0.0))
+            receiver, desired, alternative, 0.0, self.region())
         self.assertEqual(result["follower_count"], 1)
         self.assertIn("c", result["vehicle_ids"])
         self.assertEqual(result["replan_interval_s"], 1.0)
         self.assertEqual(result["follower_replans"], 10)
-        self.assertEqual(result["loss_vehicle_ids"], ["c"])
-        self.assertEqual(result["excluded_loss_vehicle_ids"], ["a", "b"])
-        self.assertEqual(set(result["vehicle_loss_details"]), {"c"})
+        self.assertEqual(result["follower_vehicle_ids"], ["c"])
+        self.assertEqual(
+            result["excluded_follower_vehicle_ids"], ["a", "b"])
+        self.assertEqual(set(result["follower_effects"]), {"c"})
 
     def test_negotiating_actors_are_excluded_from_loss_but_follower_is_included(self):
         def path(veh, kind, x0, speeds):
@@ -251,12 +393,13 @@ class DecelerationLossTests(unittest.TestCase):
                       receivedPaths=[sender_planned, follower])
 
         result = prediction.evaluate(
-            receiver, desired, alternative, 0.0, (40.0, 0.0))
+            receiver, desired, alternative, 0.0, self.region())
 
-        self.assertEqual(result["loss_vehicle_ids"], ["c"])
-        self.assertEqual(result["excluded_loss_vehicle_ids"], ["a", "b"])
-        self.assertEqual(set(result["vehicle_loss_details"]), {"c"})
-        self.assertNotEqual(result["accept_time_equivalent_loss_s"], 0.0)
+        self.assertEqual(result["follower_vehicle_ids"], ["c"])
+        self.assertEqual(
+            result["excluded_follower_vehicle_ids"], ["a", "b"])
+        self.assertEqual(set(result["follower_effects"]), {"c"})
+        self.assertNotEqual(result["follower_effects"]["c"], 0.0)
 
     def test_counterfactuals_compare_union_of_different_follower_sets(self):
         def path(veh, kind, lane, y, lane_position, speeds):
@@ -285,7 +428,7 @@ class DecelerationLossTests(unittest.TestCase):
             receivedPaths=[sender_planned, reject_only, accept_only])
 
         result = prediction.evaluate(
-            receiver, desired, alternative, 0.0, (60.0, 0.0))
+            receiver, desired, alternative, 0.0, self.region(60.0))
 
         self.assertEqual(result["accept_follower_ids"], ["d"])
         self.assertEqual(result["reject_follower_ids"], ["c"])
@@ -364,7 +507,7 @@ class DecelerationLossTests(unittest.TestCase):
         self.assertEqual(prediction._followers(
             "a", leader, {"b": crossing}, 0.0, {"a"}), [])
 
-    def test_prediction_records_selected_time_half_life(self):
+    def test_prediction_records_selected_convex_lambda(self):
         def path(veh, kind, x0, speeds):
             times = [0.0, 5.0, 10.0]
             return NS(vehID=veh, type=kind, pathID=veh + kind,
@@ -375,13 +518,14 @@ class DecelerationLossTests(unittest.TestCase):
             id="b", plannedPath=path("b", "planned", 10, [8, 8, 8]),
             receivedPaths=[path("a", "planned", 20, [8, 8, 8])])
 
-        with patch.object(prediction, "TIME_HALF_LIFE_S", 3.0):
+        with patch.object(prediction, "CONVEX_LAMBDA", 0.25):
             result = prediction.evaluate(
                 receiver, path("a", "desired", 20, [10, 10, 10]),
-                path("b", "alter", 10, [6, 6, 6]), 0.0, (60.0, 0.0))
+                path("b", "alter", 10, [6, 6, 6]), 0.0,
+                self.region(60.0))
 
-        self.assertEqual(result["time_weighting"], "exponential-half-life")
-        self.assertEqual(result["time_half_life_s"], 3.0)
+        self.assertEqual(result["convex_lambda"], 0.25)
+        self.assertEqual(result["time_weight"], 0.75)
 
     def test_active_decision_is_available_only_in_active_mode(self):
         def path(veh, kind, speeds):
@@ -396,10 +540,10 @@ class DecelerationLossTests(unittest.TestCase):
         receiver = NS(id="b", plannedPath=planned, receivedPaths=[sender])
         prediction.configure("active")
         self.assertTrue(prediction.active_decision(
-            receiver, desired, alternative, 0.0, (40.0, 0.0)))
+            receiver, desired, alternative, 0.0, self.region()))
         prediction.configure("off")
         self.assertIsNone(prediction.active_decision(
-            receiver, desired, alternative, 0.0, (40.0, 0.0)))
+            receiver, desired, alternative, 0.0, self.region()))
 
     def test_active_decision_locks_only_the_same_desired_path_for_one_second(self):
         def path(veh, kind, name, speeds):
@@ -414,37 +558,12 @@ class DecelerationLossTests(unittest.TestCase):
         receiver = NS(id="b", plannedPath=planned, receivedPaths=[sender])
         prediction.configure("active")
         prediction.active_decision(
-            receiver, desired, alternative, 0.0, (40.0, 0.0))
+            receiver, desired, alternative, 0.0, self.region())
         self.assertTrue(prediction.active_decision_is_locked(receiver, desired, 0.9))
         self.assertFalse(prediction.active_decision_is_locked(receiver, desired, 1.0))
         newer_desired = path("a", "desired", "a_desired_2", [13, 13, 13])
         self.assertFalse(prediction.active_decision_is_locked(receiver, newer_desired, 0.1))
         prediction.configure("off")
-
-    def test_rejection_wait_episode_accumulates_resets_and_clears(self):
-        receiver = NS(id="b")
-        desired = NS(vehID="a")
-        with patch.object(prediction, "REJECTION_WAIT_CAP_S", 10.0):
-            prediction.configure("active")
-            key, wait, continued = prediction._rejection_wait(
-                receiver, desired, 1.0)
-            self.assertEqual(wait, 0)
-            prediction._update_rejection_wait(key, 1.0, True, continued)
-
-            key, wait, continued = prediction._rejection_wait(
-                receiver, desired, 2.0)
-            self.assertTrue(continued)
-            self.assertEqual(wait, 1.0)
-            prediction._update_rejection_wait(key, 2.0, True, continued)
-
-            _, wait, continued = prediction._rejection_wait(
-                receiver, desired, 4.1)
-            self.assertFalse(continued)
-            self.assertEqual(wait, 0)
-            prediction._update_rejection_wait(key, 4.1, False, continued)
-            self.assertNotIn(("b", "a"), prediction.REJECTION_WAIT_EPISODES)
-            prediction.configure("off")
-
 
 if __name__ == "__main__":
     unittest.main()
