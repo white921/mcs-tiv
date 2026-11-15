@@ -45,7 +45,10 @@
 2. 必須artifact、checkpoint、runner/stdout/stderr、物理衝突、致命的ログを監査する。
 3. 実験記録を更新し、結果保存規則に従う。
 4. systemd unit、SUMO/runner残存、一時物を確認して後始末する。
-5. heartbeat automationを停止する。
+5. 結果と必要な証拠を保存・pushした後、cleanで非稼働の実験worktreeを削除する。
+   branchとremote commitは残し、必要時に再作成する。未コミット変更、未追跡の実験証拠、
+   active processまたはactive automationから参照されるworktreeは削除しない。
+6. heartbeat automationを停止する。
 
 ## 現行の周期変更
 

@@ -11,6 +11,16 @@
 - Treat the heartbeat's SSH readback as the source of truth; never report a
   remembered or locally inferred remote state.
 
+## Worktree lifecycle
+
+- Create a worktree only when concurrent work or a clean isolated experiment
+  requires it. Do not keep one checkout per historical branch by default.
+- After results and required evidence are preserved and the branch is pushed,
+  remove a clean inactive worktree. Keep the branch and remote commit so the
+  checkout can be recreated when needed.
+- Never remove a worktree with tracked changes, untracked experiment evidence,
+  an active process, or an active automation reference.
+
 - Save every new run under `results/runs/<experiment-id>/`; never add new
   simulation output to the legacy singular `result/` directory.
 - One batch invocation owns one experiment directory. One case/seed process
