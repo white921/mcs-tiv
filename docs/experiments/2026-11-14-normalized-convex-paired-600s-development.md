@@ -1,10 +1,10 @@
 # 正規化凸結合式・山下手法ペア10-seed・600秒開発比較
 
 - 台帳ID: `2026-11-14-normalized-convex-paired-600s-development`
-- 状態: `running`
+- 状態: `completed`
 - 位置づけ: `development`
 - 開始日時: 2026-11-14 JST
-- 終了日時: 実行中
+- 終了日時: 2026-11-15 JST
 - 実験ディレクトリ:
   - `results/runs/normalized-convex-600s-proposal-eval7-r1000-a1000-seeds1-2-3-6-7-8-9-10-11-12-v2-20261114/`
   - `results/runs/normalized-convex-600s-yamashita-eval7-r1000-a1000-seeds1-2-3-6-7-8-9-10-11-12-v2-20261114/`
@@ -54,25 +54,37 @@ Eval.7交通性能と安全性を、同一固定入力10 seed・600秒で比較�
 
 ## 完了・完全性確認
 
-- [ ] 両バッチmanifestが正常完了
-- [ ] 予定した20 runが存在
-- [ ] 全Runが`exit_code: 0`
-- [ ] 全Runが`source_unchanged: true`
-- [ ] runner/stdout/stderr/SUMOログを確認
-- [ ] 必須artifactとhashを確認
-- [ ] 物理衝突と既知警告を確認
+- [x] 両バッチmanifestが正常完了
+- [x] 予定した20 runが存在
+- [x] 全Runが`exit_code: 0`
+- [x] 全Runが`source_unchanged: true`
+- [x] runner/stdout/stderr/SUMOログを確認
+- [x] 必須artifactとhashを確認
+- [x] 物理衝突と既知警告を確認
 - [ ] 結果ディレクトリだけの専用commitをpush
 
 ## 結果
 
-実行中。
+- 提案10 run、山下10 runの計20 runが正常終了した。
+- 全runは実行ソース`78ce283ab`、dirty=false、`source_unchanged=true`で、
+  同一seed間の600秒固定入力prefix hashも10組すべて一致した。
+- 全車平均速度の10-seed平均は、提案`4.21265 m/s`、山下`4.14991 m/s`、
+  対応差（提案−山下）は`+0.06274 m/s`だった。
+- seed別対応差は、提案優位7 seed、山下優位3 seedで、最大の負差は
+  seed 9の`-0.82014 m/s`だった。平均値だけで安定した優位性とは判断しない。
+- 物理衝突は両方式とも0。Traceback、ValueError、RuntimeErrorは0件だった。
+- 全runで必須監査artifactと10個の60秒checkpointを確認した。
 
 ## 結論
 
-- 確認できたこと: 実行中。
-- 確認できなかったこと: 実行中。
-- 採否・次の判断: 実行中。
-- 既存の研究判断から変わったこと: 実行中。
+- 確認できたこと: 評価式以外を固定した本条件では、提案の全車平均速度は
+  10-seed平均で山下より`0.06274 m/s`高く、両方式とも物理衝突0だった。
+- 確認できなかったこと: seed間のばらつきが大きく、独立holdoutでもないため、
+  提案式の一般的優越性や統計的な差は確認していない。
+- 採否・次の判断: 本結果は実装・条件確認を兼ねたdevelopment比較として採用し、
+  独立seedを事前固定した検証を別途行う。
+- 既存の研究判断から変わったこと: 正規化凸結合式が山下方式とほぼ同じ結果に
+  なるとは限らず、seed 9のような大きい負差もあるため、平均だけで評価しない。
 
 ## 限界・異常
 
