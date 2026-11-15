@@ -1,9 +1,9 @@
 # 正規化凸結合式 lambda 300秒スイープ
 
 - 台帳ID: `2026-11-16-normalized-convex-lambda-sweep-300s-development`
-- 状態: `planned`
+- 状態: `running`
 - 位置づけ: `development`
-- 開始日時: 未開始
+- 開始日時: 2026-11-16 02:00:07 JST
 - 終了日時: 未開始
 - 実験ディレクトリ:
   - `results/runs/normalized-convex-lambda090-eval7-r1000-a1000-seeds33-42-300s-20261116/`
@@ -63,6 +63,11 @@
 | 結果commit | 未定 |
 | 記録commit | 未定 |
 | 実行コマンド | `scripts/run_thesis_batch.py --cases eval7 --seeds 33 34 35 36 37 38 39 40 41 42 --duration 300 --eval7-flows 1000 1000 --fixed-input-override fixed_inputs/thesis/eval7-flow-sweep/requesting-1000-accepting-1000/seed-{seed}.jsonl --bus-allocation fixed --workers 3 --deceleration-active --deceleration-convex-lambda <lambda> --no-diagnostic-traces --checkpoint-interval 0` |
+
+実行unitは`mcs-normalized-convex-lambda{090,093,095,40over41,80over81}-300s-20261116.service`。
+各候補を同一commitから作ったsparse worktreeで実行し、候補ごとに3 worker、機械全体で
+実SUMO 15並列とする。正式実行前にλ=0.95・seed 33・10秒smokeがPython 3.15.1、
+SUMO 1.28.0、`exit_code=0`、`source_unchanged=true`で完了した。
 
 ## 完了・完全性確認
 
