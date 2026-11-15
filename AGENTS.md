@@ -1,5 +1,16 @@
 # Simulation result commits
 
+## Long-running simulation monitoring
+
+- When the user says `いつも通り監視`, `監視もお願い`, or otherwise requests
+  continued monitoring of an Ubuntu/SUMO batch, read
+  `docs/experiments/monitoring.md` before starting the monitor.
+- Use a Codex thread heartbeat automation for periodic monitoring. Do not keep
+  the foreground turn occupied with a shell sleep/poll loop unless the user
+  explicitly requests foreground monitoring.
+- Treat the heartbeat's SSH readback as the source of truth; never report a
+  remembered or locally inferred remote state.
+
 - Save every new run under `results/runs/<experiment-id>/`; never add new
   simulation output to the legacy singular `result/` directory.
 - One batch invocation owns one experiment directory. One case/seed process
