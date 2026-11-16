@@ -1,10 +1,10 @@
 # 正規化凸結合式 lambda 0.90/0.95・600秒対応比較
 
 - 台帳ID: `2026-11-16-normalized-convex-lambda090-095-600s-development`
-- 状態: `planned`
+- 状態: `incomplete`
 - 位置づけ: `development`
-- 開始日時:
-- 終了日時:
+- 開始日時: 2026-11-16 11:33:39 JST
+- 終了日時: 2026-11-16 11:33:39 JST（起動前検証失敗）
 - 実験ディレクトリ:
   - `results/runs/normalized-convex-lambda090-eval7-r1000-a1000-seeds33-42-600s-20261116/`
   - `results/runs/normalized-convex-lambda095-eval7-r1000-a1000-seeds33-42-600s-20261116/`
@@ -68,13 +68,35 @@
 
 ## 結果
 
-完了後に記録する。
+### 起動・実行前失敗
+
+2026-11-16 11:33:39 JSTに2候補を同時起動したが、両systemd unitともrunnerの
+引数検証で`exit status 2`となった。指定した`--sumo-home`:
+
+`/media/yamada/UbuntuData/home-yamada/Documents/卒業研究/mcs-tiv/.venv-py315-sumo128`
+
+には`bin/sumo`はあるが`tools/traci`がなく、runnerが
+`--sumo-home must contain bin/sumo and tools/traci`で停止した。SUMOは起動せず、
+seed manifest、runner log、実験ディレクトリは生成されていない。このためシミュレーション
+runの失敗や条件差は発生していないが、バッチ起動は失敗として扱う。
+
+- lambda 0.90 unit: `mcs-normalized-convex-lambda090-600s-20261116.service`
+  - invocation ID: `b52b927e52984d6694c58ae7e2da026a`
+- lambda 0.95 unit: `mcs-normalized-convex-lambda095-600s-20261116.service`
+  - invocation ID: `6d0cc281ff534b3f8ba05012c5042ada`
+
+正しいSUMO home候補は次であり、`bin/sumo`と`tools/traci`、SUMO 1.28.0、
+Python 3.15.1からの`traci`/`sumolib` importを読み取り確認した。再起動は未実施。
+
+`/media/yamada/UbuntuData/home-yamada/Documents/卒業研究/mcs-tiv/.venv-py315-sumo128/lib/python3.15/site-packages/sumo`
 
 ## 結論
 
-完了後に記録する。
+交通性能の結論は得られていない。失敗runの自動再実行を禁止する条件に従い、
+修正したSUMO homeでの再起動はユーザー判断待ちとする。
 
 ## 限界・異常
 
 seed 33–42は既実験と候補選択に使用済みであり、本実験は独立holdoutではない。
+両専用worktreeとfailed unitは、不完全状態の証拠と再起動判断のため保全している。
 
