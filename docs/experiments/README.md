@@ -48,6 +48,7 @@
 
 | 状態 | 開始日 | 実験 | 記録 |
 | --- | --- | --- | --- |
+| planned | 2026-11-16 | 正規化凸結合式 lambda 0.90/0.95・600秒対応比較 | [記録](2026-11-16-normalized-convex-lambda090-095-600s-development.md) |
 | completed | 2026-11-16 | 正規化凸結合式lambda 300秒スイープ | [記録](2026-11-16-normalized-convex-lambda-sweep-300s-development.md) |
 | completed | 2026-11-15 | 正規化凸結合式・山下手法・旧実験同一seed 600秒比較 | [記録](2026-11-15-normalized-convex-seeds33-42-600s-development.md) |
 | completed | 2026-11-14 | 正規化凸結合式・山下手法ペア10-seed・600秒開発比較 | [記録](2026-11-14-normalized-convex-paired-600s-development.md) |
