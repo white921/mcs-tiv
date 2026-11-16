@@ -61,7 +61,7 @@
 | 実行ソースcommit | `e0f36fc461a37e179bf831121ef01b982c5121db` |
 | 実行開始時dirty | `false`を必須とする |
 | 結果commit | `codex/normalized-convex-lambda090-sweep-20261116` @ `b918343bc665cabbcf3f4a0c950897b70021f11d`<br>`codex/normalized-convex-lambda093-sweep-20261116` @ `cb2ea78ea5086c7957af7398b227225410dd3025`<br>`codex/normalized-convex-lambda095-sweep-20261116` @ `17d94c17b7d87a1a3e69b3ae8a7918f99f906fbe`<br>`codex/normalized-convex-lambda40over41-sweep-20261116` @ `fe96fb7adc71b163b353f6ac496c120e4f9a8ad3`<br>`codex/normalized-convex-lambda80over81-sweep-20261116` @ `bddd06fe94c31de371f985cd7e8d2d0428238250` |
-| 記録commit | 完了更新commitを作成後に記録する |
+| 記録commit | `99d10a348a6ba6d7f3e4f7aa136940121214ef55` |
 | 実行コマンド | `scripts/run_thesis_batch.py --cases eval7 --seeds 33 34 35 36 37 38 39 40 41 42 --duration 300 --eval7-flows 1000 1000 --fixed-input-override fixed_inputs/thesis/eval7-flow-sweep/requesting-1000-accepting-1000/seed-{seed}.jsonl --bus-allocation fixed --workers 3 --deceleration-active --deceleration-convex-lambda <lambda> --no-diagnostic-traces --checkpoint-interval 0` |
 
 実行unitは`mcs-normalized-convex-lambda{090,093,095,40over41,80over81}-300s-20261116.service`。
