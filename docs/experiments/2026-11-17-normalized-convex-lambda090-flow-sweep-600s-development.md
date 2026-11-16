@@ -1,9 +1,9 @@
 # 正規化凸結合式 lambda 0.90・交通量比600秒比較
 
 - 台帳ID: `2026-11-17-normalized-convex-lambda090-flow-sweep-600s-development`
-- 状態: `planned`
+- 状態: `running`
 - 位置づけ: `development`
-- 開始日時:
+- 開始日時: 2026-11-17 01:56:51 JST
 - 終了日時:
 - 実験ディレクトリ:
   - `results/runs/normalized-convex-lambda090-eval7-r300-a1000-seeds33-42-600s-20261117/`
@@ -67,6 +67,19 @@
 | source変更 | 固定入力、対応交通量・seedの宣言、固定入力テストのみ。評価式は不変 |
 | 記録ブランチ | `codex/normalized-convex-lambda090-flow-sweep-600s-development` |
 | 結果commit | 完了後に交通量ごとに記録 |
+
+## 起動
+
+2026-11-17 01:56:51 JSTに4バッチを同時起動した。起動後に全unitが`active/running`、
+4つのexperiment manifestが`running`、実行ソースcommit一致、開始時Git clean、
+lambda 0.90、各交通量、合計10 SUMO processを確認した。
+
+| 交通量 | workers | systemd unit | invocation ID |
+| --- | ---: | --- | --- |
+| 300/1000 | 2 | `mcs-l090-flow-r300-600s-20261117.service` | `80c4e22e8b584a748a33f8bb6b627114` |
+| 500/1000 | 2 | `mcs-l090-flow-r500-600s-20261117.service` | `d1549db060744d67b12527b4bdc5e340` |
+| 700/1000 | 3 | `mcs-l090-flow-r700-600s-20261117.service` | `cfb2e6d55a84463b9f07162cf98cf5a5` |
+| 1200/1000 | 3 | `mcs-l090-flow-r1200-600s-20261117.service` | `f8289ada74dd418da913e9d6e3ea2e53` |
 
 ## 実行コマンド
 
