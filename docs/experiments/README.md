@@ -48,7 +48,7 @@
 
 | 状態 | 開始日 | 実験 | 記録 |
 | --- | --- | --- | --- |
-| running | 2026-11-16 | 正規化凸結合式lambda 300秒スイープ | [記録](2026-11-16-normalized-convex-lambda-sweep-300s-development.md) |
+| completed | 2026-11-16 | 正規化凸結合式lambda 300秒スイープ | [記録](2026-11-16-normalized-convex-lambda-sweep-300s-development.md) |
 | completed | 2026-11-15 | 正規化凸結合式・山下手法・旧実験同一seed 600秒比較 | [記録](2026-11-15-normalized-convex-seeds33-42-600s-development.md) |
 | completed | 2026-11-14 | 正規化凸結合式・山下手法ペア10-seed・600秒開発比較 | [記録](2026-11-14-normalized-convex-paired-600s-development.md) |
 | completed | 2026-11-14 | 正規化凸結合式・山下手法ペアsmoke | [記録](2026-11-14-normalized-convex-paired-smoke.md) |
@@ -76,6 +76,7 @@
 
 | 実験 | 位置づけ | 確認したこと | 次へ引き継いだ判断 |
 | --- | --- | --- | --- |
+| 2026-11-16 正規化凸結合式lambda 300秒スイープ | development | 0.95が平均5.1339 m/s、0.90が5.1116 m/sで、両方とも80/81を上回った。一方、0.95−0.90の差は+0.0222 m/s、seed対応bootstrap区間は0をまたぎ、0.95が高いのは2/10 seedだった。50 runで物理衝突0 | 平均1位の0.95と2位の0.90は優劣不明として、両方を600秒developmentへ進める。0.93、40/41、80/81は次段候補から外す |
 | 2026-11-15 正規化凸結合式・同一seed比較 | development | 新提案4.1878 m/s、新山下4.1762 m/sで平均差は+0.0116 m/s。7/10 seedで提案が高かったが、seed対応bootstrap 95%区間は0をまたいだ。20 runで物理衝突0 | 正規化による係数の解釈可能性と交通性能の優位性を分ける。新提案の速度改善は支持されたと扱わず、このseed集合を次の独立holdoutに再利用しない |
 | 2026-11-12 Eval.7 lane2削除等価性 | diagnostic | 全固定入力でlane 2使用0。integrated lambda=2・1000/1000・seed 6の60秒と600秒対応実行で、判定、後続損失、速度、衝突が一致した | `main_2`は現行Eval.7の結果に影響しない未使用laneと判断し、削除可能とする。動的比較は1条件であることを限界として残す |
 | 2026-10-30 反実仮ベンチマーク | development | 提案`lambda=0.25/0.5`の公称Regretは山下方式より6.1%小さかったが、不確実性区間は0をまたぎ、後続車影響項の優位性は確立しなかった | 旧120件を改善用とし、式と未使用seedを結果を見る前に固定して独立holdoutへ進む |
