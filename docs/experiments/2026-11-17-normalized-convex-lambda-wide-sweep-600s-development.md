@@ -1,9 +1,9 @@
 # 正規化凸結合式 lambda 広域600秒スイープ
 
 - 台帳ID: `2026-11-17-normalized-convex-lambda-wide-sweep-600s-development`
-- 状態: `planned`
+- 状態: `running`
 - 位置づけ: `development screening`
-- 開始日時:
+- 開始日時: 2026-11-17 20:56:23 JST
 - 終了日時:
 - 新規実験ディレクトリ:
   - `results/runs/normalized-convex-lambda000-eval7-r1000-a1000-seeds33-42-600s-20261117/`
@@ -85,6 +85,9 @@ checkpointを有効にした別バッチで完全性を確認する。
 `1125fb122...`だが、`1125fb122...`から`e0f36fc...`までの差分はAGENTSと実験台帳だけで、
 シミュレーションコードと固定入力は同一である。
 
+各新規lambdaは開始時Git cleanを独立に保証するため、`e0f36fc...`から作成したlambda別の
+detached worktreeで実行する。結果ディレクトリは各worktreeの`results/runs/`に保存する。
+
 ## 実行コマンド
 
 各`<lambda>`と`<tag>`について小さいlambdaから順に実行する。
@@ -104,6 +107,37 @@ scripts/run_thesis_batch.py
   --checkpoint-interval 0
   --run-name normalized-convex-lambda<tag>-eval7-r1000-a1000-seeds33-42-600s-20261117
 ```
+
+## 起動
+
+### 端点smoke
+
+2026-11-17 20:54 JSTにlambda 0.0と1.0をseed 33・10秒で実行し、両方で
+`exit_code: 0`、`source_unchanged: true`、Python 3.15.1、SUMO 1.28.0を確認した。
+stderrは空で、smokeは正式結果と分けてUbuntu上のquarantineへ保存した。
+
+### 正式実行
+
+初回unitはsystemd-runがshell配列の変数を起動前に展開し、lambdaが空文字となって
+runnerの引数検証で`exit status 2`になった。SUMO、実験ディレクトリ、run manifestは
+生成されておらず、正式runの失敗には数えない。
+
+- 初回unit: `mcs-normalized-convex-lambda-wide-sweep-600s-20261117.service`
+- invocation ID: `3b84f40d824f49a091c0c29c69bf8cc1`
+
+`--expand-environment=no`を付けたattempt 2を2026-11-17 20:56:23 JSTに起動した。
+lambda 0.0のexperiment manifest、10 run manifest、実行ソース、開始時Git clean、固定条件、
+lambda 0.0、10 SUMOを読み取り確認した。後続lambdaは独立worktreeで小さい順に実行する。
+
+- lambda 0.0 unit: `mcs-normalized-convex-lambda-wide-sweep-600s-20261117-attempt2.service`
+  - invocation ID: `b2bec7f0bd124140ac4fc00038f9dc4f`
+- lambda 0.1以降の継続unit:
+  `mcs-normalized-convex-lambda-wide-sweep-600s-20261117-continuation.service`
+  - invocation ID: `caabdee08715439f86ee9a53cfb7e1c9`
+
+lambda 0.0完了後にattempt 2の停止済み親shellを終了し、継続unitが
+`0.1 → 0.2 → ... → 0.8 → 1.0`の順で各10 seedを実行する。失敗時は継続を停止し、
+自動再実行やseed差し替えを行わない。
 
 ## 完了・完全性確認
 
