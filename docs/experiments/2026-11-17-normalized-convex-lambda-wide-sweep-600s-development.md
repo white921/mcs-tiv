@@ -37,7 +37,9 @@
 - 同一条件で実行済みの`0.90`は再実行しない。
 - 既存の`0.95`と`80/81 = 0.987654...`も高lambda側の補助点として再利用する。
 - 新規候補は`0.0`から`0.8`までの9候補と`1.0`の計10候補、100 runとする。
-- 新規候補はlambdaの小さい順に1候補ずつ完了させ、各候補へ10 workerを割り当てる。
+- 全runを「lambda昇順、その中でseed昇順」の単一キューへ並べ、機械全体15 slotを使う。
+  最初はlambda 0.0を10件、次にlambda 0.1を5件投入し、1件終了するたびにキュー先頭の
+  1件を補充する。あるlambdaの全10件終了を待ってから次へ進む方式にはしない。
 - 粗いスイープ完了後、最良領域の両隣を細かく追加する。追加点は粗い結果を見る前には
   固定せず、別のdevelopment記録として扱う。
 
@@ -66,7 +68,7 @@
 | screeningログ | diagnostic traceなし、checkpointなし。manifest、runner/stdout/stderr、評価指標、物理衝突、prediction auditは保存 |
 | Python / SUMO | 3.15.1 / 1.28.0 |
 | OS・実行機 | Ubuntu `sgnlab` |
-| 並列 | 1候補10 worker、機械全体最大10 SUMO |
+| 並列 | lambda昇順の共有キュー、機械全体最大15 SUMO、終了ごとに1件補充 |
 
 diagnostic traceとcheckpointは探索コストを抑えるため新規候補では無効にする。評価式、
 SUMO挙動、固定入力、seedは変更しない。上位候補を最終候補へ進めるときは、診断traceと
@@ -90,7 +92,8 @@ detached worktreeで実行する。結果ディレクトリは各worktreeの`res
 
 ## 実行コマンド
 
-各`<lambda>`と`<tag>`について小さいlambdaから順に実行する。
+各runの実行条件は次のbatch runner相当とし、実際の投入は
+`scripts/run_lambda_shared_queue.py`がlambda昇順・seed昇順に行う。
 
 ```text
 scripts/run_thesis_batch.py
@@ -135,9 +138,15 @@ lambda 0.0、10 SUMOを読み取り確認した。後続lambdaは独立worktree�
   `mcs-normalized-convex-lambda-wide-sweep-600s-20261117-continuation.service`
   - invocation ID: `caabdee08715439f86ee9a53cfb7e1c9`
 
-lambda 0.0完了後にattempt 2の停止済み親shellを終了し、継続unitが
-`0.1 → 0.2 → ... → 0.8 → 1.0`の順で各10 seedを実行する。失敗時は継続を停止し、
-自動再実行やseed差し替えを行わない。
+当初はlambda 0.0完了後に候補単位で次を始める継続unitを用意したが、ユーザー指定により
+2026-11-17 21時台に、15 slotの共有キュー方式へ変更した。継続unitはlambda 0.1を始める前に
+停止しており、重複runや条件変更はない。lambda 0.0の10件はそのまま継続し、空き5 slotから
+lambda 0.1を投入する。以後は1件終了ごとにlambda昇順・seed昇順の次runを補充する。
+
+共有キューはlambda別のclean worktreeからrunnerの`run_task`を呼び、lambda別に通常の
+experiment manifest、run manifest、summary、runner logを生成する。機械全体のSUMO数が
+15を超えた場合またはrunが失敗した場合は、新規投入を停止し、自動再実行やseed差し替えを
+行わない。
 
 ## 完了・完全性確認
 
