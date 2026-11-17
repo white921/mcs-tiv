@@ -158,6 +158,8 @@ lambda 0.1のseed 33–37を5件投入した。約10秒後に実SUMO 15 process�
 run manifest 5件、lambda 0.2のrun manifest 0件を読み取り、指定どおりlambda昇順に
 15 slotが埋まったことを確認した。
 
+- heartbeat: `mcs-2`（`MCS λ広域スイープ監視`、queue実行中は30分間隔）
+
 ## 完了・完全性確認
 
 - [ ] 新規10バッチ・100 runが正常完了
