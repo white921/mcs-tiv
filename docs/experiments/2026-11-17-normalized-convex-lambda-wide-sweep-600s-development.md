@@ -148,6 +148,16 @@ experiment manifest、run manifest、summary、runner logを生成する。機�
 15を超えた場合またはrunが失敗した場合は、新規投入を停止し、自動再実行やseed差し替えを
 行わない。
 
+- 共有キューunit: `mcs-normalized-convex-lambda-shared-queue-600s-20261117.service`
+  - invocation ID: `58c09b13e4d34f96919c5be6a0f91a8b`
+  - scheduler commit: `6b28b81a4`
+  - scheduler SHA-256: `0e7b7a8051e7682408372c1f2cb7bf71fe9e2313bb8227f8493c22429305e4ab`
+
+2026-11-17 21:06:48 JSTに共有キューを起動した。開始時はlambda 0.0が10件実行中で、
+lambda 0.1のseed 33–37を5件投入した。約10秒後に実SUMO 15 process、lambda 0.1の
+run manifest 5件、lambda 0.2のrun manifest 0件を読み取り、指定どおりlambda昇順に
+15 slotが埋まったことを確認した。
+
 ## 完了・完全性確認
 
 - [ ] 新規10バッチ・100 runが正常完了
