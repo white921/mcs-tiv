@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Run ordered lambda candidates through one machine-wide shared slot queue.
 
-The queue is lambda-major and then seed-major.  It can join an already-running
-first lambda batch: the active runs in that external batch occupy slots, and
-each completed external or managed run immediately releases one slot for the
-next queued task.
+The queue is lambda-major and then seed-major. It can start a fresh sweep or
+join an already-running first lambda batch. In the latter case, the active runs
+in that external batch occupy slots, and each completed external or managed run
+immediately releases one slot for the next queued task.
 """
 
 import argparse
@@ -65,6 +65,8 @@ def read_json(path):
 
 
 def external_state(output):
+    if output is None:
+        return "completed", 0
     manifest_path = output / "experiment-manifest.json"
     manifest = read_json(manifest_path)
     active = 0
@@ -128,7 +130,9 @@ def candidate_manifest(args, context, started_at):
             "slots": args.slots,
             "candidate_order": [item[0] for item in args.candidate],
             "seed_order": list(args.seeds),
-            "external_experiment": str(args.external_output),
+            "external_experiment": (
+                str(args.external_output) if args.external_output is not None else None
+            ),
             "machine_wide_limit": args.slots,
             "orchestration_log": "orchestration.jsonl",
         },
@@ -219,7 +223,7 @@ def main():
         metavar=("TAG", "LAMBDA", "ROOT", "RUN_NAME"),
         required=True,
     )
-    parser.add_argument("--external-output", type=Path, required=True)
+    parser.add_argument("--external-output", type=Path)
     parser.add_argument("--external-unit")
     parser.add_argument("--sumo-home", type=Path, required=True)
     parser.add_argument("--python", type=Path, required=True)
@@ -261,7 +265,8 @@ def main():
         seen_tags.add(tag)
         previous_lambda = lambda_value
 
-    args.external_output = args.external_output.resolve()
+    if args.external_output is not None:
+        args.external_output = args.external_output.resolve()
     contexts = {}
     outputs = []
     for tag, lambda_value, root, run_name in parsed_candidates:
@@ -322,7 +327,7 @@ def main():
         for seed in args.seeds
     ]
     monitor_state = {"max_sumo": preflight["existing_sumo_processes"], "violation": None}
-    external_cleanup_done = False
+    external_cleanup_done = args.external_output is None
 
     def execute(tag, seed, queue_index):
         context = contexts[tag]
