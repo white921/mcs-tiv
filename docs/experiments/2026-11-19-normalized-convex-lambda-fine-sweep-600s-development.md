@@ -1,9 +1,9 @@
 # 正規化凸結合式 lambda 0.50–0.70細密600秒スイープ
 
 - 台帳ID: `2026-11-19-normalized-convex-lambda-fine-sweep-600s-development`
-- 状態: `planned`
+- 状態: `running`
 - 位置づけ: `development screening`
-- 開始日時:
+- 開始日時: 2026-11-19 17:34:56 JST
 - 終了日時:
 - 新規実験ディレクトリ:
   - `results/runs/normalized-convex-lambda0525-eval7-r1000-a1000-seeds33-42-600s-20261119/`
@@ -66,7 +66,7 @@
 | 記録branch | `codex/normalized-convex-lambda-fine-sweep-600s-development` |
 | 実行ソースcommit | `e0f36fc461a37e179bf831121ef01b982c5121db` |
 | 実行開始時dirty | `false`を必須とする |
-| scheduler | `scripts/run_lambda_shared_queue.py`。先行バッチなしのfresh queueとして起動 |
+| scheduler | `scripts/run_lambda_shared_queue.py`、commit `efe027881`、SHA-256 `50de94809aff35bd9920b659c2acbe6fe751a73ac7ce8ccc2f3efc6ea7c1f9f9`。先行バッチなしのfresh queueとして起動 |
 | 結果commit | 正常終了後、lambdaごとに専用commitを作成する |
 | 記録commit | 本記録のcommit |
 
@@ -90,10 +90,17 @@ scripts/run_thesis_batch.py
 
 ## 監視
 
-- 対象unit: 起動後に記録する。
+- 対象unit: `mcs-normalized-convex-lambda-fine-sweep-600s-20261119.service`
+- invocation ID: `d7920f91a00b460ebfe4b932af093582`
 - 60%未満は30分、60%以上は15分ごとにUbuntuの実状態を確認する。
 - 各確認で完了/60、失敗数、最遅simulation time、実SUMO数、queueの次候補、停滞、
   traceback、ディスクを報告する。
+
+2026-11-19 17:34:56 JSTに正式起動した。8秒後の読み返しでunitは`active/running`、
+実SUMOは15 processだった。最初の15件はqueue index 0–14の昇順で、`lambda=0.525`の
+seed 33–42と`lambda=0.550`のseed 33–37だった。6候補のexperiment manifestと開始済み
+15 runのmanifestから、実行ソース`e0f36fc...`、Git clean、lambda値、Python 3.15.1、
+SUMO 1.28.0、固定15 slotを確認した。開始時の失敗は0件である。
 
 ## 完了・完全性確認
 
