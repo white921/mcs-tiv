@@ -145,6 +145,14 @@ manifest、runner/stdout/stderr、evaluation metrics、prediction audit、FCDの
 
 ![1000/1000・600秒のlambda細密スイープ](figures/2026-11-19-normalized-convex-lambda-fine-sweep-600s.svg)
 
+### 広域・細密スイープの統合曲線
+
+![1000/1000・600秒のlambda広域・細密統合スイープ](figures/2026-11-20-normalized-convex-lambda-combined-sweep-600s.svg)
+
+青点は広域グリッド、橙色の塗りつぶし点は今回追加した細密グリッド、
+橙色の白抜き点は別バッチから再利用した`lambda=0.90/0.95`を示す。
+淡青色の帯は細密探索した`0.50–0.70`の範囲である。
+
 ### seed対応差と不確実性
 
 全車平均速度の名目1位は`lambda=0.525`だった。seed対応percentile bootstrapを
