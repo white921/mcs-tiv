@@ -171,7 +171,7 @@ def render_svg(
         f'<rect x="0" y="0" width="{WIDTH}" height="{HEIGHT}" fill="#FFFFFF"/>',
         '<g font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif">',
         svg_text(
-            "Normalized convex weighting: coarse + fine λ sweep at 1000/1000 veh/h"
+            "正規化凸結合式：λ広域・細密スイープ（1000/1000台/時）"
             if combined
             else "Normalized convex weighting: λ sweep at 1000/1000 veh/h",
             WIDTH / 2,
@@ -180,13 +180,36 @@ def render_svg(
             anchor="middle",
             weight=700,
         ),
-        svg_text("(a) Overall traffic speed", LEFT, 105, size=26, weight=700),
+        svg_text(
+            "(a) 全車平均速度" if combined else "(a) Overall traffic speed",
+            LEFT,
+            105,
+            size=26,
+            weight=700,
+        ),
     ]
     band_x = x_position(0.5)
     band_high = 0.7 if combined else 0.8
     parts.append(f'<rect x="{band_x:.1f}" y="{top_a}" width="{x_position(band_high) - band_x:.1f}" height="{bottom_a - top_a:.1f}" fill="#E8F1FA" opacity="0.85"/>')
-    draw_axes(parts, top=top_a, bottom=bottom_a, y_ticks=[4.0, 4.5, 5.0], y_low=y_a_low, y_high=y_a_high, show_x_labels=False)
-    parts.append(svg_text("Mean speed [m/s]", 48, (top_a + bottom_a) / 2, size=23, anchor="middle", rotate=-90))
+    draw_axes(
+        parts,
+        top=top_a,
+        bottom=bottom_a,
+        y_ticks=[4.0, 4.5, 5.0],
+        y_low=y_a_low,
+        y_high=y_a_high,
+        show_x_labels=combined,
+    )
+    parts.append(
+        svg_text(
+            "平均速度 [m/s]" if combined else "Mean speed [m/s]",
+            48,
+            (top_a + bottom_a) / 2,
+            size=23,
+            anchor="middle",
+            rotate=-90,
+        )
+    )
 
     overall_points = [(x_position(row["lambda"]), y_position(row["overall"], y_a_low, y_a_high, top_a, bottom_a)) for row in rows]
     parts.append(polyline(overall_points, blue))
@@ -212,24 +235,24 @@ def render_svg(
     label_x = x_position(0.36 if combined else 0.43)
     label_y = y_position(5.17, y_a_low, y_a_high, top_a, bottom_a)
     parts.append(f'<line x1="{label_x + 74:.1f}" y1="{label_y + 15:.1f}" x2="{best_x - 9:.1f}" y2="{best_y - 14:.1f}" stroke="#5B6573" stroke-width="2"/>')
-    parts.append(svg_text("nominal best" if combined else "coarse-grid best", label_x, label_y, size=22, anchor="middle", weight=600))
+    parts.append(svg_text("名目上の最良点" if combined else "coarse-grid best", label_x, label_y, size=22, anchor="middle", weight=600))
     best_label = f"{best_lambda:.3f}" if combined else f"{best_lambda:.2f}"
     parts.append(svg_text(f"λ = {best_label}, {best['overall']:.4f} m/s", label_x, label_y + 27, size=20, anchor="middle"))
 
     legend_y = 540
     parts.append(f'<line x1="{LEFT + 22}" y1="{legend_y}" x2="{LEFT + 82}" y2="{legend_y}" stroke="{blue}" stroke-width="4"/>')
     parts.append(f'<circle cx="{LEFT + 52}" cy="{legend_y}" r="7" fill="{blue}"/>')
-    parts.append(svg_text("Overall mean ± sample SD", LEFT + 96, legend_y + 7, size=19))
+    parts.append(svg_text("全車平均 ± 標本標準偏差" if combined else "Overall mean ± sample SD", LEFT + 96, legend_y + 7, size=19))
     parts.append(f'<circle cx="{LEFT + 430}" cy="{legend_y}" r="8" fill="white" stroke="{orange}" stroke-width="3"/>')
-    parts.append(svg_text("Reused completed runs", LEFT + 450, legend_y + 7, size=19))
+    parts.append(svg_text("既存完了結果" if combined else "Reused completed runs", LEFT + 450, legend_y + 7, size=19))
     if combined:
         parts.append(f'<circle cx="{LEFT + 735}" cy="{legend_y}" r="8" fill="{orange}" stroke="white" stroke-width="3"/>')
-        parts.append(svg_text("Added fine-grid points", LEFT + 755, legend_y + 7, size=19))
+        parts.append(svg_text("追加した細密点", LEFT + 755, legend_y + 7, size=19))
 
-    parts.append(svg_text("(b) Speed trade-off between traffic streams", LEFT, 675, size=26, weight=700))
+    parts.append(svg_text("(b) 合流側・本線側の速度比較" if combined else "(b) Speed trade-off between traffic streams", LEFT, 675, size=26, weight=700))
     draw_axes(parts, top=top_b, bottom=bottom_b, y_ticks=[2, 4, 6, 8, 10], y_low=y_b_low, y_high=y_b_high, show_x_labels=True)
-    parts.append(svg_text("Mean speed [m/s]", 48, (top_b + bottom_b) / 2, size=23, anchor="middle", rotate=-90))
-    parts.append(svg_text("Convex weight λ", (LEFT + RIGHT) / 2, bottom_b + 82, size=24, anchor="middle"))
+    parts.append(svg_text("平均速度 [m/s]" if combined else "Mean speed [m/s]", 48, (top_b + bottom_b) / 2, size=23, anchor="middle", rotate=-90))
+    parts.append(svg_text("凸結合重み λ" if combined else "Convex weight λ", (LEFT + RIGHT) / 2, bottom_b + 82, size=24, anchor="middle"))
     parts.append(f'<line x1="{best_x:.1f}" y1="{top_b}" x2="{best_x:.1f}" y2="{bottom_b}" stroke="{red}" stroke-width="2" stroke-dasharray="10 8" opacity="0.8"/>')
 
     merge_points = [(x_position(row["lambda"]), y_position(row["merge"], y_b_low, y_b_high, top_b, bottom_b)) for row in rows]
@@ -246,11 +269,11 @@ def render_svg(
 
     parts.append(f'<line x1="{LEFT + 22}" y1="{top_b + 30}" x2="{LEFT + 82}" y2="{top_b + 30}" stroke="{green}" stroke-width="4"/>')
     parts.append(f'<circle cx="{LEFT + 52}" cy="{top_b + 30}" r="7" fill="{green}"/>')
-    parts.append(svg_text("Merging side (main_0)", LEFT + 96, top_b + 37, size=19))
+    parts.append(svg_text("合流側 (main_0)" if combined else "Merging side (main_0)", LEFT + 96, top_b + 37, size=19))
     parts.append(f'<line x1="{LEFT + 390}" y1="{top_b + 30}" x2="{LEFT + 450}" y2="{top_b + 30}" stroke="{purple}" stroke-width="4"/>')
     parts.append(f'<rect x="{LEFT + 413.5}" y="{top_b + 23.5}" width="13" height="13" fill="{purple}"/>')
-    parts.append(svg_text("Mainline side (main_1)", LEFT + 464, top_b + 37, size=19))
-    parts.append(svg_text("Eval.7 · 600 s · seeds 33–42 · n = 10 per λ · no physical collisions", WIDTH / 2, 1235, size=19, anchor="middle", fill="#5B6573"))
+    parts.append(svg_text("本線側 (main_1)" if combined else "Mainline side (main_1)", LEFT + 464, top_b + 37, size=19))
+    parts.append(svg_text("Eval.7・600秒・seed 33–42・各λ n=10・物理衝突0" if combined else "Eval.7 · 600 s · seeds 33–42 · n = 10 per λ · no physical collisions", WIDTH / 2, 1235, size=19, anchor="middle", fill="#5B6573"))
     parts.extend(["</g>", "</svg>"])
     return "\n".join(parts) + "\n"
 
