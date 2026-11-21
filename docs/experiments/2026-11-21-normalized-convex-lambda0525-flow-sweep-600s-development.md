@@ -1,9 +1,9 @@
 # 正規化凸結合式 lambda 0.525・交通量比600秒比較
 
 - 台帳ID: `2026-11-21-normalized-convex-lambda0525-flow-sweep-600s-development`
-- 状態: `planned`
+- 状態: `running`
 - 位置づけ: `development`
-- 開始日時:
+- 開始日時: 2026-11-21 15:12:19 JST
 - 終了日時:
 - 新規実験ディレクトリ:
   - `results/runs/normalized-convex-lambda0525-eval7-r300-a1000-seeds33-42-600s-20261121/`
@@ -71,19 +71,27 @@
 | 項目 | 値 |
 | --- | --- |
 | 記録branch | `codex/normalized-convex-lambda0525-flow-sweep-600s` |
-| 実行ソースcommit | 起動前に確定 |
+| 実行ソースcommit | `255cb645eae0810bc4b8aa1c76f379910fbbf34b` |
 | 実行開始時dirty | `false`を必須とする |
-| 結果branch | 交通量ごとの専用branchを起動前に作成 |
+| 結果branch | `codex/normalized-convex-lambda0525-r{300,500,700,1200}-600s-20261121` |
 | 結果commit | 完了後に交通量ごとに記録 |
 | scheduler | `scripts/run_lambda0525_flow_sweep_20261121.sh` |
 
 ## 監視
 
-- systemd unit: 起動時に記録する。
+- systemd unit: `mcs-l0525-flow-sweep-600s-20261121.service`
+- invocation ID: `eb450a001b0a4797b0eafd9da4432601`
 - slowest runが60%未満は30分、60%以上は15分ごとにUbuntuの実状態を確認する。
 - 各heartbeatで完了/35、失敗数、現在の交通量、最遅simulation time、実SUMO数、
   runtime停滞、traceback、ディスクを報告する。
 - 失敗時は後続交通量を開始せず、不完全結果を保全し、自動再実行しない。
+
+2026-11-21 15:12:19 JSTに正式起動した。8秒後の読み返しでunitは`active/running`、
+最初の300/1000バッチmanifestは`running`、実SUMOは10 processだった。manifestから
+実行ソース、開始時Git clean、`lambda=0.525`、300/1000、seed 33–42、600秒、
+10 workers、診断trace、60秒checkpointを確認した。正式起動前に4交通量各1 seedの
+10秒smokeを行い、4/4で`exit_code: 0`、`source_unchanged: true`、物理衝突0、
+Python 3.15.1、SUMO 1.28.0、固定入力、lambda値を確認した。
 
 ## 完了・完全性確認
 
