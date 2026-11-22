@@ -152,6 +152,16 @@ def selected_decision_method(case, requested):
     return requested, DECISION_METHODS[requested]
 
 
+def selected_flows(name, args):
+    """Return the effective approach flows for one scheduled task."""
+    case_flows = getattr(args, "case_flows", None)
+    if case_flows is not None:
+        return [str(flow) for flow in case_flows]
+    if name == "eval7" and args.eval7_flows is not None:
+        return [str(flow) for flow in args.eval7_flows]
+    return CASES[name]["flows"]
+
+
 def filesystem_component(value):
     """Return a readable, portable component for an experiment directory."""
     component = "".join(
@@ -405,11 +415,7 @@ def run_task(task, args):
         env.update(
             MCS_DECELERATION_AUDIT=str(destination / "deceleration-audit.json"),
         )
-    flows = (
-        [str(flow) for flow in args.eval7_flows]
-        if name == "eval7" and args.eval7_flows is not None
-        else case["flows"]
-    )
+    flows = selected_flows(name, args)
     command = [args.python, "-u", case["script"], decision_alpha, str(seed),
                *flows, "--nogui", "--quiet", "--duration", str(args.duration),
                "--bus-allocation", args.bus_allocation]
@@ -582,6 +588,10 @@ def main():
     parser.add_argument(
         "--eval7-flows", type=int, nargs=2, metavar=("REQUESTING", "ACCEPTING"),
         help="override Eval.7 merging/mainline flows and select the matching fixed input")
+    parser.add_argument(
+        "--case-flows", type=int, nargs="+", metavar="FLOW",
+        help=("override the approach flows for exactly one selected case; "
+              "the number of values must match that case"))
     parser.add_argument("--stop-time", type=float,
                         help="smoke test only; retains 600-second input schedule")
     parser.add_argument("--paper", type=Path)
@@ -630,6 +640,17 @@ def main():
             parser.error("--eval7-flows requires --cases eval7")
         if any(flow < 0 or flow > 1800 for flow in args.eval7_flows):
             parser.error("--eval7-flows values must be between 0 and 1800 veh/h")
+    if args.case_flows is not None:
+        if len(args.cases) != 1:
+            parser.error("--case-flows requires exactly one selected case")
+        if args.eval7_flows is not None:
+            parser.error("--case-flows and --eval7-flows cannot be combined")
+        expected = len(CASES[args.cases[0]]["flows"])
+        if len(args.case_flows) != expected:
+            parser.error(
+                f"--case-flows for {args.cases[0]} requires {expected} values")
+        if any(flow < 0 or flow > 1800 for flow in args.case_flows):
+            parser.error("--case-flows values must be between 0 and 1800 veh/h")
     if args.stop_time is not None and not 0 < args.stop_time <= args.duration:
         parser.error("--stop-time must be in (0, --duration]")
     if (not math.isfinite(args.deceleration_convex_lambda) or
@@ -738,6 +759,8 @@ def main():
             "requesting": args.eval7_flows[0],
             "accepting": args.eval7_flows[1],
         } if args.eval7_flows is not None else None),
+        "case_flows_vph": (list(args.case_flows)
+                           if args.case_flows is not None else None),
         "tasks": [{"case": case, "seed": seed} for case, seed in tasks],
         "duration_s": args.duration,
         "stop_time_s": args.stop_time,

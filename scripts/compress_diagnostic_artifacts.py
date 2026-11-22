@@ -131,7 +131,7 @@ def split_one(root: Path, compressed: Path) -> dict[str, object] | None:
 
 
 def process(root: Path, workers: int) -> None:
-    runs = sorted(root.glob("eval7/seed-*"))
+    runs = sorted(root.glob("eval*/seed-*"))
     if not runs:
         raise RuntimeError(f"no runs found under {root}")
     tasks: list[tuple[Path, Path, str]] = []

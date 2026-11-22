@@ -30,3 +30,9 @@ They make no input-randomness calls.  The manifest records the full-file hash,
 prefix duration, prefix event count, and a SHA-256 over the canonical JSONL
 vehicle records in that prefix.  The legacy runtime generator remains
 available for other evaluations and `--bus-allocation paper-random25`.
+
+`eval35-paper-comparison/` contains the preregistered formal inputs for the
+fixed `lambda=0.525` Eval.3/5 comparison.  It freezes seeds 13–22 for the two
+published Eval.3 flow conditions (400 and 500 veh/h on every approach) and the
+published Eval.5 condition (300 veh/h on every approach).  Regenerate or check
+only this set with `scripts/generate_eval35_formal_inputs.py`.

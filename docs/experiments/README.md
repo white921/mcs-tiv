@@ -48,6 +48,7 @@
 
 | 状態 | 開始日 | 実験 | 記録 |
 | --- | --- | --- | --- |
+| planned | 2026-11-22 | 正規化凸結合式 lambda 0.525・Eval.3/5 600秒正式比較 | [記録](2026-11-22-normalized-convex-lambda0525-eval35-600s-formal.md) |
 | completed | 2026-11-21 | 正規化凸結合式 lambda 0.525・交通量比600秒比較 | [記録](2026-11-21-normalized-convex-lambda0525-flow-sweep-600s-development.md) |
 | completed | 2026-11-19 | 正規化凸結合式 lambda 0.50–0.70細密600秒スイープ | [記録](2026-11-19-normalized-convex-lambda-fine-sweep-600s-development.md) |
 | completed | 2026-11-17 | 正規化凸結合式 lambda 広域600秒スイープ | [記録](2026-11-17-normalized-convex-lambda-wide-sweep-600s-development.md) |
