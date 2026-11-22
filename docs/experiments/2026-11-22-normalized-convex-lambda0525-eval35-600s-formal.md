@@ -1,7 +1,7 @@
 # 正規化凸結合式 lambda 0.525・Eval.3/5 600秒正式比較
 
 - 台帳ID: `2026-11-22-normalized-convex-lambda0525-eval35-600s-formal`
-- 状態: `planned`
+- 状態: `running`
 - 位置づけ: `formal`
 
 ## 目的
@@ -56,6 +56,15 @@ Eval.3の40 runが完了した時点で、Eval.5のシミュレーションと�
 
 ## 再現用Git情報
 
-起動commit、結果branch/commit、systemd unit、invocation ID、開始・終了日時は正式起動時と
-完了時に追記する。不完全または失敗した結果はcommit/pushしない。
+- 実行source commit: `a64786756f33ccd983ca6a60fde2ff4ae68f1f36`
+- 起動日時: 2026-11-22 15:09 JST
+- systemd user unit: `mcs-eval35-l0525-vs-yamashita-600s-20261122.service`
+- invocation ID: `4e87c83b255249a7b6e373e8d12525e4`
+- 監視Codex thread: `01a201e0-b418-7da3-924c-b0d57d85255d`
+- スモーク: 6条件すべてseed 13を10 simulation secondsまで実行し、exit 0、同一固定入力SHA、
+  clean source、指定flowを確認した。formal成功後にスモークraw outputを削除する。
+
+起動直後のreadbackではunit `active/running`、SUMO `15/15`、6 manifest `running`、
+source clean、各flowおよび提案条件`lambda=0.525`を確認した。不完全または失敗した結果は
+commit/pushしない。終了日時、結果branch/commit、完全性監査と結論は完了時に追記する。
 
