@@ -307,7 +307,12 @@ def fixed_input_details(
     }
 
 
-def build_tasks(case_names, seeds_per_case=None, seeds=None, eval7_flows=None):
+def build_tasks(
+        case_names,
+        seeds_per_case=None,
+        seeds=None,
+        eval7_flows=None,
+        allow_undocumented_seeds=False):
     """Build tasks from documented seeds, optionally selecting an explicit subset."""
     tasks = []
     for name in case_names:
@@ -319,7 +324,7 @@ def build_tasks(case_names, seeds_per_case=None, seeds=None, eval7_flows=None):
                 allowed |= set(CASES[name].get(
                     "flow_sweep_holdout_seeds", {}).get(flow_key, ()))
             unknown = [seed for seed in seeds if seed not in allowed]
-            if unknown:
+            if unknown and not allow_undocumented_seeds:
                 raise ValueError(f"{name} does not document seeds: {unknown}")
             selected = seeds
         else:
@@ -705,7 +710,11 @@ def main():
     args.run_git_metadata = git_metadata()
     try:
         tasks = build_tasks(
-            args.cases, args.seeds_per_case, args.seeds, args.eval7_flows)
+            args.cases,
+            args.seeds_per_case,
+            args.seeds,
+            args.eval7_flows,
+            allow_undocumented_seeds=args.fixed_input_override is not None)
     except ValueError as error:
         parser.error(str(error))
     if args.resume_checkpoint is not None:
