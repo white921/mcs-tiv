@@ -10,7 +10,12 @@ sys.path.insert(0, str(ROOT / "func"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from fixed_vehicle_inputs import load_fixed_vehicle_input
-from generate_eval35_formal_inputs import CONDITIONS, SEEDS, expected_files
+from generate_eval35_formal_inputs import (
+    CONDITIONS,
+    GENERATION_PYTHON,
+    SEEDS,
+    expected_files,
+)
 from run_thesis_batch import fixed_input_details, selected_flows
 
 
@@ -32,6 +37,9 @@ class Eval35FormalInputTests(unittest.TestCase):
                     expected_flows_vph=flows,
                     expected_bus_share=0.25,
                     prefix_duration_s=600,
+                )
+                self.assertEqual(
+                    schedule.metadata["generated_with_python"], GENERATION_PYTHON
                 )
                 expected_count = sum(int(flow / 6) for flow in flows.values())
                 self.assertEqual(len(schedule.events), expected_count)

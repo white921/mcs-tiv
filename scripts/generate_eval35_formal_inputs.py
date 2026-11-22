@@ -15,6 +15,7 @@ from generate_fixed_vehicle_inputs import generate_records, serialize  # noqa: E
 
 
 SEEDS = tuple(range(13, 23))
+GENERATION_PYTHON = "3.15.1"
 CONDITIONS = {
     "eval3-400": (
         "eval3",
@@ -35,7 +36,9 @@ def expected_files(output: Path):
     for condition, (case, flows) in CONDITIONS.items():
         for seed in SEEDS:
             path = output / condition / f"seed-{seed}.jsonl"
-            yield path, serialize(generate_records(case, seed, flows))
+            records = generate_records(case, seed, flows)
+            records[0]["generated_with_python"] = GENERATION_PYTHON
+            yield path, serialize(records)
 
 
 def main() -> int:
