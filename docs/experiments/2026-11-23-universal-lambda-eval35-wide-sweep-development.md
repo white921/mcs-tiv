@@ -1,7 +1,7 @@
 # 全シナリオ共通lambda選定のためのEval.3/5広域スイープ
 
 - 台帳ID: \`2026-11-23-universal-lambda-eval35-wide-sweep-development\`
-- 状態: \`scope revised to 220 runs; preflight pending\`
+- 状態: \`running\`
 - 分類: \`development screening\`
 - 実行対象: Ubuntu \`sgnlab\`
 
@@ -58,7 +58,7 @@ MCSのシナリオ非依存性を保ち、T字路、十字路、合流で別々�
 ## 実行・保存
 
 - 計画・スケジューラブランチ: \`codex/universal-lambda-eval35-development\`
-- 実行source commit: 起動前に追記する。
+- 実行source commit: \`e0b7fac76f358335771bec8ab6d7cc48009208f7\`
 - 結果branch:
   - \`codex/universal-lambda-eval3-r500-results\`
   - \`codex/universal-lambda-eval5-r300-results\`
@@ -97,6 +97,17 @@ evaluation metrics、物理衝突、集約済み判断件数、ログ、retentio
 性能項の有効性に関する主な差は500/500/500で確認されている。ユーザとの合意により、
 新規広域スイープはT字路500/500/500と十字路300/300/300/300の2条件、220 runに絞る。
 合流1000/1000の既存110 runと各シナリオの山下TIVtep基準は再利用する。
+
+2026-11-23 11:49 JSTに修正後のattempt 2を起動した。
+
+- systemd unit: \`mcs-universal-lambda-eval35-wide-sweep-220run-20261123.service\`
+- invocation ID: \`bba7f7d0ef434d0282385d0b3ca58b49\`
+- 実行順: \`condition -> lambda -> seed\`
+- 初期送出: Eval.3 500/500/500の\`lambda=0.0\` 10 seedを全て送出後、
+  \`lambda=0.1\`の先5 seedを送出
+- 初期確認: active 15、SUMO 15、machine slot超過なし
+- 監視: Codex heartbeat \`mcs-220run\`を30分間隔で開始し、slowest active runが60%以上で
+  15分間隔に短縮する。
 
 ## 最終holdout
 
