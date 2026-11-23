@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+import tempfile
 import unittest
 
 
@@ -42,6 +43,18 @@ class Eval35UniversalLambdaSweepTests(unittest.TestCase):
             "000", "010", "020", "030", "040", "050",
             "060", "070", "080", "090", "100",
         ])
+
+    def test_sumo_home_requires_binary_and_traci_package(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            sumo_home = Path(temporary_directory)
+            (sumo_home / "bin").mkdir()
+            (sumo_home / "bin" / "sumo").touch()
+            with self.assertRaisesRegex(RuntimeError, "tools/traci/__init__.py"):
+                SWEEP.validate_sumo_home_layout(sumo_home)
+
+            (sumo_home / "tools" / "traci").mkdir(parents=True)
+            (sumo_home / "tools" / "traci" / "__init__.py").touch()
+            SWEEP.validate_sumo_home_layout(sumo_home)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 # 全シナリオ共通lambda選定のためのEval.3/5広域スイープ
 
 - 台帳ID: \`2026-11-23-universal-lambda-eval35-wide-sweep-development\`
-- 状態: \`planned\`
+- 状態: \`launch failed; relaunch pending user decision\`
 - 分類: \`development screening\`
 - 実行対象: Ubuntu \`sgnlab\`
 
@@ -69,6 +69,21 @@ MCSのシナリオ非依存性を保ち、T字路、十字路、合流で別々�
 本バッチはdevelopment screeningなので、大きなprediction event streamとper-run source snapshotは
 完全性・数値集計・SHA-256を確認した後に保存対象から外す。manifest、固定入力hash、
 evaluation metrics、物理衝突、集約済み判断件数、ログ、retention auditは保存する。
+
+## 2026-11-23 初回起動の失敗
+
+- systemd unit: \`mcs-universal-lambda-eval35-wide-sweep-20261123.service\`
+- invocation ID: \`ae0cc46579b043459df850474df98b5d\`
+- 実行時間: 2026-11-23 11:22:56–11:23:05 JST
+- 送出数: 15/330、成功0、失敗15、未送出315
+- 失敗範囲: Eval.3 400/400/400の\`lambda=0.0\` 10 seedと\`lambda=0.1\` 5 seed
+- 直接原因: \`SUMO_HOME\`にPython仮想環境のルートを渡し、
+  \`<SUMO_HOME>/tools/traci\`が存在しなかったため\`ModuleNotFoundError: No module named 'traci'\`で終了した。
+- 影響: 各プロセスは約3.3–3.6秒で終了し、600秒シミュレーションは完遂していない。
+  結果branchのcommit・pushはない。条件や数値結果に関する結論は出せない。
+- 対応: スケジューラに\`bin/sumo\`、\`tools/traci/__init__.py\`、および対象Pythonからの
+  \`import traci\`を送出前に検証するpreflightを追加する。
+- 再実行: 失敗runを自動再実行しないルールに従い、修正後の別attemptは未起動。
 
 ## 最終holdout
 

@@ -9,6 +9,7 @@ import datetime
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -90,6 +91,19 @@ def build_ordered_tasks() -> list[tuple[str, float, int]]:
     ]
 
 
+def validate_sumo_home_layout(sumo_home: Path) -> None:
+    required = (
+        sumo_home / "bin" / "sumo",
+        sumo_home / "tools" / "traci" / "__init__.py",
+    )
+    missing = [str(path) for path in required if not path.is_file()]
+    if missing:
+        raise RuntimeError(
+            "SUMO_HOME must contain bin/sumo and tools/traci/__init__.py; "
+            f"missing: {missing}"
+        )
+
+
 def method_args(args, runner, output: Path, condition: str, value: float):
     spec = CONDITION_SPECS[condition]
     return SimpleNamespace(
@@ -155,6 +169,7 @@ def cohort_manifest(args, context, started_at):
 
 
 def validate_preflight(args, contexts):
+    validate_sumo_home_layout(args.sumo_home)
     version_text = subprocess.check_output(
         [str(args.python), "-c", "import platform; print(platform.python_version())"],
         text=True,
@@ -167,6 +182,19 @@ def validate_preflight(args, contexts):
     first_line = sumo_output.splitlines()[0]
     if not re.search(rf"\b{re.escape(EXPECTED_SUMO)}\b", first_line):
         raise RuntimeError(f"SUMO must be {EXPECTED_SUMO}: {first_line}")
+    traci_environment = os.environ.copy()
+    existing_pythonpath = traci_environment.get("PYTHONPATH")
+    tools_path = str(args.sumo_home / "tools")
+    traci_environment["PYTHONPATH"] = (
+        tools_path if not existing_pythonpath else f"{tools_path}:{existing_pythonpath}"
+    )
+    subprocess.run(
+        [str(args.python), "-c", "import traci; print(traci.__file__)"],
+        env=traci_environment,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
     existing_sumo = count_sumo_processes()
     if existing_sumo:
         raise RuntimeError(f"refusing to start with {existing_sumo} SUMO process(es)")
