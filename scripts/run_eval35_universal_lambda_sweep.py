@@ -298,6 +298,7 @@ def main() -> int:
     parser.add_argument("--date-tag", required=True)
     parser.add_argument("--slots", type=int, default=15)
     parser.add_argument("--cleanup-workers", type=int, default=2)
+    parser.add_argument("--preflight-only", action="store_true")
     parser.add_argument("--push-results", action=argparse.BooleanOptionalAction, default=True)
     args = parser.parse_args()
     if args.slots != 15:
@@ -339,6 +340,9 @@ def main() -> int:
             outputs.append(output)
 
     preflight = validate_preflight(args, contexts)
+    if args.preflight_only:
+        print(json.dumps({"status": "preflight-passed", **preflight}, allow_nan=False))
+        return 0
     started_at = datetime.datetime.now().astimezone()
     for context in contexts.values():
         output = context["args"].output

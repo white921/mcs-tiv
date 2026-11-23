@@ -82,7 +82,8 @@ evaluation metrics、物理衝突、集約済み判断件数、ログ、retentio
 - 影響: 各プロセスは約3.3–3.6秒で終了し、600秒シミュレーションは完遂していない。
   結果branchのcommit・pushはない。条件や数値結果に関する結論は出せない。
 - 対応: スケジューラに\`bin/sumo\`、\`tools/traci/__init__.py\`、および対象Pythonからの
-  \`import traci\`を送出前に検証するpreflightを追加する。
+  \`import traci\`を送出前に検証するpreflightと、送出せず検査だけを行う
+  \`--preflight-only\`を追加する。
 - 再実行: 失敗runを自動再実行しないルールに従い、修正後の別attemptは未起動。
 
 ## 最終holdout
