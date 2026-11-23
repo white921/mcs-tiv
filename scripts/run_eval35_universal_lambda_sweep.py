@@ -22,9 +22,8 @@ EXPECTED_PYTHON = (3, 15, 1)
 EXPECTED_SUMO = "1.28.0"
 SEEDS = tuple(range(13, 23))
 LAMBDAS = tuple(index / 10 for index in range(11))
-CONDITION_ORDER = ("eval3-400", "eval3-500", "eval5-300")
+CONDITION_ORDER = ("eval3-500", "eval5-300")
 CONDITION_SPECS = {
-    "eval3-400": {"case": "eval3", "flows": (400, 400, 400)},
     "eval3-500": {"case": "eval3", "flows": (500, 500, 500)},
     "eval5-300": {"case": "eval5", "flows": (300, 300, 300, 300)},
 }

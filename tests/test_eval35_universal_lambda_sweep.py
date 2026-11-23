@@ -14,23 +14,23 @@ SPEC.loader.exec_module(SWEEP)
 class Eval35UniversalLambdaSweepTests(unittest.TestCase):
     def test_queue_is_condition_then_lambda_then_seed(self):
         tasks = SWEEP.build_ordered_tasks()
-        self.assertEqual(len(tasks), 330)
+        self.assertEqual(len(tasks), 220)
         self.assertEqual(
             tasks[:12],
             [
-                *(('eval3-400', 0.0, seed) for seed in range(13, 23)),
-                ('eval3-400', 0.1, 13),
-                ('eval3-400', 0.1, 14),
+                *(('eval3-500', 0.0, seed) for seed in range(13, 23)),
+                ('eval3-500', 0.1, 13),
+                ('eval3-500', 0.1, 14),
             ],
         )
-        self.assertEqual(tasks[109], ("eval3-400", 1.0, 22))
-        self.assertEqual(tasks[110], ("eval3-500", 0.0, 13))
-        self.assertEqual(tasks[220], ("eval5-300", 0.0, 13))
+        self.assertEqual(tasks[109], ("eval3-500", 1.0, 22))
+        self.assertEqual(tasks[110], ("eval5-300", 0.0, 13))
+        self.assertEqual(tasks[219], ("eval5-300", 1.0, 22))
 
     def test_initial_slots_finish_first_lambda_cohort_early(self):
         tasks = SWEEP.build_ordered_tasks()[:15]
-        self.assertEqual(tasks[:10], [("eval3-400", 0.0, seed) for seed in range(13, 23)])
-        self.assertEqual(tasks[10:], [("eval3-400", 0.1, seed) for seed in range(13, 18)])
+        self.assertEqual(tasks[:10], [("eval3-500", 0.0, seed) for seed in range(13, 23)])
+        self.assertEqual(tasks[10:], [("eval3-500", 0.1, seed) for seed in range(13, 18)])
 
     def test_fixed_inputs_are_condition_specific(self):
         for condition in SWEEP.CONDITION_ORDER:

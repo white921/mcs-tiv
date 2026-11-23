@@ -1,7 +1,7 @@
 # 全シナリオ共通lambda選定のためのEval.3/5広域スイープ
 
 - 台帳ID: \`2026-11-23-universal-lambda-eval35-wide-sweep-development\`
-- 状態: \`preflight passed; relaunch pending user decision\`
+- 状態: \`scope revised to 220 runs; preflight pending\`
 - 分類: \`development screening\`
 - 実行対象: Ubuntu \`sgnlab\`
 
@@ -18,7 +18,7 @@ MCSのシナリオ非依存性を保ち、T字路、十字路、合流で別々�
 
 | 項目 | 値 |
 | --- | --- |
-| 追加ケース | Eval.3 T字路 400/400/400、Eval.3 T字路 500/500/500、Eval.5 十字路 300/300/300/300 veh/h |
+| 追加ケース | Eval.3 T字路 500/500/500、Eval.5 十字路 300/300/300/300 veh/h |
 | lambda | \`0.0, 0.1, ..., 1.0\`の11候補 |
 | seed | \`13–22\`の10 seed |
 | 時間 | 600 s |
@@ -26,7 +26,7 @@ MCSのシナリオ非依存性を保ち、T字路、十字路、合流で別々�
 | 入力 | \`fixed_inputs/thesis/eval35-paper-comparison/<condition>/seed-<seed>.jsonl\` |
 | 提案条件 | \`T_pred=10 s\`、\`N_max=40\`、正規化凸結合式 |
 | 環境 | Python 3.15.1、SUMO 1.28.0 |
-| 新規run | 3条件 × 11 lambda × 10 seed = 330 |
+| 新規run | 2条件 × 11 lambda × 10 seed = 220 |
 | 分類 | lambda選定用development、diagnostic trace/checkpointなし |
 | 並列 | machine-wide 15 SUMO |
 
@@ -46,9 +46,9 @@ MCSのシナリオ非依存性を保ち、T字路、十字路、合流で別々�
 
 1. 完全性監査、固定入力、実行ソース、物理衝突を先に確認する。
 2. 各条件で、同一seedの山下TIVtepに対する全車平均速度の対応差と相対差を計算する。
-3. T字路の2交通量を先に平均し、T字路・十字路・合流の3形状を等重みにする
+3. T字路・十字路・合流の3形状を等重みにする
    topology-balanced macro averageを算出する。
-4. 併せて、4条件中の最悪の相対差を算出し、一部条件の大きな悪化を平均で隠さない。
+4. 併せて、3条件中の最悪の相対差を算出し、一部条件の大きな悪化を平均で隠さない。
 5. 広域グリッドでmacro averageと最悪条件のPareto前線を出し、その共通高性能域だけを
    別のdevelopment記録で細密化する。
 
@@ -60,7 +60,6 @@ MCSのシナリオ非依存性を保ち、T字路、十字路、合流で別々�
 - 計画・スケジューラブランチ: \`codex/universal-lambda-eval35-development\`
 - 実行source commit: 起動前に追記する。
 - 結果branch:
-  - \`codex/universal-lambda-eval3-r400-results\`
   - \`codex/universal-lambda-eval3-r500-results\`
   - \`codex/universal-lambda-eval5-r300-results\`
 - scheduler: \`scripts/run_eval35_universal_lambda_sweep.py\`
@@ -91,6 +90,13 @@ evaluation metrics、物理衝突、集約済み判断件数、ログ、retentio
   \`0f446f0840f2f81e13644237b149a09ad3baecd2\`、Python 3.15.1、SUMO 1.28.0、既存SUMOプロセス0、
   3条件×10 seedの固定入力hashは全worktreeで一致した。
 - 再実行: 失敗runを自動再実行しないルールに従い、修正後の別attemptは未起動。
+
+## 2026-11-23 実行範囲の修正
+
+山下修論のEval.3では400/400/400と500/500/500の両方が正式に評価されているが、
+性能項の有効性に関する主な差は500/500/500で確認されている。ユーザとの合意により、
+新規広域スイープはT字路500/500/500と十字路300/300/300/300の2条件、220 runに絞る。
+合流1000/1000の既存110 runと各シナリオの山下TIVtep基準は再利用する。
 
 ## 最終holdout
 
