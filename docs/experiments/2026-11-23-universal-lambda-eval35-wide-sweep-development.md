@@ -1,7 +1,7 @@
 # 全シナリオ共通lambda選定のためのEval.3/5広域スイープ
 
 - 台帳ID: \`2026-11-23-universal-lambda-eval35-wide-sweep-development\`
-- 状態: \`launch failed; relaunch pending user decision\`
+- 状態: \`preflight passed; relaunch pending user decision\`
 - 分類: \`development screening\`
 - 実行対象: Ubuntu \`sgnlab\`
 
@@ -84,6 +84,12 @@ evaluation metrics、物理衝突、集約済み判断件数、ログ、retentio
 - 対応: スケジューラに\`bin/sumo\`、\`tools/traci/__init__.py\`、および対象Pythonからの
   \`import traci\`を送出前に検証するpreflightと、送出せず検査だけを行う
   \`--preflight-only\`を追加する。
+- 失敗証跡: 未追跡の33 cohortディレクトリは削除せず、
+  \`/media/yamada/UbuntuData/home-yamada/Documents/卒業研究/mcs-tiv-failed-launches/mcs-universal-lambda-eval35-wide-sweep-20261123/\`
+  へ隔離した。結果worktreeは再びcleanである。
+- 再検証: 2026-11-23 11:28 JSTに\`--preflight-only\`が成功した。source commitは
+  \`0f446f0840f2f81e13644237b149a09ad3baecd2\`、Python 3.15.1、SUMO 1.28.0、既存SUMOプロセス0、
+  3条件×10 seedの固定入力hashは全worktreeで一致した。
 - 再実行: 失敗runを自動再実行しないルールに従い、修正後の別attemptは未起動。
 
 ## 最終holdout
