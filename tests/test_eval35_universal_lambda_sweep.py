@@ -32,6 +32,20 @@ class Eval35UniversalLambdaSweepTests(unittest.TestCase):
         self.assertEqual(tasks[:10], [("eval3-500", 0.0, seed) for seed in range(13, 23)])
         self.assertEqual(tasks[10:], [("eval3-500", 0.1, seed) for seed in range(13, 18)])
 
+    def test_high_grid_uses_matched_seeds_and_skips_completed_merge_cohorts(self):
+        tasks = SWEEP.build_ordered_tasks("high")
+        expected = [
+            (condition, value, seed)
+            for condition, values, seeds in (
+                ("eval3-500", (0.925, 0.95, 40 / 41, 80 / 81), range(13, 23)),
+                ("eval5-300", (0.925, 0.95, 40 / 41, 80 / 81), range(13, 23)),
+                ("eval7-1000", (0.925, 40 / 41), range(33, 43)),
+            )
+            for value in values
+            for seed in seeds
+        ]
+        self.assertEqual(tasks, expected)
+
     def test_fixed_inputs_are_condition_specific(self):
         for condition in SWEEP.CONDITION_ORDER:
             path = SWEEP.fixed_input_template(condition)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the broad universal-lambda screening for Eval.3 and Eval.5."""
+"""Run universal-lambda screening on a shared SUMO queue."""
 
 from __future__ import annotations
 
@@ -23,9 +23,12 @@ EXPECTED_SUMO = "1.28.0"
 SEEDS = tuple(range(13, 23))
 LAMBDAS = tuple(index / 10 for index in range(11))
 CONDITION_ORDER = ("eval3-500", "eval5-300")
+HIGH_LAMBDAS = (0.925, 0.95, 40 / 41, 80 / 81)
+MERGE_SEEDS = tuple(range(33, 43))
 CONDITION_SPECS = {
     "eval3-500": {"case": "eval3", "flows": (500, 500, 500)},
     "eval5-300": {"case": "eval5", "flows": (300, 300, 300, 300)},
+    "eval7-1000": {"case": "eval7", "flows": (1000, 1000)},
 }
 
 
@@ -68,25 +71,42 @@ def count_sumo_processes() -> int:
 
 
 def fixed_input_template(condition: str) -> str:
+    if condition == "eval7-1000":
+        return (
+            "fixed_inputs/thesis/eval7-flow-sweep/"
+            "requesting-1000-accepting-1000/seed-{seed}.jsonl"
+        )
     return (
         "fixed_inputs/thesis/eval35-paper-comparison/"
         f"{condition}/seed-{{seed}}.jsonl"
     )
 
 
-def run_name(condition: str, value: float, date_tag: str) -> str:
+def run_name(condition: str, value: float, date_tag: str, seeds=SEEDS, grid: str = "wide") -> str:
+    tag = lambda_tag(value) if grid == "wide" else f"{value:.8f}".partition(".")[2]
     return (
-        f"universal-lambda{lambda_tag(value)}-{condition}-"
-        f"seeds13-22-600s-{date_tag}"
+        f"universal-lambda{tag}-{condition}-"
+        f"seeds{seeds[0]}-{seeds[-1]}-600s-{date_tag}"
     )
 
 
-def build_ordered_tasks() -> list[tuple[str, float, int]]:
+def condition_cohorts(grid: str):
+    if grid == "wide":
+        return {condition: (LAMBDAS, SEEDS) for condition in CONDITION_ORDER}
+    # The matched 600 s Eval.7 cohorts at 0.95 and 80/81 already exist.
+    return {
+        "eval3-500": (HIGH_LAMBDAS, SEEDS),
+        "eval5-300": (HIGH_LAMBDAS, SEEDS),
+        "eval7-1000": ((0.925, 40 / 41), MERGE_SEEDS),
+    }
+
+
+def build_ordered_tasks(grid: str = "wide") -> list[tuple[str, float, int]]:
     return [
         (condition, value, seed)
-        for condition in CONDITION_ORDER
-        for value in LAMBDAS
-        for seed in SEEDS
+        for condition, (lambdas, seeds) in condition_cohorts(grid).items()
+        for value in lambdas
+        for seed in seeds
     ]
 
 
@@ -147,16 +167,16 @@ def cohort_manifest(args, context, started_at):
         "method": "normalized-deceleration-propagation",
         "requested_decision_method": "tivtep",
         "deceleration_convex_lambda": context["lambda"],
-        "tasks": [{"case": spec["case"], "seed": seed} for seed in SEEDS],
+        "tasks": [{"case": spec["case"], "seed": seed} for seed in context["seeds"]],
         "duration_s": 600.0,
         "bus_share": 0.25,
         "workers": args.slots,
         "scheduler": {
             "type": "condition-lambda-seed-work-conserving-shared-queue",
             "slots": args.slots,
-            "condition_order": list(CONDITION_ORDER),
-            "lambda_order": list(LAMBDAS),
-            "seed_order": list(SEEDS),
+            "condition_order": list(args.condition_order),
+            "lambda_order": list(context["lambdas"]),
+            "seed_order": list(context["seeds"]),
             "machine_wide_limit": args.slots,
             "orchestration_log": "orchestration.jsonl",
             "cohort_postprocess": True,
@@ -202,9 +222,7 @@ def validate_preflight(args, contexts):
     runner_hashes = set()
     scheduler_hashes = set()
     finalizer_hashes = set()
-    fixed_input_hashes: dict[tuple[str, int], set[str]] = {
-        (condition, seed): set() for condition in CONDITION_ORDER for seed in SEEDS
-    }
+    fixed_input_hashes: dict[tuple[str, int], set[str]] = {}
     checked_roots = set()
     for context in contexts.values():
         metadata = context["args"].run_git_metadata
@@ -224,7 +242,7 @@ def validate_preflight(args, contexts):
         runner = context["runner"]
         condition = context["condition"]
         spec = CONDITION_SPECS[condition]
-        for seed in SEEDS:
+        for seed in context["seeds"]:
             details = runner.fixed_input_details(
                 spec["case"],
                 seed,
@@ -235,7 +253,7 @@ def validate_preflight(args, contexts):
                 flows=spec["flows"],
                 relative_path_override=fixed_input_template(condition),
             )
-            fixed_input_hashes[(condition, seed)].add(details["sha256"])
+            fixed_input_hashes.setdefault((condition, seed), set()).add(details["sha256"])
     if len(commits) != 1:
         raise RuntimeError(f"condition roots differ in source commit: {sorted(commits)}")
     if len(runner_hashes) != 1 or len(scheduler_hashes) != 1 or len(finalizer_hashes) != 1:
@@ -295,13 +313,14 @@ def main() -> int:
     parser.add_argument("--python", type=Path, required=True)
     parser.add_argument("--system-python", type=Path, default=Path("/usr/bin/python3"))
     parser.add_argument("--date-tag", required=True)
-    parser.add_argument("--slots", type=int, default=15)
+    parser.add_argument("--grid", choices=("wide", "high"), default="wide")
+    parser.add_argument("--slots", type=int, choices=(15, 20), default=15)
     parser.add_argument("--cleanup-workers", type=int, default=2)
     parser.add_argument("--preflight-only", action="store_true")
     parser.add_argument("--push-results", action=argparse.BooleanOptionalAction, default=True)
     args = parser.parse_args()
-    if args.slots != 15:
-        parser.error("this screening scheduler requires exactly 15 slots")
+    plan = condition_cohorts(args.grid)
+    args.condition_order = tuple(plan)
     if args.cleanup_workers < 1 or args.cleanup_workers > 2:
         parser.error("--cleanup-workers must be 1 or 2")
     supplied = {}
@@ -309,24 +328,26 @@ def main() -> int:
         if condition in supplied:
             parser.error(f"duplicate condition: {condition}")
         supplied[condition] = (Path(root_text).resolve(), branch)
-    if tuple(supplied) != CONDITION_ORDER:
-        parser.error("condition roots must be supplied in order: " + ", ".join(CONDITION_ORDER))
+    if tuple(supplied) != args.condition_order:
+        parser.error("condition roots must be supplied in order: " + ", ".join(args.condition_order))
 
     contexts = {}
     outputs = []
-    for condition in CONDITION_ORDER:
+    for condition, (lambdas, seeds) in plan.items():
         root, branch = supplied[condition]
         if not root.is_dir():
             parser.error(f"condition root does not exist: {root}")
-        for value in LAMBDAS:
-            tag = f"{condition}-lambda{lambda_tag(value)}"
-            output = root / "results" / "runs" / run_name(condition, value, args.date_tag)
+        for value in lambdas:
+            tag = run_name(condition, value, args.date_tag, seeds, args.grid)
+            output = root / "results" / "runs" / tag
             if output.exists():
                 parser.error(f"output already exists: {output}")
             runner = load_runner(root, tag)
             contexts[(condition, value)] = {
                 "condition": condition,
                 "lambda": value,
+                "lambdas": lambdas,
+                "seeds": seeds,
                 "root": root,
                 "branch": branch,
                 "runner": runner,
@@ -339,8 +360,16 @@ def main() -> int:
             outputs.append(output)
 
     preflight = validate_preflight(args, contexts)
+    queue = build_ordered_tasks(args.grid)
     if args.preflight_only:
-        print(json.dumps({"status": "preflight-passed", **preflight}, allow_nan=False))
+        print(json.dumps({
+            "status": "preflight-passed", "slots": args.slots, "total_tasks": len(queue),
+            "cohorts": [
+                {"condition": condition, "lambda": value, "seeds": context["seeds"]}
+                for (condition, value), context in contexts.items()
+            ],
+            **preflight,
+        }, allow_nan=False))
         return 0
     started_at = datetime.datetime.now().astimezone()
     for context in contexts.values():
@@ -358,7 +387,7 @@ def main() -> int:
                 "event": "experiment_started",
                 "condition": context["condition"],
                 "lambda": context["lambda"],
-                "tasks": len(SEEDS),
+                "tasks": len(context["seeds"]),
                 "shared_slots": args.slots,
             },
         )
@@ -376,7 +405,6 @@ def main() -> int:
                 append_jsonl(output / "orchestration.jsonl", record)
             print(json.dumps(record, allow_nan=False), flush=True)
 
-    queue = build_ordered_tasks()
     active = 0
     max_active = 0
     active_lock = threading.Lock()
@@ -457,7 +485,7 @@ def main() -> int:
             elapsed_seconds=finished_at.timestamp() - started_at.timestamp(),
             completed_simulations=len(reports) - len(failures),
             failed_simulations=len(failures),
-            missing_simulations=len(SEEDS) - len(reports),
+            missing_simulations=len(context["seeds"]) - len(reports),
             summary_file="summary.json",
             runner_log="runner.log",
             max_shared_active_runs=max_active,
@@ -507,9 +535,12 @@ def main() -> int:
         source_commit=preflight["source_commit"],
         slots=args.slots,
         total_tasks=len(queue),
-        condition_order=list(CONDITION_ORDER),
-        lambda_order=list(LAMBDAS),
-        seed_order=list(SEEDS),
+        condition_order=list(args.condition_order),
+        lambda_order=sorted({value for _, value in contexts}),
+        seed_order_by_condition={
+            condition: seeds for condition, (_, seeds) in plan.items()
+        },
+        **({"seed_order": list(SEEDS)} if args.grid == "wide" else {}),
     )
     abort = False
     next_index = 0
@@ -534,7 +565,7 @@ def main() -> int:
                         seed=seed,
                         error=report.get("error"),
                     )
-                if len(context["reports"]) == len(SEEDS):
+                if len(context["reports"]) == len(context["seeds"]):
                     finalize_context(condition, value)
                     if context["manifest"]["status"] == "completed":
                         cleanup_future = cleanup_pool.submit(postprocess, condition, value)
@@ -597,8 +628,10 @@ def main() -> int:
 
     stop_monitor.set()
     monitor_thread.join(timeout=2)
-    for condition in CONDITION_ORDER:
-        condition_contexts = [contexts[(condition, value)] for value in LAMBDAS]
+    for condition in args.condition_order:
+        condition_contexts = [
+            context for (key, _), context in contexts.items() if key == condition
+        ]
         if all(
             context["finalized"]
             and context["manifest"]["status"] == "completed"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit, compact, and summarize one completed Eval.3/5 lambda cohort."""
+"""Audit, compact, and summarize one completed lambda cohort."""
 
 from __future__ import annotations
 
@@ -14,7 +14,11 @@ import statistics
 import xml.etree.ElementTree as ET
 
 
-SEEDS = tuple(range(13, 23))
+SEEDS_BY_CASE = {
+    "eval3": tuple(range(13, 23)),
+    "eval5": tuple(range(13, 23)),
+    "eval7": tuple(range(33, 43)),
+}
 
 
 def read_json(path: Path):
@@ -205,22 +209,25 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--condition", required=True)
-    parser.add_argument("--case", choices=("eval3", "eval5"), required=True)
+    parser.add_argument("--case", choices=SEEDS_BY_CASE, required=True)
     parser.add_argument("--lambda-value", type=float, required=True)
     parser.add_argument("--source-commit", required=True)
     args = parser.parse_args()
     output = args.output.resolve()
     experiment = read_json(output / "experiment-manifest.json")
+    seeds = SEEDS_BY_CASE[args.case]
     errors = []
     if experiment.get("status") != "completed":
         errors.append("experiment_status")
-    if experiment.get("completed_simulations") != 10:
+    if experiment.get("completed_simulations") != len(seeds):
         errors.append("completed_simulations")
     if experiment.get("failed_simulations") != 0:
         errors.append("failed_simulations")
+    if experiment.get("tasks") != [{"case": args.case, "seed": seed} for seed in seeds]:
+        errors.append("tasks")
 
     rows = []
-    for seed in SEEDS:
+    for seed in seeds:
         run = output / args.case / f"seed-{seed}"
         row, run_errors = analyze_run(
             run, seed=seed, source_commit=args.source_commit, lambda_value=args.lambda_value
@@ -238,12 +245,12 @@ def main() -> int:
         "case": args.case,
         "lambda": args.lambda_value,
         "source_commit": args.source_commit,
-        "seeds": list(SEEDS),
+        "seeds": list(seeds),
         "aggregate": aggregate(rows),
         "per_seed": rows,
     }
     write_json(output / "lambda-screening-summary.json", summary)
-    retention = [compact_run(output / args.case / f"seed-{seed}", row) for seed, row in zip(SEEDS, rows)]
+    retention = [compact_run(output / args.case / f"seed-{seed}", row) for seed, row in zip(seeds, rows)]
     write_json(
         output / "post-run-audit.json",
         {
