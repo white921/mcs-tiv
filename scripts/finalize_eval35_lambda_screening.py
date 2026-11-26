@@ -212,10 +212,13 @@ def main() -> int:
     parser.add_argument("--case", choices=SEEDS_BY_CASE, required=True)
     parser.add_argument("--lambda-value", type=float, required=True)
     parser.add_argument("--source-commit", required=True)
+    parser.add_argument("--seeds", type=int, nargs="+")
     args = parser.parse_args()
+    seeds = tuple(args.seeds) if args.seeds else SEEDS_BY_CASE[args.case]
+    if min(seeds) < 0 or tuple(sorted(set(seeds))) != seeds:
+        parser.error("--seeds must contain distinct nonnegative seeds in ascending order")
     output = args.output.resolve()
     experiment = read_json(output / "experiment-manifest.json")
-    seeds = SEEDS_BY_CASE[args.case]
     errors = []
     if experiment.get("status") != "completed":
         errors.append("experiment_status")

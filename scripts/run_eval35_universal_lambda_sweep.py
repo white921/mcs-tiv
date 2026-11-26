@@ -25,10 +25,19 @@ LAMBDAS = tuple(index / 10 for index in range(11))
 CONDITION_ORDER = ("eval3-500", "eval5-300")
 HIGH_LAMBDAS = (0.925, 0.95, 40 / 41, 80 / 81)
 MERGE_SEEDS = tuple(range(33, 43))
+MERGE_FLOW_SEEDS = {
+    300: MERGE_SEEDS,
+    500: tuple(range(43, 48)),
+    700: MERGE_SEEDS,
+    1200: MERGE_SEEDS,
+}
 CONDITION_SPECS = {
     "eval3-500": {"case": "eval3", "flows": (500, 500, 500)},
     "eval5-300": {"case": "eval5", "flows": (300, 300, 300, 300)},
-    "eval7-1000": {"case": "eval7", "flows": (1000, 1000)},
+    **{
+        f"eval7-{flow}": {"case": "eval7", "flows": (flow, 1000)}
+        for flow in (*MERGE_FLOW_SEEDS, 1000)
+    },
 }
 
 
@@ -71,10 +80,12 @@ def count_sumo_processes() -> int:
 
 
 def fixed_input_template(condition: str) -> str:
-    if condition == "eval7-1000":
+    spec = CONDITION_SPECS[condition]
+    if spec["case"] == "eval7":
+        requesting, accepting = spec["flows"]
         return (
             "fixed_inputs/thesis/eval7-flow-sweep/"
-            "requesting-1000-accepting-1000/seed-{seed}.jsonl"
+            f"requesting-{requesting}-accepting-{accepting}/seed-{{seed}}.jsonl"
         )
     return (
         "fixed_inputs/thesis/eval35-paper-comparison/"
@@ -93,6 +104,8 @@ def run_name(condition: str, value: float, date_tag: str, seeds=SEEDS, grid: str
 def condition_cohorts(grid: str):
     if grid == "wide":
         return {condition: (LAMBDAS, SEEDS) for condition in CONDITION_ORDER}
+    if grid == "merge-flow":
+        return {f"eval7-{flow}": ((0.95,), seeds) for flow, seeds in MERGE_FLOW_SEEDS.items()}
     # The matched 600 s Eval.7 cohorts at 0.95 and 80/81 already exist.
     return {
         "eval3-500": (HIGH_LAMBDAS, SEEDS),
@@ -313,7 +326,7 @@ def main() -> int:
     parser.add_argument("--python", type=Path, required=True)
     parser.add_argument("--system-python", type=Path, default=Path("/usr/bin/python3"))
     parser.add_argument("--date-tag", required=True)
-    parser.add_argument("--grid", choices=("wide", "high"), default="wide")
+    parser.add_argument("--grid", choices=("wide", "high", "merge-flow"), default="wide")
     parser.add_argument("--slots", type=int, choices=(15, 20), default=15)
     parser.add_argument("--cleanup-workers", type=int, default=2)
     parser.add_argument("--preflight-only", action="store_true")
@@ -514,6 +527,7 @@ def main() -> int:
             "--case", CONDITION_SPECS[condition]["case"],
             "--lambda-value", str(value),
             "--source-commit", preflight["source_commit"],
+            "--seeds", *(str(seed) for seed in context["seeds"]),
         ]
         emit("cohort_postprocess_started", condition=condition, lambda_value=value)
         result = subprocess.run(command, text=True, capture_output=True, check=False)

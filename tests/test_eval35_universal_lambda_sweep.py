@@ -46,6 +46,26 @@ class Eval35UniversalLambdaSweepTests(unittest.TestCase):
         ]
         self.assertEqual(tasks, expected)
 
+    def test_merge_flow_uses_paired_seeds_and_starts_with_two_complete_cohorts(self):
+        tasks = SWEEP.build_ordered_tasks("merge-flow")
+        expected_cohorts = {
+            300: range(33, 43),
+            500: range(43, 48),
+            700: range(33, 43),
+            1200: range(33, 43),
+        }
+        self.assertEqual(tasks, [
+            (f"eval7-{flow}", 0.95, seed)
+            for flow, seeds in expected_cohorts.items()
+            for seed in seeds
+        ])
+        for flow, seeds in expected_cohorts.items():
+            for seed in seeds:
+                self.assertEqual(
+                    SWEEP.fixed_input_template(f"eval7-{flow}").format(seed=seed),
+                    f"fixed_inputs/thesis/eval7-flow-sweep/requesting-{flow}-accepting-1000/seed-{seed}.jsonl",
+                )
+
     def test_fixed_inputs_are_condition_specific(self):
         for condition in SWEEP.CONDITION_ORDER:
             path = SWEEP.fixed_input_template(condition)
