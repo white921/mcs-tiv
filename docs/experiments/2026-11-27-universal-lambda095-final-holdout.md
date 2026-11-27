@@ -44,6 +44,10 @@ screeningで事前固定した正規化凸結合式の `lambda=0.95`を、選定
 ## 実行・保存予定
 
 - 実行機 `sgnlab`。systemd user unit、invocation ID、実行開始時刻は起動時に追記する。
+- 現在のEval.7診断が正常終了した後、
+  `scripts/orchestrate_after_eval7_diagnostic_20261127.sh`が完全性gateを通過した場合だけ
+  holdoutを起動する。診断unit、artifact監査、holdout preflightのいずれかが失敗したら
+  後続を起動せず終了する。
 - schedulerは `scripts/run_universal_lambda095_holdout.py`。定数・キュー順・固定入力ハッシュ・
   Python/SUMO版・開始時Git clean・既存SUMO 0をpreflightで検査する。
 - 完了後は `scripts/finalize_universal_lambda095_holdout.py`をsystem Pythonで実行し、
