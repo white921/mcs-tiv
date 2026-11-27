@@ -51,17 +51,21 @@ def classify_existing_tasks(root: Path, queue, date_tag: str, commands):
         condition, method, seed = task
         run = run_directory(root, queue, task, date_tag)
         manifest_path = run / "manifest.json"
+        is_running = any(command_matches_run(command, run) for command in commands)
         if manifest_path.is_file():
             report = json.loads(manifest_path.read_text())
             expected_case = queue.CONDITION_SPECS[condition]["case"]
             if report.get("case") != expected_case or report.get("seed") != seed:
                 raise RuntimeError(f"existing run identity mismatch: {manifest_path}")
+            if report.get("exit_code") == 0 and report.get("source_unchanged") is True:
+                completed.add(task)
+                reports.append(report)
+                continue
+            if report.get("exit_code") is None and is_running:
+                running.add(task)
+                continue
             if report.get("exit_code") != 0 or report.get("source_unchanged") is not True:
                 raise RuntimeError(f"failed or incomplete run cannot be retried: {manifest_path}")
-            completed.add(task)
-            reports.append(report)
-            continue
-        is_running = any(command_matches_run(command, run) for command in commands)
         if is_running:
             running.add(task)
             continue

@@ -50,6 +50,16 @@ class UniversalLambda095OverlapFillerTests(unittest.TestCase):
                 root, QUEUE, running_task, "20261127"
             )
             running_run.mkdir(parents=True)
+            (running_run / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "case": "eval3",
+                        "seed": 24,
+                        "exit_code": None,
+                        "source_unchanged": None,
+                    }
+                )
+            )
             commands = [
                 "101 /opt/sumo/bin/sumo --fcd-output "
                 f"{running_run.resolve()}/fcd.xml.gz"
