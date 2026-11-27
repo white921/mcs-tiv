@@ -125,6 +125,7 @@ def main() -> int:
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--slots", type=int, default=15)
     parser.add_argument("--allowed-external-fragment", action="append", default=[])
+    parser.add_argument("--preflight-only", action="store_true")
     args = parser.parse_args()
     if args.slots != 15:
         parser.error("this filler requires exactly 15 machine-wide slots")
@@ -161,6 +162,23 @@ def main() -> int:
             contexts[(condition, method)] = queue.method_args(
                 args, runner, output, condition, method, git_metadata
             )
+
+    if args.preflight_only:
+        print(
+            json.dumps(
+                {
+                    "status": "preflight-passed",
+                    "source_commit": args.source_commit,
+                    "completed_tasks": len(completed),
+                    "running_tasks": [list(task) for task in sorted(running)],
+                    "queued_tasks": len(tasks),
+                    "existing_sumo_processes": len(commands),
+                    "slots": args.slots,
+                },
+                allow_nan=False,
+            )
+        )
+        return 0
 
     log = (
         root
