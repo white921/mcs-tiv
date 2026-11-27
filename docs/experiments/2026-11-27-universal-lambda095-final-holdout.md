@@ -52,8 +52,10 @@ screeningで事前固定した正規化凸結合式の `lambda=0.95`を、選定
   `scripts/audit_after_eval7_diagnostic_20261127.sh`の別unitが行う。いずれも失敗時は自動再実行しない。
 - 初回起動で、run内の短時間の`sumo --version`を外部SUMOと誤検知し、12本投入後に
   新規補充が停止した。投入済みrunは中断せず完了させ、
-  `scripts/resume_holdout_after_initial_overlap_20261127.sh`が成功済みmanifestを読み、
-  未投入runだけを再開する。失敗または未完了のper-run manifestがあれば自動再実行せず停止する。
+  `scripts/run_universal_lambda095_overlap_filler.py`が実行中runを出力パスで除外して空き枠へ
+  未投入runを補充する。その後、`scripts/resume_holdout_after_overlap_filler_20261127.sh`が
+  成功済みmanifestを再監査し、未投入runだけを再開する。失敗または未完了のper-run
+  manifestがあれば自動再実行せず停止する。
 - schedulerは `scripts/run_universal_lambda095_holdout.py`。定数・キュー順・固定入力ハッシュ・
   Python/SUMO版・開始時Git clean・既存SUMO 0をpreflightで検査する。
 - 完了後は `scripts/finalize_universal_lambda095_holdout.py`をsystem Pythonで実行し、

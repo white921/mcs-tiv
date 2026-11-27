@@ -389,7 +389,11 @@ def main() -> int:
                 "condition": condition,
                 "method": method,
                 "reports": reports,
-                "finalized": len(reports) == len(SEEDS),
+                "finalized": (
+                    len(reports) == len(SEEDS)
+                    and manifest is not None
+                    and manifest.get("status") == "completed"
+                ),
                 "manifest": manifest,
             }
             context["args"] = method_args(
