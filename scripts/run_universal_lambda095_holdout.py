@@ -69,6 +69,11 @@ def parse_sumo_process_output(output: str) -> list[str]:
         pid, state, command = fields
         if "Z" in state:
             continue
+        # A process that has already exited can briefly remain visible as a
+        # bracketed comm name even when ps reports a non-Z transitional state.
+        # It has no executable arguments and cannot consume a SUMO slot.
+        if command == "[sumo]" or command.startswith("[sumo] "):
+            continue
         rendered = f"{pid} {command}"
         if is_simulation_sumo_command(rendered):
             commands.append(rendered)
