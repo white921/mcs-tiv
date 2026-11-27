@@ -61,6 +61,16 @@ screeningで事前固定した正規化凸結合式の `lambda=0.95`を、選定
   21:05 JSTに新規補充だけを停止した。実行中runは継続し、プロセス状態`Z`を枠数から
   除外する修正版filler v2が成功済み・実行中runを除外して引き継ぐ。シミュレーションは
   再実行しない。
+- filler v2は2026-11-27 23:49 JSTに、`ps`が非`Z`の遷移状態で表示した引数なしの
+  `2300564 [sumo]`を再び外部SUMOと誤認し、新規補充だけを停止した。実行中runは継続し、
+  状態にかかわらず引数が`[sumo]`だけの終了済みプロセスを枠数から除外するcommit
+  `e92ef59c`のfiller v3へ重複なしで引き継いだ。起動前preflightは成功21、実行中13、
+  未投入26、既存SUMO 13、失敗0を確認した。v3 unitは
+  `mcs-universal-lambda095-overlap-filler-v3-20261128.service`、invocation
+  `b7e42e5abeae46b499b90bc6c35f2a79`。23:58 JSTにEval.5山下seed 27/28を投入し、
+  実SUMO 15を確認した。終了後の再開・finalizeは
+  `mcs-universal-lambda095-final-holdout-resume-v4-20261128.service`、invocation
+  `6b15eb0fd44647f681d1445c88c02f4d`が、旧filler群の終了も待った上でv3だけを成功必須として行う。
 - 先行Eval.7診断4本は全run成功したが、初回監査unitはmanifestに存在しない
   `requesting_speed` / `accepting_speed`を参照して終了コード1となった。シミュレーションは
   再実行せず、既存集計と同じく`stderr.log`末尾の名前付き速度を読むよう監査を修正して
