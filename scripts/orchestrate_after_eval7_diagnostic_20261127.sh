@@ -58,7 +58,8 @@ printf '{"event":"holdout_started","source_commit":"%s"}\n' "$source_commit"
     --slots 15
 
 printf '{"event":"holdout_finalization_started","source_commit":"%s"}\n' "$source_commit"
-/usr/bin/python3 scripts/finalize_universal_lambda095_holdout.py \
+nice -n 10 ionice -c2 -n7 /usr/bin/python3 \
+    scripts/finalize_universal_lambda095_holdout.py \
     --root "$holdout_root" \
     --date-tag "$date_tag" \
     --source-commit "$source_commit" \
