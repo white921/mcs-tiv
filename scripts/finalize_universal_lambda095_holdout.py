@@ -224,7 +224,25 @@ def main() -> int:
                 "errors": [],
             },
         )
-    print(json.dumps(summary, allow_nan=False))
+    print(
+        json.dumps(
+            {
+                "status": "completed",
+                "run_count": summary["run_count"],
+                "all_pre_compression_checks_passed": summary[
+                    "all_pre_compression_checks_passed"
+                ],
+                "topology_balanced_relative_improvement_percent": summary[
+                    "topology_balanced_relative_improvement_percent"
+                ],
+                "worst_condition_relative_improvement_percent": summary[
+                    "worst_condition_relative_improvement_percent"
+                ],
+            },
+            allow_nan=False,
+        ),
+        flush=True,
+    )
     return 0
 
 
