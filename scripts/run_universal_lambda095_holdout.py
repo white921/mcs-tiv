@@ -56,6 +56,10 @@ def load_runner(root: Path):
     return module
 
 
+def is_simulation_sumo_command(command: str) -> bool:
+    return bool(command.strip()) and " --version" not in command
+
+
 def sumo_process_commands() -> list[str]:
     result = subprocess.run(
         ["pgrep", "-a", "-x", "sumo"],
@@ -67,7 +71,11 @@ def sumo_process_commands() -> list[str]:
         return []
     if result.returncode != 0:
         raise RuntimeError(f"pgrep failed: {result.stderr.strip()}")
-    return [line for line in result.stdout.splitlines() if line.strip()]
+    return [
+        line
+        for line in result.stdout.splitlines()
+        if is_simulation_sumo_command(line)
+    ]
 
 
 def count_sumo_processes() -> int:
@@ -107,7 +115,14 @@ def output_name(condition: str, method: str, date_tag: str) -> str:
     )
 
 
-def method_args(args, runner, output: Path, condition: str, method: str):
+def method_args(
+    args,
+    runner,
+    output: Path,
+    condition: str,
+    method: str,
+    run_git_metadata,
+):
     spec = CONDITION_SPECS[condition]
     proposal = method == "proposal"
     return SimpleNamespace(
@@ -130,8 +145,56 @@ def method_args(args, runner, output: Path, condition: str, method: str):
         stop_time=None,
         resume_checkpoint=None,
         paper=None,
-        run_git_metadata=runner.git_metadata(),
+        run_git_metadata=run_git_metadata,
     )
+
+
+def resume_git_metadata(root: Path, runner):
+    tracked = subprocess.run(
+        ["git", "diff", "--quiet"], cwd=root, check=False
+    ).returncode
+    staged = subprocess.run(
+        ["git", "diff", "--cached", "--quiet"], cwd=root, check=False
+    ).returncode
+    if tracked != 0 or staged != 0:
+        raise RuntimeError("resume root has tracked or staged changes")
+    status = subprocess.check_output(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=root,
+        text=True,
+    ).splitlines()
+    unexpected = [
+        line
+        for line in status
+        if not line.startswith(
+            "?? results/runs/universal-lambda095-holdout-"
+        )
+    ]
+    if unexpected:
+        raise RuntimeError(f"unexpected resume worktree changes: {unexpected[:10]}")
+    metadata = dict(runner.git_metadata())
+    metadata["dirty"] = False
+    metadata["resume_with_existing_untracked_results"] = True
+    return metadata
+
+
+def load_completed_reports(output: Path, case: str):
+    reports = []
+    for seed in SEEDS:
+        manifest_path = output / case / f"seed-{seed}" / "manifest.json"
+        if not manifest_path.is_file():
+            continue
+        report = json.loads(manifest_path.read_text())
+        if report.get("case") != case or report.get("seed") != seed:
+            raise RuntimeError(
+                f"existing run identity mismatch: {manifest_path}"
+            )
+        if report.get("exit_code") is None:
+            raise RuntimeError(f"incomplete existing run cannot be retried: {manifest_path}")
+        if report.get("exit_code") != 0 or report.get("source_unchanged") is not True:
+            raise RuntimeError(f"failed existing run cannot be retried: {manifest_path}")
+        reports.append(report)
+    return reports
 
 
 def context_manifest(args, context, started_at):
@@ -230,7 +293,13 @@ def validate_preflight(args, root: Path, runner, contexts):
     if unexpected:
         raise RuntimeError(f"unexpected existing SUMO process(es): {unexpected}")
 
-    metadata = runner.git_metadata()
+    metadata_values = {
+        json.dumps(context["args"].run_git_metadata, sort_keys=True)
+        for context in contexts.values()
+    }
+    if len(metadata_values) != 1:
+        raise RuntimeError("context Git metadata differs before launch")
+    metadata = json.loads(next(iter(metadata_values)))
     if metadata["commit"] is None or metadata["dirty"] is not False:
         raise RuntimeError(f"source root is not a clean Git commit: {metadata}")
     fixed_input_hashes = {}
@@ -248,10 +317,8 @@ def validate_preflight(args, root: Path, runner, contexts):
                 relative_path_override=fixed_input_template(condition),
             )
             fixed_input_hashes[f"{condition}/seed-{seed}"] = details["sha256"]
-    scheduler_hash = file_sha256(root / "scripts" / Path(__file__).name)
+    scheduler_hash = file_sha256(Path(__file__).resolve())
     runner_hash = file_sha256(root / "scripts" / "run_thesis_batch.py")
-    if any(context["args"].run_git_metadata != metadata for context in contexts.values()):
-        raise RuntimeError("context Git metadata differs before launch")
     return {
         "source_commit": metadata["commit"],
         "python_version": version_text,
@@ -275,6 +342,7 @@ def main() -> int:
     parser.add_argument("--slots", type=int, default=15)
     parser.add_argument("--allow-existing-sumo", type=int, default=0)
     parser.add_argument("--allowed-external-fragment")
+    parser.add_argument("--resume", action="store_true")
     parser.add_argument("--preflight-only", action="store_true")
     args = parser.parse_args()
     if args.slots != 15:
@@ -294,6 +362,9 @@ def main() -> int:
         parser.error(f"root does not exist: {root}")
 
     runner = load_runner(root)
+    run_git_metadata = (
+        resume_git_metadata(root, runner) if args.resume else runner.git_metadata()
+    )
     contexts = {}
     outputs = []
     for condition in CONDITION_ORDER:
@@ -301,22 +372,46 @@ def main() -> int:
             output = root / "results" / "runs" / output_name(
                 condition, method, args.date_tag
             )
-            if output.exists():
+            if output.exists() and not args.resume:
                 parser.error(f"output already exists: {output}")
+            if args.resume and output.exists():
+                manifest_path = output / "experiment-manifest.json"
+                if not manifest_path.is_file():
+                    parser.error(f"resume output lacks experiment manifest: {output}")
+                manifest = json.loads(manifest_path.read_text())
+                reports = load_completed_reports(
+                    output, CONDITION_SPECS[condition]["case"]
+                )
+            else:
+                manifest = None
+                reports = []
             context = {
                 "condition": condition,
                 "method": method,
-                "reports": [],
-                "finalized": False,
+                "reports": reports,
+                "finalized": len(reports) == len(SEEDS),
+                "manifest": manifest,
             }
             context["args"] = method_args(
-                args, runner, output, condition, method
+                args,
+                runner,
+                output,
+                condition,
+                method,
+                run_git_metadata,
             )
             contexts[(condition, method)] = context
             outputs.append(output)
 
     preflight = validate_preflight(args, root, runner, contexts)
-    queue = build_ordered_tasks()
+    completed_tasks = {
+        (condition, method, report["seed"])
+        for (condition, method), context in contexts.items()
+        for report in context["reports"]
+    }
+    queue = [
+        task for task in build_ordered_tasks() if task not in completed_tasks
+    ]
     if args.preflight_only:
         print(
             json.dumps(
@@ -327,7 +422,10 @@ def main() -> int:
                     "conditions": list(CONDITION_ORDER),
                     "methods": list(METHOD_ORDER),
                     "seeds": list(SEEDS),
-                    "total_tasks": len(queue),
+                    "total_tasks": len(build_ordered_tasks()),
+                    "completed_tasks_before_start": len(completed_tasks),
+                    "remaining_tasks": len(queue),
+                    "resume": args.resume,
                     "slots": args.slots,
                     **preflight,
                 },
@@ -339,6 +437,33 @@ def main() -> int:
     started_at = datetime.datetime.now().astimezone()
     for context in contexts.values():
         output = context["args"].output
+        if output.exists():
+            manifest = context["manifest"]
+            if manifest.get("git", {}).get("commit") != preflight["source_commit"]:
+                raise RuntimeError(f"resume source commit mismatch: {output}")
+            if context["finalized"]:
+                continue
+            manifest.update(
+                status="running",
+                resumed_at=started_at.isoformat(),
+                resume_count=int(manifest.get("resume_count", 0)) + 1,
+                completed_before_resume=len(context["reports"]),
+                preflight=preflight,
+            )
+            write_json(output / "experiment-manifest.json", manifest)
+            append_jsonl(
+                output / "runner.log",
+                {
+                    "time": started_at.isoformat(),
+                    "event": "experiment_resumed",
+                    "condition": context["condition"],
+                    "method": context["method"],
+                    "completed_before_resume": len(context["reports"]),
+                    "remaining_tasks": len(SEEDS) - len(context["reports"]),
+                    "shared_slots": args.slots,
+                },
+            )
+            continue
         output.parent.mkdir(parents=True, exist_ok=True)
         output.mkdir(parents=False, exist_ok=False)
         manifest = context_manifest(args, context, started_at)
@@ -479,7 +604,10 @@ def main() -> int:
             status=status,
             finished_at=finished_at.isoformat(),
             finished_epoch=finished_at.timestamp(),
-            elapsed_seconds=finished_at.timestamp() - started_at.timestamp(),
+            elapsed_seconds=(
+                finished_at.timestamp()
+                - float(context["manifest"].get("started_epoch", started_at.timestamp()))
+            ),
             completed_simulations=len(reports) - len(failures),
             failed_simulations=len(failures),
             missing_simulations=len(SEEDS) - len(reports),
@@ -509,8 +637,11 @@ def main() -> int:
         source_commit=preflight["source_commit"],
         classification="formal",
         lambda_value=LAMBDA,
+        resume=args.resume,
+        completed_tasks_before_start=len(completed_tasks),
         slots=args.slots,
-        total_tasks=len(queue),
+        total_tasks=len(build_ordered_tasks()),
+        remaining_tasks=len(queue),
         condition_order=list(CONDITION_ORDER),
         method_order=list(METHOD_ORDER),
         seed_order=list(SEEDS),
@@ -607,7 +738,8 @@ def main() -> int:
     emit(
         "orchestration_finished",
         submitted_tasks=next_index,
-        total_tasks=len(queue),
+        remaining_tasks_at_start=len(queue),
+        total_tasks=len(build_ordered_tasks()),
         max_active_runs=max_active,
         max_machine_sumo_processes=monitor_state["max_sumo"],
         machine_slot_violation=monitor_state["violation"],

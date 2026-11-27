@@ -1,5 +1,7 @@
 import importlib.util
 from pathlib import Path
+import json
+import tempfile
 import unittest
 
 
@@ -70,6 +72,45 @@ class UniversalLambda095HoldoutQueueTests(unittest.TestCase):
             QUEUE.external_sumo_commands(root, commands),
             [commands[0]],
         )
+
+    def test_version_probe_is_not_counted_as_a_simulation(self):
+        self.assertFalse(
+            QUEUE.is_simulation_sumo_command("101 /opt/sumo/bin/sumo --version")
+        )
+        self.assertTrue(
+            QUEUE.is_simulation_sumo_command(
+                "102 /opt/sumo/bin/sumo -c merge.sumocfg --remote-port 10001"
+            )
+        )
+
+    def test_resume_loads_only_successful_terminal_runs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            run = output / "eval3" / "seed-23"
+            run.mkdir(parents=True)
+            (run / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "case": "eval3",
+                        "seed": 23,
+                        "exit_code": 0,
+                        "source_unchanged": True,
+                    }
+                )
+            )
+            reports = QUEUE.load_completed_reports(output, "eval3")
+            self.assertEqual([report["seed"] for report in reports], [23])
+
+    def test_resume_rejects_incomplete_existing_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            run = output / "eval3" / "seed-23"
+            run.mkdir(parents=True)
+            (run / "manifest.json").write_text(
+                json.dumps({"case": "eval3", "seed": 23})
+            )
+            with self.assertRaisesRegex(RuntimeError, "cannot be retried"):
+                QUEUE.load_completed_reports(output, "eval3")
 
 
 if __name__ == "__main__":
