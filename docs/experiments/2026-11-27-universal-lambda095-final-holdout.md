@@ -1,7 +1,7 @@
 # 3シナリオ共通λ=0.95の最終holdout
 
 - 台帳ID `2026-11-27-universal-lambda095-final-holdout`
-- 状態 `preregistered`
+- 状態 `running`
 - 分類 `formal`
 
 ## 目的
@@ -41,8 +41,9 @@ screeningで事前固定した正規化凸結合式の `lambda=0.95`を、選定
   [3シナリオ共通λの高λ域スイープ](2026-11-25-universal-lambda-high-sweep-development.md)。
 - 本holdoutでは同じ新規固定入力を使い、現行の同一実行ソースから提案と山下
   TIVtepを実行する。既存の山下結果は旧ソースとの交絡を避けるため再利用しない。
-- 実行ソースbranchは `codex/universal-lambda095-holdout`。source commitは起動前に
-  本記録へ追記する。
+- 実行ソースbranchは `codex/universal-lambda095-holdout`、source commitは
+  `f7590fd4d73d78c4f7863512b12985f33d6540bf`。実験worktreeはこのcommitに固定し、
+  scheduler修正は別control worktreeから行う。
 
 ## 実行・保存予定
 
@@ -68,6 +69,27 @@ screeningで事前固定した正規化凸結合式の `lambda=0.95`を、選定
   ログを監査する。診断JSONLとcheckpointは可逆圧縮を復元検査する。
 - Gitには実験記録、manifest、compact metrics、比較summary、選定図を保存する。
   大容量生artifactの外部保存先は未決定のため、検証済みコピができるまでUbuntu上に保持する。
+
+## 実行状態
+
+- 初回unitは`mcs-universal-lambda095-final-holdout-20261127.service`、invocation
+  `4287509a96fe4a9695b4b2583c524b35`、2026-11-27 16:32:45 JST開始。
+- 空き枠補充unitは`mcs-universal-lambda095-overlap-filler-20261127.service`、invocation
+  `0a9d716e2e064f248e32ef7a8c1ab358`。終了後の再監査・集計unitは
+  `mcs-universal-lambda095-final-holdout-resume-v2-20261127.service`、invocation
+  `ed2d869e69674092b961bcd8c136ec15`。
+- 先行Eval.7診断4本はexit code 0、source unchanged、600秒到達、物理衝突0、必須artifact完備。
+  修正版監査`diagnostic-audit.json`は`ok: true`、run count 4。監査修正commitは
+  `03e34cf86`で、シミュレーションの再実行はしていない。
+- λ=0.95−0.525の対応差はseed 37で全車速度−0.6714 m/s、合流側−1.1052 m/s、
+  本線側+0.9038 m/s、停止時間+2881.8 s。seed 38では全車速度+0.9922 m/s、
+  合流側+0.5063 m/s、本線側+2.1525 m/s、停止時間−722.7 s。2 seedで符号が揃わず、
+  700/1000条件の遅延改善はseed依存である。この診断だけで1000/1000の正式holdoutを
+  変更せず、事前登録どおり継続する。
+- sgnlabのroot filesystemが100%で、監査のbuffered stdout flushが終了コード120になった。
+  監査JSON自体は別ディスクへ正常保存され、unbuffered再確認は終了コード0。古いsmoke一時物
+  77MBを削除せず`/media/yamada/UbuntuData/home-yamada/Documents/卒業研究/mcs-tiv-temp-backup/20261127-root-full`
+  へ退避したが、一般ユーザー向け空きはまだ0。実験artifact先のUbuntuDataは約1.1TB空き。
 
 ## 制約と判定
 
