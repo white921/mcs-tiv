@@ -56,15 +56,32 @@ def load_runner(root: Path):
     return module
 
 
-def count_sumo_processes() -> int:
+def sumo_process_commands() -> list[str]:
     result = subprocess.run(
-        ["pgrep", "-x", "sumo"], text=True, capture_output=True, check=False
+        ["pgrep", "-a", "-x", "sumo"],
+        text=True,
+        capture_output=True,
+        check=False,
     )
     if result.returncode == 1:
-        return 0
+        return []
     if result.returncode != 0:
         raise RuntimeError(f"pgrep failed: {result.stderr.strip()}")
-    return len([line for line in result.stdout.splitlines() if line.strip()])
+    return [line for line in result.stdout.splitlines() if line.strip()]
+
+
+def count_sumo_processes() -> int:
+    return len(sumo_process_commands())
+
+
+def external_sumo_commands(root: Path, commands=None) -> list[str]:
+    commands = sumo_process_commands() if commands is None else commands
+    managed_marker = str(root.resolve())
+    return [command for command in commands if managed_marker not in command]
+
+
+def available_capacity(machine_slots: int, external_count: int, managed_count: int) -> int:
+    return max(0, machine_slots - external_count - managed_count)
 
 
 def build_ordered_tasks(seeds=SEEDS):
@@ -197,11 +214,21 @@ def validate_preflight(args, root: Path, runner, contexts):
         capture_output=True,
         check=True,
     )
-    existing_sumo = count_sumo_processes()
-    if existing_sumo:
+    existing_commands = sumo_process_commands()
+    existing_sumo = len(existing_commands)
+    if existing_sumo > args.allow_existing_sumo:
         raise RuntimeError(
-            f"refusing to start with {existing_sumo} existing SUMO process(es)"
+            f"refusing to start with {existing_sumo} existing SUMO process(es); "
+            f"allowed {args.allow_existing_sumo}"
         )
+    unexpected = [
+        command
+        for command in existing_commands
+        if not args.allowed_external_fragment
+        or args.allowed_external_fragment not in command
+    ]
+    if unexpected:
+        raise RuntimeError(f"unexpected existing SUMO process(es): {unexpected}")
 
     metadata = runner.git_metadata()
     if metadata["commit"] is None or metadata["dirty"] is not False:
@@ -230,6 +257,9 @@ def validate_preflight(args, root: Path, runner, contexts):
         "python_version": version_text,
         "sumo_version": EXPECTED_SUMO,
         "existing_sumo_processes": existing_sumo,
+        "existing_sumo_commands": existing_commands,
+        "allowed_existing_sumo_processes": args.allow_existing_sumo,
+        "allowed_external_fragment": args.allowed_external_fragment,
         "runner_sha256": runner_hash,
         "scheduler_sha256": scheduler_hash,
         "fixed_input_sha256": fixed_input_hashes,
@@ -243,10 +273,22 @@ def main() -> int:
     parser.add_argument("--python", type=Path, required=True)
     parser.add_argument("--date-tag", required=True)
     parser.add_argument("--slots", type=int, default=15)
+    parser.add_argument("--allow-existing-sumo", type=int, default=0)
+    parser.add_argument("--allowed-external-fragment")
     parser.add_argument("--preflight-only", action="store_true")
     args = parser.parse_args()
     if args.slots != 15:
         parser.error("this formal scheduler requires exactly 15 slots")
+    if not 0 <= args.allow_existing_sumo < args.slots:
+        parser.error("--allow-existing-sumo must be between 0 and 14")
+    if args.allow_existing_sumo and not args.allowed_external_fragment:
+        parser.error(
+            "--allowed-external-fragment is required with --allow-existing-sumo"
+        )
+    if not args.allow_existing_sumo and args.allowed_external_fragment:
+        parser.error(
+            "--allowed-external-fragment requires --allow-existing-sumo"
+        )
     root = args.root.resolve()
     if not root.is_dir():
         parser.error(f"root does not exist: {root}")
@@ -337,12 +379,29 @@ def main() -> int:
     def monitor_sumo():
         while not stop_monitor.wait(0.5):
             try:
-                count = count_sumo_processes()
+                commands = sumo_process_commands()
             except Exception as error:
                 monitor_state["violation"] = repr(error)
                 emit("sumo_monitor_error", error=repr(error))
                 return
+            count = len(commands)
             monitor_state["max_sumo"] = max(monitor_state["max_sumo"], count)
+            external = external_sumo_commands(root, commands)
+            unknown_external = [
+                command
+                for command in external
+                if not args.allowed_external_fragment
+                or args.allowed_external_fragment not in command
+            ]
+            if unknown_external:
+                monitor_state["violation"] = (
+                    f"unexpected external SUMO process(es): {unknown_external}"
+                )
+                emit(
+                    "unexpected_external_sumo",
+                    commands=unknown_external,
+                )
+                return
             if count > args.slots:
                 monitor_state["violation"] = (
                     f"SUMO count {count} exceeded {args.slots}"
@@ -483,7 +542,23 @@ def main() -> int:
 
             if monitor_state["violation"] is not None:
                 abort = True
-            capacity = args.slots - len(futures)
+            commands = sumo_process_commands()
+            external = external_sumo_commands(root, commands)
+            unknown_external = [
+                command
+                for command in external
+                if not args.allowed_external_fragment
+                or args.allowed_external_fragment not in command
+            ]
+            if unknown_external:
+                abort = True
+                monitor_state["violation"] = (
+                    f"unexpected external SUMO process(es): {unknown_external}"
+                )
+                emit("unexpected_external_sumo", commands=unknown_external)
+            capacity = available_capacity(
+                args.slots, len(external), len(futures)
+            )
             while not abort and capacity > 0 and next_index < len(queue):
                 condition, method, seed = queue[next_index]
                 futures[pool.submit(
@@ -496,6 +571,8 @@ def main() -> int:
                     seed=seed,
                     queue_index=next_index,
                     managed_active=len(futures),
+                    external_sumo_processes=len(external),
+                    machine_slot_limit=args.slots,
                 )
                 next_index += 1
                 capacity -= 1

@@ -55,6 +55,22 @@ class UniversalLambda095HoldoutQueueTests(unittest.TestCase):
             "seeds23-32-600s-20261127",
         )
 
+    def test_external_runs_reduce_only_initial_managed_capacity(self):
+        self.assertEqual(QUEUE.available_capacity(15, 4, 0), 11)
+        self.assertEqual(QUEUE.available_capacity(15, 4, 11), 0)
+        self.assertEqual(QUEUE.available_capacity(15, 0, 11), 4)
+
+    def test_external_process_classification_uses_worktree_path(self):
+        root = Path("/research/mcs-tiv-universal-lambda095-holdout")
+        commands = [
+            "101 sumo --fcd-output /research/mcs-tiv-diagnostic-artifacts/a.xml.gz",
+            "102 sumo --fcd-output /research/mcs-tiv-universal-lambda095-holdout/results/a.xml.gz",
+        ]
+        self.assertEqual(
+            QUEUE.external_sumo_commands(root, commands),
+            [commands[0]],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

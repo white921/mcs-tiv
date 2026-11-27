@@ -31,6 +31,9 @@ screeningで事前固定した正規化凸結合式の `lambda=0.95`を、選定
 - 実行キューは `condition -> method -> seed`。条件順は
   `Eval.3 500 -> Eval.5 300 -> Eval.7 1000`、方式順は`提案 -> 山下`。
   実行機全体で15 SUMOを上限とする。
+- 起動時に先行のEval.7診断SUMOが残っている場合は、そのコマンドが記録済みの
+  診断出力パスと一致することを検査し、`15 - 先行SUMO数`の空き枠だけを投入する。
+  先行runが終了した分は自動的にholdoutで補充し、常に機械全体で15本以下とする。
 
 ## 比較対象と選定の系譜
 
@@ -44,10 +47,9 @@ screeningで事前固定した正規化凸結合式の `lambda=0.95`を、選定
 ## 実行・保存予定
 
 - 実行機 `sgnlab`。systemd user unit、invocation ID、実行開始時刻は起動時に追記する。
-- 現在のEval.7診断が正常終了した後、
-  `scripts/orchestrate_after_eval7_diagnostic_20261127.sh`が完全性gateを通過した場合だけ
-  holdoutを起動する。診断unit、artifact監査、holdout preflightのいずれかが失敗したら
-  後続を起動せず終了する。
+- `scripts/run_holdout_alongside_diagnostic_20261127.sh`で先行診断の空き枠を使って
+  holdoutを起動する。先行診断の完了監査は
+  `scripts/audit_after_eval7_diagnostic_20261127.sh`の別unitが行う。いずれも失敗時は自動再実行しない。
 - schedulerは `scripts/run_universal_lambda095_holdout.py`。定数・キュー順・固定入力ハッシュ・
   Python/SUMO版・開始時Git clean・既存SUMO 0をpreflightで検査する。
 - 完了後は `scripts/finalize_universal_lambda095_holdout.py`をsystem Pythonで実行し、
