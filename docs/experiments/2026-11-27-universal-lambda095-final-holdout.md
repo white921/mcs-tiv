@@ -56,6 +56,10 @@ screeningで事前固定した正規化凸結合式の `lambda=0.95`を、選定
   未投入runを補充する。その後、`scripts/resume_holdout_after_overlap_filler_20261127.sh`が
   成功済みmanifestを再監査し、未投入runだけを再開する。失敗または未完了のper-run
   manifestがあれば自動再実行せず停止する。
+- 先行Eval.7診断4本は全run成功したが、初回監査unitはmanifestに存在しない
+  `requesting_speed` / `accepting_speed`を参照して終了コード1となった。シミュレーションは
+  再実行せず、既存集計と同じく`stderr.log`末尾の名前付き速度を読むよう監査を修正して
+  同じartifactを再監査する。
 - schedulerは `scripts/run_universal_lambda095_holdout.py`。定数・キュー順・固定入力ハッシュ・
   Python/SUMO版・開始時Git clean・既存SUMO 0をpreflightで検査する。
 - 完了後は `scripts/finalize_universal_lambda095_holdout.py`をsystem Pythonで実行し、

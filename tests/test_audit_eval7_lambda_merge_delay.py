@@ -10,6 +10,15 @@ import audit_eval7_lambda_merge_delay as AUDIT
 
 
 class AuditEval7LambdaMergeDelayTests(unittest.TestCase):
+    def test_summary_value_reads_merge_group_speed(self):
+        stderr = "requesting_speed : 3.25\naccepting_speed : 9.5\n"
+        self.assertEqual(AUDIT.summary_value(stderr, "requesting_speed"), 3.25)
+        self.assertEqual(AUDIT.summary_value(stderr, "accepting_speed"), 9.5)
+
+    def test_summary_value_requires_named_line(self):
+        with self.assertRaisesRegex(RuntimeError, "missing requesting_speed"):
+            AUDIT.summary_value("all_speed : 5.0\n", "requesting_speed")
+
     def test_summary_pairs_same_seed_and_lambda(self):
         rows = []
         for value in AUDIT.LAMBDAS:

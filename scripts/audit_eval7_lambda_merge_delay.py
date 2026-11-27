@@ -61,6 +61,13 @@ def group_total(metrics, field: str) -> float:
     )
 
 
+def summary_value(stderr: str, name: str) -> float:
+    match = re.search(rf"^{name}\s*:\s*([0-9.eE+-]+)", stderr, re.MULTILINE)
+    if match is None:
+        raise RuntimeError(f"missing {name} in stderr")
+    return float(match.group(1))
+
+
 def analyze_run(
     output_root: Path,
     source_root: Path,
@@ -136,8 +143,8 @@ def analyze_run(
         "lambda": value,
         "seed": seed,
         "all_speed_mps": float(manifest["all_speed_mps"]),
-        "requesting_speed_mps": float(manifest["requesting_speed"]),
-        "accepting_speed_mps": float(manifest["accepting_speed"]),
+        "requesting_speed_mps": summary_value(stderr, "requesting_speed"),
+        "accepting_speed_mps": summary_value(stderr, "accepting_speed"),
         "stop_time_s": group_total(metrics, "stop_time_s"),
         "hard_brake_time_s": group_total(metrics, "hard_brake_time_s"),
         "physical_collision_episodes": metrics["physical_safety"][
