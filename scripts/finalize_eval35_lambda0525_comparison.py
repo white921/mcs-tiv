@@ -69,6 +69,16 @@ def group_total(metrics, field):
                for group in ("car", "bus"))
 
 
+def flows_match(manifest_flows, case, expected_flows):
+    expected = list(expected_flows)
+    if case == "eval7":
+        return manifest_flows == {
+            "requesting": expected[0],
+            "accepting": expected[1],
+        }
+    return manifest_flows == expected
+
+
 def analyze_run(context, seed, source_commit):
     spec = context["spec"]
     run = context["output"] / spec["case"] / f"seed-{seed}"
@@ -108,7 +118,9 @@ def analyze_run(context, seed, source_commit):
         "git_clean": manifest.get("git", {}).get("dirty") is False,
         "case": manifest.get("case") == spec["case"],
         "seed": manifest.get("seed") == seed,
-        "flows": manifest.get("flows_vph") == list(spec["flows"]),
+        "flows": flows_match(
+            manifest.get("flows_vph"), spec["case"], spec["flows"]
+        ),
         "duration": manifest.get("input_duration") == 600.0,
         "bus_share": math.isclose(float(manifest.get("bus_share", -1)), 0.25),
         "bus_fixed": manifest.get("bus_allocation") == "fixed",

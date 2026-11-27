@@ -10,6 +10,29 @@ import finalize_universal_lambda095_holdout as FINALIZER
 
 
 class FinalizeUniversalLambda095HoldoutTests(unittest.TestCase):
+    def test_flow_check_accepts_eval7_manifest_shape(self):
+        self.assertTrue(
+            FINALIZER.BASE.flows_match(
+                {"requesting": 1000, "accepting": 1000},
+                "eval7",
+                (1000, 1000),
+            )
+        )
+
+    def test_flow_check_keeps_junction_manifest_shape(self):
+        self.assertTrue(
+            FINALIZER.BASE.flows_match(
+                [500, 500, 500], "eval3", (500, 500, 500)
+            )
+        )
+        self.assertFalse(
+            FINALIZER.BASE.flows_match(
+                {"requesting": 500, "accepting": 500},
+                "eval3",
+                (500, 500, 500),
+            )
+        )
+
     def rows_for(self, condition, yamashita_speed, proposal_speed):
         rows = []
         for seed in FINALIZER.SCHEDULER.SEEDS:
