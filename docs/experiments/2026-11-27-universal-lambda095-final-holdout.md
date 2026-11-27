@@ -129,3 +129,9 @@ screeningで事前固定した正規化凸結合式の `lambda=0.95`を、選定
 unsupported率と理由、後続車数、`Z_time/Z_follow`寄与、Accept率、判断不一致、
 方向別速度・停止、連続Rejectと待ち時間を集計する。これらは主要性能結果とは分けて
 探索的機序分析として報告する。
+
+形状別の全audit counter、保存上限内の判断レコード、主性能差を分離して集計する
+`scripts/summarize_universal_lambda095_topology_mechanism.py`を用意した。正式finalizerが
+60 runの完全性を確認した後にだけ実行し、既定出力
+`results/runs/universal-lambda095-topology-mechanism-20261127.json`を生成する。方向別の
+待ち時間と連続Rejectは、この集計で形状差を確認した後に診断JSONLから追加する。
