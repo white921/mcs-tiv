@@ -57,6 +57,10 @@ screeningで事前固定した正規化凸結合式の `lambda=0.95`を、選定
   未投入runを補充する。その後、`scripts/resume_holdout_after_overlap_filler_20261127.sh`が
   成功済みmanifestを再監査し、未投入runだけを再開する。失敗または未完了のper-run
   manifestがあれば自動再実行せず停止する。
+- 初回fillerは終了直後のゾンビプロセス`[sumo]`を外部SUMOと誤検知し、2026-11-27
+  21:05 JSTに新規補充だけを停止した。実行中runは継続し、プロセス状態`Z`を枠数から
+  除外する修正版filler v2が成功済み・実行中runを除外して引き継ぐ。シミュレーションは
+  再実行しない。
 - 先行Eval.7診断4本は全run成功したが、初回監査unitはmanifestに存在しない
   `requesting_speed` / `accepting_speed`を参照して終了コード1となった。シミュレーションは
   再実行せず、既存集計と同じく`stderr.log`末尾の名前付き速度を読むよう監査を修正して
@@ -89,7 +93,9 @@ screeningで事前固定した正規化凸結合式の `lambda=0.95`を、選定
 - sgnlabのroot filesystemが100%で、監査のbuffered stdout flushが終了コード120になった。
   監査JSON自体は別ディスクへ正常保存され、unbuffered再確認は終了コード0。古いsmoke一時物
   77MBを削除せず`/media/yamada/UbuntuData/home-yamada/Documents/卒業研究/mcs-tiv-temp-backup/20261127-root-full`
-  へ退避したが、一般ユーザー向け空きはまだ0。実験artifact先のUbuntuDataは約1.1TB空き。
+  へ退避したが、一般ユーザー向け空きはまだ0。ChatGPTアプリもユーザー許可後に正常終了したが
+  容量は変わらず、当初の「削除済みバイナリ保持」という推定は誤りだった。再取得可能なAPT
+  cache約614MBの清掃にはsudoが必要。実験artifact先のUbuntuDataは約1.1TB空き。
 
 ## 制約と判定
 

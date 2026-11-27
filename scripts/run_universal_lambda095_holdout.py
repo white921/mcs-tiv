@@ -60,9 +60,24 @@ def is_simulation_sumo_command(command: str) -> bool:
     return bool(command.strip()) and " --version" not in command
 
 
+def parse_sumo_process_output(output: str) -> list[str]:
+    commands = []
+    for line in output.splitlines():
+        fields = line.strip().split(maxsplit=2)
+        if len(fields) < 3:
+            continue
+        pid, state, command = fields
+        if "Z" in state:
+            continue
+        rendered = f"{pid} {command}"
+        if is_simulation_sumo_command(rendered):
+            commands.append(rendered)
+    return commands
+
+
 def sumo_process_commands() -> list[str]:
     result = subprocess.run(
-        ["pgrep", "-a", "-x", "sumo"],
+        ["ps", "-C", "sumo", "-o", "pid=,stat=,args="],
         text=True,
         capture_output=True,
         check=False,
@@ -70,12 +85,8 @@ def sumo_process_commands() -> list[str]:
     if result.returncode == 1:
         return []
     if result.returncode != 0:
-        raise RuntimeError(f"pgrep failed: {result.stderr.strip()}")
-    return [
-        line
-        for line in result.stdout.splitlines()
-        if is_simulation_sumo_command(line)
-    ]
+        raise RuntimeError(f"ps failed: {result.stderr.strip()}")
+    return parse_sumo_process_output(result.stdout)
 
 
 def count_sumo_processes() -> int:

@@ -83,6 +83,19 @@ class UniversalLambda095HoldoutQueueTests(unittest.TestCase):
             )
         )
 
+    def test_process_parser_ignores_zombies_and_version_probes(self):
+        output = "\n".join(
+            (
+                "101 Z [sumo] <defunct>",
+                "102 S /opt/sumo/bin/sumo --version",
+                "103 R /opt/sumo/bin/sumo -c merge.sumocfg --remote-port 10001",
+            )
+        )
+        self.assertEqual(
+            QUEUE.parse_sumo_process_output(output),
+            ["103 /opt/sumo/bin/sumo -c merge.sumocfg --remote-port 10001"],
+        )
+
     def test_resume_loads_only_successful_terminal_runs(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)

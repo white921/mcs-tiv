@@ -2,7 +2,8 @@
 set -euo pipefail
 
 initial_unit="mcs-universal-lambda095-final-holdout-20261127.service"
-filler_unit="mcs-universal-lambda095-overlap-filler-20261127.service"
+retired_filler_unit="mcs-universal-lambda095-overlap-filler-20261127.service"
+filler_unit="mcs-universal-lambda095-overlap-filler-v2-20261127.service"
 control_root="/media/yamada/UbuntuData/home-yamada/Documents/卒業研究/mcs-tiv-universal-lambda095-holdout-control"
 experiment_root="/media/yamada/UbuntuData/home-yamada/Documents/卒業研究/mcs-tiv-universal-lambda095-holdout"
 python315="/media/yamada/UbuntuData/home-yamada/Documents/卒業研究/mcs-tiv/.venv-py315-sumo128/bin/python3.15"
@@ -10,7 +11,7 @@ sumo_home="/media/yamada/UbuntuData/home-yamada/Documents/卒業研究/mcs-tiv/.
 date_tag="20261127"
 source_commit="f7590fd4d73d78c4f7863512b12985f33d6540bf"
 
-for unit in "$initial_unit" "$filler_unit"; do
+for unit in "$initial_unit" "$retired_filler_unit" "$filler_unit"; do
     printf '{"event":"waiting_for_holdout_unit","unit":"%s"}\n' "$unit"
     while systemctl --user is-active --quiet "$unit"; do
         sleep 30
