@@ -36,3 +36,9 @@ fixed `lambda=0.525` Eval.3/5 comparison.  It freezes seeds 13–22 for the two
 published Eval.3 flow conditions (400 and 500 veh/h on every approach) and the
 published Eval.5 condition (300 veh/h on every approach).  Regenerate or check
 only this set with `scripts/generate_eval35_formal_inputs.py`.
+
+`universal-lambda095-holdout/` contains the preregistered final holdout for the
+single cross-scenario `lambda=0.95`.  It freezes previously unused seeds 23–32
+for Eval.3 at 500/500/500 veh/h, Eval.5 at 300/300/300/300 veh/h, and Eval.7 at
+1000/1000 veh/h.  Regenerate or verify this set only with
+`scripts/generate_universal_lambda095_holdout_inputs.py`.
