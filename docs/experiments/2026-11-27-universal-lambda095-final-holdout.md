@@ -46,6 +46,8 @@ screeningで事前固定した正規化凸結合式の `lambda=0.95`を、選定
 - 実行機 `sgnlab`。systemd user unit、invocation ID、実行開始時刻は起動時に追記する。
 - schedulerは `scripts/run_universal_lambda095_holdout.py`。定数・キュー順・固定入力ハッシュ・
   Python/SUMO版・開始時Git clean・既存SUMO 0をpreflightで検査する。
+- 完了後は `scripts/finalize_universal_lambda095_holdout.py`をsystem Pythonで実行し、
+  60 runの完全性、対応入力、形状別差と等重み集計、圧縮復元を監査する。
 - 完了後はmanifest、metrics、物理衝突、固定入力hash、診断artifact、checkpoint、
   ログを監査する。診断JSONLとcheckpointは可逆圧縮を復元検査する。
 - Gitには実験記録、manifest、compact metrics、比較summary、選定図を保存する。
