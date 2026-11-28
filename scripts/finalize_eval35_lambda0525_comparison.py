@@ -21,6 +21,42 @@ import xml.etree.ElementTree as ET
 LAMBDA = 0.525
 FORMULA = "M=(1-lambda)*Z_time+lambda*Z_follow; accept iff M<=0"
 SEEDS = tuple(range(13, 23))
+COMPACT_TOP_LEVEL_FILES = (
+    "experiment-manifest.json",
+    "summary.json",
+    "eval35-comparison-summary.json",
+    "post-run-audit.json",
+    "compression-audit.json",
+    "storage-split-audit.json",
+    "retention-audit.json",
+    "runner.log",
+    "orchestration.jsonl",
+)
+COMPACT_RUN_FILES = (
+    "manifest.json",
+    "evaluation-metrics.json",
+    "tiv-audit.json",
+    "deceleration-audit.json",
+    "physical-collisions.jsonl",
+    "stdout.log",
+    "stderr.log",
+)
+RAW_ARTIFACT_NAMES = {
+    "runtime.jsonl",
+    "runtime.jsonl.gz",
+    "fcd.xml.gz",
+    "negotiations.jsonl",
+    "negotiations.jsonl.gz",
+    "conflicts.jsonl",
+    "conflicts.jsonl.gz",
+    "vehicle-states.jsonl",
+    "vehicle-states.jsonl.gz",
+    "prediction-events.jsonl",
+    "prediction-events.jsonl.gz",
+    "mcs-state.pkl",
+    "mcs-state.pkl.xz",
+    "sumo-state.xml.gz",
+}
 FATAL_PATTERN = re.compile(
     r"traceback|segmentation fault|fatal error|connection closed by sumo|"
     r"process exited with code [1-9]|\berror:\s",
@@ -258,6 +294,134 @@ def git_save(context, push):
     return commit
 
 
+def compact_files(context):
+    """Return the compact formal evidence that may be committed."""
+    output = context["output"]
+    selected = {output / name for name in COMPACT_TOP_LEVEL_FILES}
+    for seed in SEEDS:
+        run = output / context["spec"]["case"] / f"seed-{seed}"
+        selected.update(run / name for name in COMPACT_RUN_FILES if (run / name).is_file())
+        selected.update(sorted((run / "checkpoints").glob("t*/checkpoint.json")))
+    missing = sorted(str(path) for path in selected if not path.is_file())
+    if missing:
+        raise RuntimeError(f"{context['tag']}: missing compact evidence: {missing[:5]}")
+    forbidden = sorted(
+        str(path.relative_to(output))
+        for path in selected
+        if path.name in RAW_ARTIFACT_NAMES or "source" in path.relative_to(output).parts
+    )
+    if forbidden:
+        raise RuntimeError(f"{context['tag']}: raw artifact selected: {forbidden[:5]}")
+    return selected
+
+
+def audit_existing_finalization(context, source_commit):
+    """Validate a completed pre-policy finalization without touching its raw files."""
+    output = context["output"]
+    report = json.loads((output / "eval35-comparison-summary.json").read_text())
+    post_run = json.loads((output / "post-run-audit.json").read_text())
+    compression = json.loads((output / "compression-audit.json").read_text())
+    split = json.loads((output / "storage-split-audit.json").read_text())
+    checks = {
+        "report_source_commit": report.get("source_commit") == source_commit,
+        "report_eval": report.get("eval") == context["spec"]["eval"],
+        "report_run_count": report.get("run_count") == 2 * len(SEEDS),
+        "report_pre_compression_audit": report.get("all_pre_compression_checks_passed") is True,
+        "report_rows": (
+            len(report.get("per_run", [])) == 2 * len(SEEDS)
+            and all(not row.get("errors") for row in report.get("per_run", []))
+        ),
+        "post_run_audit": (
+            post_run.get("ok") is True
+            and post_run.get("phase") == "complete"
+            and post_run.get("source_commit") == source_commit
+        ),
+        "compression_audit": (
+            compression.get("all_verified") is True
+            and compression.get("run_count") == len(SEEDS)
+            and compression.get("item_count") == 13 * len(SEEDS)
+        ),
+        "storage_split_audit": split.get("all_verified") is True,
+    }
+    failed = [name for name, passed in checks.items() if not passed]
+    if failed:
+        raise RuntimeError(f"{context['tag']}: existing finalization audit failed: {failed}")
+
+    raw_files = [
+        path for path in output.rglob("*")
+        if path.is_file() and path.name in RAW_ARTIFACT_NAMES
+    ]
+    source_snapshots = [path for path in output.glob("eval*/seed-*/source") if path.exists()]
+    retention = {
+        "schema_version": 1,
+        "classification": "formal",
+        "policy": "compact-git-evidence-with-raw-outside-repository",
+        "source_commit": source_commit,
+        "compact_git_evidence": [
+            "experiment and run manifests",
+            "evaluation and method audit metrics",
+            "comparison summary and finalization audits",
+            "checkpoint metadata and compact logs",
+        ],
+        "excluded_raw_artifact_count": len(raw_files),
+        "excluded_raw_artifact_bytes": sum(path.stat().st_size for path in raw_files),
+        "raw_artifact_location": str(output),
+        "external_storage": "pending",
+        "source_snapshots_present": [str(path.relative_to(output)) for path in source_snapshots],
+        "compression_round_trip_verified": True,
+        "storage_split_verified": True,
+        "ok": not source_snapshots,
+    }
+    if source_snapshots:
+        raise RuntimeError(f"{context['tag']}: source snapshots remain after verification")
+    write_json(output / "retention-audit.json", retention)
+    return retention
+
+
+def git_save_compact(context, push):
+    """Commit only compact evidence while retaining raw artifacts in the worktree."""
+    root = context["root"]
+    output = context["output"]
+    branch = subprocess.check_output(
+        ["git", "branch", "--show-current"], cwd=root, text=True
+    ).strip()
+    if branch != context["branch"]:
+        raise RuntimeError(f"{context['tag']}: expected branch {context['branch']}, got {branch}")
+
+    selected = compact_files(context)
+    staged_before = subprocess.check_output(
+        ["git", "diff", "--cached", "--name-only"], cwd=root, text=True
+    ).splitlines()
+    output_relative = output.relative_to(root)
+    outside = [path for path in staged_before if not path.startswith(str(output_relative) + "/")]
+    if outside:
+        raise RuntimeError(f"{context['tag']}: unrelated staged files: {outside[:5]}")
+    if staged_before:
+        subprocess.run(
+            ["git", "restore", "--staged", "--", *staged_before], cwd=root, check=True
+        )
+
+    relative_selected = sorted(str(path.relative_to(root)) for path in selected)
+    subprocess.run(["git", "add", "-f", "--", *relative_selected], cwd=root, check=True)
+    staged = subprocess.check_output(
+        ["git", "diff", "--cached", "--name-only"], cwd=root, text=True
+    ).splitlines()
+    if set(staged) != set(relative_selected):
+        raise RuntimeError(f"{context['tag']}: compact staging mismatch")
+    staged_raw = [path for path in staged if Path(path).name in RAW_ARTIFACT_NAMES]
+    if staged_raw:
+        raise RuntimeError(f"{context['tag']}: raw artifacts staged: {staged_raw[:5]}")
+
+    subprocess.run(
+        ["git", "commit", "-m", f"results: add compact {context['tag']} formal evidence"],
+        cwd=root, check=True,
+    )
+    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+    if push:
+        subprocess.run(["git", "push", "origin", f"HEAD:{context['branch']}"], cwd=root, check=True)
+    return commit
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--eval", choices=("eval3", "eval5"), required=True)
@@ -268,6 +432,11 @@ def main():
     )
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--push", action="store_true")
+    parser.add_argument(
+        "--save-existing-compact",
+        action="store_true",
+        help="save already verified outputs as compact Git evidence without touching raw artifacts",
+    )
     args = parser.parse_args()
 
     script_root = Path(__file__).resolve().parents[1]
@@ -294,6 +463,14 @@ def main():
         if context["spec"]["eval"] != args.eval:
             raise RuntimeError(f"{tag}: expected {args.eval}")
         contexts.append(context)
+
+    if args.save_existing_compact:
+        commits = {}
+        for context in contexts:
+            audit_existing_finalization(context, args.source_commit)
+            commits[context["tag"]] = git_save_compact(context, args.push)
+        print(json.dumps({"eval": args.eval, "status": "completed", "commits": commits}))
+        return 0
 
     rows = [
         analyze_run(context, seed, args.source_commit)

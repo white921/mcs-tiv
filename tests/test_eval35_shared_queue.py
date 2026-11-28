@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+import tempfile
 import unittest
 
 
@@ -69,6 +70,36 @@ class Eval35SharedQueueTests(unittest.TestCase):
         self.assertAlmostEqual(report["speed_improvement_from_means_percent"], 10.0)
         self.assertEqual(report["proposal_faster_seed_count"], 10)
         self.assertEqual(report["paired_bootstrap_95_percent_mps"], [0.5, 0.5])
+
+    def test_compact_result_selection_excludes_raw_artifacts(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            output = root / "results" / "runs" / "formal"
+            output.mkdir(parents=True)
+            for name in FINALIZER.COMPACT_TOP_LEVEL_FILES:
+                (output / name).touch()
+            for seed in FINALIZER.SEEDS:
+                run = output / "eval5" / f"seed-{seed}"
+                run.mkdir(parents=True)
+                for name in FINALIZER.COMPACT_RUN_FILES:
+                    (run / name).touch()
+                checkpoint = run / "checkpoints" / "t0000060.0" / "checkpoint.json"
+                checkpoint.parent.mkdir(parents=True)
+                checkpoint.touch()
+                for raw_name in FINALIZER.RAW_ARTIFACT_NAMES:
+                    (run / raw_name).touch()
+            context = {
+                "tag": "formal",
+                "root": root,
+                "output": output,
+                "spec": {"case": "eval5"},
+            }
+
+            selected = FINALIZER.compact_files(context)
+
+            self.assertIn(output / "experiment-manifest.json", selected)
+            self.assertTrue(any(path.name == "checkpoint.json" for path in selected))
+            self.assertFalse(any(path.name in FINALIZER.RAW_ARTIFACT_NAMES for path in selected))
 
 
 if __name__ == "__main__":
