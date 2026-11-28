@@ -478,6 +478,30 @@ class DecelerationLossTests(unittest.TestCase):
         self.assertEqual(details["heading_path"]["distinct_position_count"], 1)
         self.assertEqual(details["heading_path"]["yaw_sample_count"], 0)
 
+    def test_lane_metadata_fallback_evaluates_stationary_path_without_yaw(self):
+        def path(veh, kind, x, lane):
+            return NS(vehID=veh, type=kind, pathID=veh + kind,
+                      t=[0.0, 5.0, 10.0], s_d=[0.0, 0.0, 0.0],
+                      x=[x, x, x], y=[0.0, 0.0, 0.0],
+                      lane_id=lane, lane_position=x,
+                      allowed_speed_mps=10.0)
+
+        sender = path("a", "planned", 20.0, "main_0")
+        desired = path("a", "desired", 20.0, "main_0")
+        planned = path("b", "planned", 100.0, "other_0")
+        alternative = path("b", "alter", 100.0, "other_0")
+        follower = path("c", "planned", 0.0, "main_0")
+        receiver = NS(
+            id="b", plannedPath=planned,
+            receivedPaths=[sender, follower],
+        )
+
+        with patch.object(prediction, "LANE_METADATA_HEADING_FALLBACK", True):
+            result = prediction.evaluate(
+                receiver, desired, alternative, 0.0, self.region(60.0))
+
+        self.assertEqual(result["follower_vehicle_ids"], ["c"])
+
     def test_adjacent_parallel_lane_is_not_a_follower(self):
         def path(veh, x, lane, y):
             return NS(vehID=veh, type="planned", pathID=veh + "path",

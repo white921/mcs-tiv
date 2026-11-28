@@ -49,6 +49,7 @@ CONTROLLED_MCS_ENV = {
     "MCS_DECELERATION_AUDIT",
     "MCS_DECELERATION_MODE",
     "MCS_DECELERATION_CONVEX_LAMBDA",
+    "MCS_DECELERATION_LANE_METADATA_HEADING_FALLBACK",
     # Retired proposal switches are also scrubbed so old shell state cannot
     # silently describe or influence a new normalized-formula run.
     "MCS_DECELERATION_LOSS_LAMBDA",
@@ -248,6 +249,14 @@ def deceleration_prediction_manifest(args):
             "detected followers excluding request and receiver vehicles"),
         "excluded_follower_roles": ["request_vehicle", "receiver_vehicle"],
         "score_bounds": [-1.0, 1.0],
+        "lane_metadata_heading_fallback": {
+            "enabled": getattr(
+                args, "deceleration_lane_metadata_heading_fallback", False),
+            "scope": (
+                "defer heading reconstruction when explicit lane identity "
+                "and lane position determine same-lane following"),
+            "changes_default": False,
+        },
     }
 
 
@@ -390,6 +399,10 @@ def run_task(task, args):
                MCS_DECELERATION_CONVEX_LAMBDA=str(
                    args.deceleration_convex_lambda
                    if args.deceleration_active else DEFAULT_CONVEX_LAMBDA),
+               MCS_DECELERATION_LANE_METADATA_HEADING_FALLBACK=(
+                   "1" if getattr(
+                       args, "deceleration_lane_metadata_heading_fallback", False)
+                   else "0"),
                MCS_AGREEMENT_LEASE_S=str(args.agreement_lease_seconds),
                MCS_MERGE_NEGOTIATION_LEAD_S=str(
                    args.merge_negotiation_lead_seconds),
@@ -616,6 +629,10 @@ def main():
         help=("convex weight on normalized follower impact in [0,1]; "
               "default 80/81 preserves the former raw A+2B threshold"))
     parser.add_argument(
+        "--deceleration-lane-metadata-heading-fallback", action="store_true",
+        help=("diagnostic ablation: use lane identity/position without "
+              "requiring heading when they fully determine same-lane following"))
+    parser.add_argument(
         "--agreement-lease-seconds", type=float, default=0.0,
         help="reuse a feasible Accept for the same sender/conflict region; 0 disables it")
     parser.add_argument(
@@ -688,6 +705,11 @@ def main():
             "documented", "tivtep"):
         parser.error(
             "--deceleration-active requires the documented TIVtep baseline")
+    if (args.deceleration_lane_metadata_heading_fallback
+            and not args.deceleration_active):
+        parser.error(
+            "--deceleration-lane-metadata-heading-fallback requires "
+            "--deceleration-active")
     if args.fixed_input_override is not None:
         if len(args.cases) != 1 or args.seeds is None:
             parser.error("--fixed-input-override requires one --cases value and explicit --seeds")
@@ -759,6 +781,8 @@ def main():
         "deceleration_convex_lambda": (
             args.deceleration_convex_lambda
             if args.deceleration_active else None),
+        "deceleration_lane_metadata_heading_fallback": getattr(
+            args, "deceleration_lane_metadata_heading_fallback", False),
         "agreement_lease_seconds": args.agreement_lease_seconds,
         "merge_negotiation_lead_seconds": (
             args.merge_negotiation_lead_seconds),

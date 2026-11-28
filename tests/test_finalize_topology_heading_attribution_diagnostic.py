@@ -51,6 +51,7 @@ class FinalizeTopologyHeadingAttributionDiagnosticTest(unittest.TestCase):
                     "counterfactual_case": "reject",
                     "heading_path": {
                         "path_type": "planned", "lane_id": "east_0",
+                        "lane_position": 12.0,
                         "distinct_position_count": 1, "finite_yaw_count": 0,
                     },
                 },
@@ -75,6 +76,7 @@ class FinalizeTopologyHeadingAttributionDiagnosticTest(unittest.TestCase):
         self.assertEqual(report["validated_run_count"], 1)
         self.assertEqual(condition["active_unsupported"], 1)
         self.assertEqual(condition["stationary_without_yaw"], 1)
+        self.assertEqual(condition["lane_position_present"], 1)
         self.assertEqual(condition["counterfactual_case"], {"reject": 1})
         self.assertEqual(condition["retained_detail_coverage"], 1.0)
 

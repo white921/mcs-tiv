@@ -94,6 +94,7 @@ def summarize(experiment_roots: list[Path], expected_source: str) -> dict:
         "path_type": Counter(),
         "lane_id": Counter(),
         "stationary_without_yaw": 0,
+        "lane_position_present": 0,
         "other_heading_shape": 0,
         "unsupported_reasons": Counter(),
     })
@@ -132,6 +133,8 @@ def summarize(experiment_roots: list[Path], expected_source: str) -> dict:
                 heading = details.get("heading_path", {})
                 item["path_type"][heading.get("path_type") or "unknown"] += 1
                 item["lane_id"][heading.get("lane_id") or "unknown"] += 1
+                if heading.get("lane_position") is not None:
+                    item["lane_position_present"] += 1
                 if (heading.get("distinct_position_count") == 1
                         and heading.get("finite_yaw_count") == 0):
                     item["stationary_without_yaw"] += 1
@@ -158,7 +161,7 @@ def summarize(experiment_roots: list[Path], expected_source: str) -> dict:
                 "run_count", "active_attempts", "active_evaluations",
                 "active_unsupported", "retained_unsupported",
                 "retained_with_details", "stationary_without_yaw",
-                "other_heading_shape")},
+                "lane_position_present", "other_heading_shape")},
             "unsupported_rate": (
                 item["active_unsupported"] / attempts if attempts else None),
             "retained_detail_coverage": (

@@ -81,7 +81,21 @@ def _convex_lambda_from_environment():
     return value
 
 
+def _boolean_from_environment(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be a boolean")
+
+
 CONVEX_LAMBDA = _convex_lambda_from_environment()
+LANE_METADATA_HEADING_FALLBACK = _boolean_from_environment(
+    "MCS_DECELERATION_LANE_METADATA_HEADING_FALLBACK")
 # 200 m communication range / (5 m vehicle + 5 m minimum gap) = 20
 # followers per lane; the lane-closure model has two same-direction lanes.
 MAXIMUM_FOLLOWERS = 40
@@ -259,21 +273,29 @@ def _latest_planned(receiver):
 
 def _followers(leader_id, leader_path, candidates, now, excluded):
     """Return current-lane and future-merge followers, nearest first."""
-    try:
-        x, y, hx, hy = _heading(leader_path, now)
-    except PredictionUnsupported as error:
-        error.details.update(leader_id=str(leader_id))
-        raise
     leader_lane = _lane_id(leader_path)
     leader_lane_position = _lane_position(leader_path)
+    leader_geometry = None
+
+    def geometry():
+        nonlocal leader_geometry
+        if leader_geometry is None:
+            try:
+                leader_geometry = _heading(leader_path, now)
+            except PredictionUnsupported as error:
+                error.details.update(leader_id=str(leader_id))
+                raise
+        return leader_geometry
+
+    # Preserve the published predictor unless the diagnostic ablation is
+    # explicitly enabled.  The ablation defers heading reconstruction until a
+    # geometric legacy fallback actually needs it.
+    if not LANE_METADATA_HEADING_FALLBACK:
+        geometry()
     queue = []
     for vehicle_id, path in candidates.items():
         if vehicle_id in excluded or vehicle_id == leader_id:
             continue
-        px, py = _position(path, now)
-        dx, dy = px - x, py - y
-        longitudinal = dx * hx + dy * hy
-        lateral = abs(dx * hy - dy * hx)
         candidate_lane = _lane_id(path)
         if leader_lane is not None and candidate_lane is not None:
             if leader_lane == candidate_lane:
@@ -284,11 +306,16 @@ def _followers(leader_id, leader_path, candidates, now, excluded):
                     if lane_separation > 0.1:
                         gap = max(0.0, lane_separation - 5.0)
                         queue.append((0, lane_separation, vehicle_id, path, gap))
-                elif longitudinal < -0.1:
+                else:
                     # Compatibility with packets produced before lane position
-                    # became part of the MCM context.
-                    gap = max(0.0, math.hypot(dx, dy) - 5.0)
-                    queue.append((0, abs(longitudinal), vehicle_id, path, gap))
+                    # became part of the MCM context still needs geometry.
+                    x, y, hx, hy = geometry()
+                    px, py = _position(path, now)
+                    dx, dy = px - x, py - y
+                    longitudinal = dx * hx + dy * hy
+                    if longitudinal < -0.1:
+                        gap = max(0.0, math.hypot(dx, dy) - 5.0)
+                        queue.append((0, abs(longitudinal), vehicle_id, path, gap))
                 continue
             convergence = _future_lane_convergence(leader_path, path, now)
             if convergence is not None:
@@ -300,6 +327,11 @@ def _followers(leader_id, leader_path, candidates, now, excluded):
 
         # Old logs have no lane metadata. Preserve their geometric fallback,
         # but new simulations always use the explicit lane identity above.
+        x, y, hx, hy = geometry()
+        px, py = _position(path, now)
+        dx, dy = px - x, py - y
+        longitudinal = dx * hx + dy * hy
+        lateral = abs(dx * hy - dy * hx)
         if longitudinal < -0.1 and lateral <= LANE_TOLERANCE:
             gap = max(0.0, math.hypot(dx, dy) - 5.0)
             queue.append((0, abs(longitudinal), vehicle_id, path, gap))
@@ -594,6 +626,8 @@ def _write_audit():
                 "convex_lambda": CONVEX_LAMBDA,
                 "prediction_horizon_s": HORIZON,
                 "maximum_followers": MAXIMUM_FOLLOWERS,
+                "lane_metadata_heading_fallback": (
+                    LANE_METADATA_HEADING_FALLBACK),
                 "counts": dict(COUNTS),
                 "records": RECORDS,
             }), stream, indent=2,

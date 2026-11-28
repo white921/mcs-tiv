@@ -19,6 +19,7 @@ class ResultLayoutTests(unittest.TestCase):
             "run_name": None,
             "deceleration_active": True,
             "deceleration_convex_lambda": RUNNER.DEFAULT_CONVEX_LAMBDA,
+            "deceleration_lane_metadata_heading_fallback": False,
             "agreement_lease_seconds": 0.0,
             "merge_negotiation_lead_seconds": 0.0,
             "two_stage_merge_negotiation": False,
@@ -63,6 +64,7 @@ class ResultLayoutTests(unittest.TestCase):
             "MCS_PRIORITY_HOLD_MODE": "conditional",
             "MCS_DECELERATION_MODE": "active",
             "MCS_DECELERATION_CONVEX_LAMBDA": "0.25",
+            "MCS_DECELERATION_LANE_METADATA_HEADING_FALLBACK": "1",
             "MCS_DECELERATION_TIME_HALF_LIFE_S": "99",
             "MCS_DECELERATION_LOSS_LAMBDA": "99",
             "MCS_REJECTION_WAIT_CAP_S": "99",
@@ -102,6 +104,17 @@ class ResultLayoutTests(unittest.TestCase):
         self.assertEqual(
             manifest["excluded_follower_roles"],
             ["request_vehicle", "receiver_vehicle"])
+        self.assertFalse(
+            manifest["lane_metadata_heading_fallback"]["enabled"])
+
+    def test_manifest_records_lane_metadata_heading_ablation(self):
+        manifest = RUNNER.deceleration_prediction_manifest(self.args(
+            deceleration_lane_metadata_heading_fallback=True))
+
+        self.assertTrue(
+            manifest["lane_metadata_heading_fallback"]["enabled"])
+        self.assertFalse(
+            manifest["lane_metadata_heading_fallback"]["changes_default"])
 
 
 if __name__ == "__main__":
