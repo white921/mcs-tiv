@@ -79,3 +79,18 @@
   `/media/yamada/UbuntuData/home-yamada/Documents/卒業研究/mcs-tiv-diagnostic-artifacts/intersection-decision-lock-cadence-ablation-20261129/`。
 - heartbeat `mcs-heading`は30分間隔で有効。最遅active runが180/300 s以上になったら
   15分へ変更し、完了監査後に停止する。
+
+## 完了後の分岐
+
+1. 15/15正常終了、完全性監査、物理衝突0のいずれかを満たさない場合は停止する。
+   失敗runを自動再実行せず、原因と再現条件だけを保存する。
+2. `cadence_hypothesis.supported=true`の場合は、1秒ロックを交差点性能差の有力な
+   原因とする。ただしdevelopment seedのため、そのまま方式採用や優越性を主張しない。
+   seed 15/20のtraceで交渉増幅が縮小したことを確認したうえで、未使用seedによる
+   山下法・1.0秒・0.1秒の正式な三者比較案を作る。正式runは自動起動しない。
+3. 形状別の速度・停止時間またはseed 15/20の改善が一部だけ成立する場合は、
+   cadenceを単独主因とせず、完成traceを用いてturn・競合点・判断種別ごとの差を先に
+   解析する。追加計測が必要と判明するまで新規runを起動しない。
+4. `cadence_hypothesis.supported=false`で改善信号も乏しい場合は、1秒ロック仮説を棄却し、
+   後続車項の捕捉範囲と実効寄与の小ささを次の主対象とする。既存traceから測定可能な
+   変更仮説を作り、回帰テストと15-run診断条件を用意してから次バッチを判断する。
