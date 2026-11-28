@@ -94,3 +94,12 @@
 4. `cadence_hypothesis.supported=false`で改善信号も乏しい場合は、1秒ロック仮説を棄却し、
    後続車項の捕捉範囲と実効寄与の小ささを次の主対象とする。既存traceから測定可能な
    変更仮説を作り、回帰テストと15-run診断条件を用意してから次バッチを判断する。
+
+## 実行中の先行監査
+
+- 最初に完了したEval.5 seed 19はexit 0、source不変、必須成果物完備、物理衝突0だった。
+- 305 active attemptのうち304件を評価し、1件だけ130.5 sに
+  `trajectory does not enter the detected conflict region within the horizon`でunsupportedとなった。
+  heading/yaw欠損の再発ではない。0.1秒化によって評価機会自体が変わるため、finalizerは
+  unsupportedをrun失敗条件にせず、対照との差と理由をcadence outcomeとして集計する。
+- 残りrunは自動再実行せず継続し、全15本の完全性とunsupported総数を完了後に監査する。

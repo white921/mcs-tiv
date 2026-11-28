@@ -118,7 +118,13 @@ def validate_run(
     unsupported = int(counts.get("active_unsupported", 0))
     require(attempts == evaluated + unsupported,
             f"prediction counter mismatch: {run}")
-    require(unsupported == 0, f"unexpected unsupported prediction: {run}")
+    unsupported_reasons = Counter(
+        str(record.get("reason", "unknown"))
+        for record in audit.get("records", [])
+        if record.get("status") == "unsupported"
+    )
+    require(sum(unsupported_reasons.values()) == unsupported,
+            f"unsupported reason count mismatch: {run}")
     events = negotiation_counts(run / "negotiations.jsonl")
     require(events["suppressed"] == int(
         counts.get("active_duplicate_decisions_suppressed", 0)),
@@ -132,6 +138,8 @@ def validate_run(
         "decision_lock_s": lock_s,
         "attempts": attempts,
         "evaluated": evaluated,
+        "unsupported": unsupported,
+        "unsupported_reasons": dict(unsupported_reasons),
         "duplicate_suppressed": events["suppressed"],
         "decisions": events["decision"],
         "cancellations": events["cancelled"],
@@ -204,6 +212,10 @@ def summarize(
             "hard_brake_time_delta_s": (
                 after["hard_brake_time_s"] - before["hard_brake_time_s"]),
             "attempt_delta": after["attempts"] - before["attempts"],
+            "baseline_unsupported": before["unsupported"],
+            "short_lock_unsupported": after["unsupported"],
+            "unsupported_delta": after["unsupported"] - before["unsupported"],
+            "short_lock_unsupported_reasons": after["unsupported_reasons"],
             "decision_delta": after["decisions"] - before["decisions"],
             "duplicate_suppressed_delta": (
                 after["duplicate_suppressed"] - before["duplicate_suppressed"]),
@@ -227,6 +239,12 @@ def summarize(
                 item["hard_brake_time_delta_s"] for item in pairs),
             "mean_attempt_delta": statistics.fmean(
                 item["attempt_delta"] for item in pairs),
+            "baseline_unsupported_total": sum(
+                item["baseline_unsupported"] for item in pairs),
+            "short_lock_unsupported_total": sum(
+                item["short_lock_unsupported"] for item in pairs),
+            "mean_unsupported_delta": statistics.fmean(
+                item["unsupported_delta"] for item in pairs),
             "mean_decision_delta": statistics.fmean(
                 item["decision_delta"] for item in pairs),
             "mean_duplicate_suppressed_delta": statistics.fmean(
@@ -245,6 +263,9 @@ def summarize(
         all(item["mean_speed_delta_mps"] > 0 for item in conditions.values())
         and all(item["mean_stop_time_delta_s"] < 0 for item in conditions.values())
         and severe_seed_stop_improved)
+    short_lock_unsupported_reasons = Counter()
+    for record in short.values():
+        short_lock_unsupported_reasons.update(record["unsupported_reasons"])
     return {
         "analysis": "intersection-decision-lock-cadence-ablation",
         "classification": "diagnostic-development-ablation",
@@ -253,6 +274,14 @@ def summarize(
         "validated_baseline_run_count": len(baseline),
         "validated_short_lock_run_count": len(short),
         "physical_collision_count": 0,
+        "prediction_support": {
+            "baseline_unsupported_total": sum(
+                int(record["unsupported"]) for record in baseline.values()),
+            "short_lock_unsupported_total": sum(
+                int(record["unsupported"]) for record in short.values()),
+            "short_lock_unsupported_reasons": dict(
+                short_lock_unsupported_reasons),
+        },
         "conditions": conditions,
         "cadence_hypothesis": {
             "supported": cadence_signal,
@@ -267,6 +296,7 @@ def summarize(
         "limitations": [
             "The ablation uses development seeds 13-22 and is not an independent holdout.",
             "Only the active proposal decision-lock duration differs between each paired run.",
+            "Unsupported predictions are retained as a cadence outcome rather than treated as an invalid run.",
             "The result diagnoses controller cadence and does not by itself validate a final method.",
         ],
     }

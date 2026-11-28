@@ -117,6 +117,36 @@ class DecisionLockFinalizerTest(unittest.TestCase):
                 MODULE.summarize(
                     baseline, short, MODULE.BASELINE_SOURCE, "short-source")
 
+    def test_retains_unsupported_prediction_as_cadence_outcome(self):
+        with tempfile.TemporaryDirectory() as directory:
+            baseline = self.roots(
+                directory, "before", MODULE.BASELINE_SOURCE, 1.0, 5.0)
+            short = self.roots(
+                directory, "after", "short-source", 0.1, 5.2)
+            audit_path = (
+                short[1] / "eval5" / "seed-19" /
+                "deceleration-audit.json")
+            audit = json.loads(audit_path.read_text(encoding="utf-8"))
+            audit["counts"].update({
+                "active_attempts": 11,
+                "active_evaluations": 10,
+                "active_unsupported": 1,
+            })
+            audit["records"] = [{
+                "status": "unsupported",
+                "reason": (
+                    "trajectory does not enter the detected conflict region "
+                    "within the horizon"),
+            }]
+            self.write_json(audit_path, audit)
+            report = MODULE.summarize(
+                baseline, short, MODULE.BASELINE_SOURCE, "short-source")
+        self.assertEqual(
+            report["prediction_support"]["short_lock_unsupported_total"], 1)
+        self.assertEqual(
+            report["conditions"]["eval5:300-300-300-300"]
+            ["short_lock_unsupported_total"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
