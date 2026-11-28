@@ -1,7 +1,7 @@
 # 形状別 heading/yaw unsupported 帰属診断
 
 - 台帳ID: `2026-11-28-topology-heading-attribution-diagnostic`
-- 状態: `planned`
+- 状態: `running`
 - 位置づけ: `diagnostic`
 - 実行対象: Ubuntu `sgnlab`
 
@@ -42,7 +42,7 @@ prediction attemptの約8.5%が `trajectory has no usable heading or yaw` とな
 
 - scheduler: `scripts/run_topology_heading_attribution_diagnostic.py`
 - source branch: `codex/intersection-heading-diagnostic`
-- source commit: 起動時manifestから追記する（現在は未検証）。
+- source commit: `79b14b4effe40570e6310f0e1962839be8fc2f49`。
 - raw output: UbuntuData上の `mcs-tiv-diagnostic-artifacts/`。
 - 完了後、manifest、metrics、unsupported集計、物理衝突、固定入力hash、ログを検証する。
 - 失敗runは自動再実行しない。diagnostic raw traceは、原因の説明と回帰テストを
@@ -50,4 +50,21 @@ prediction attemptの約8.5%が `trajectory has no usable heading or yaw` とな
 
 ## 結果
 
-未実行。
+実行中。
+
+### 2026-11-28 起動とEval.7の送出前失敗
+
+- 主unit: `mcs-topology-heading-attribution-20261128.service`、invocation
+  `cd5152f17686490fac2df5355a298a4b`。preflightはsource clean、SUMO 0、固定入力15本、
+  machine-wide 15 workerを確認した。
+- Eval.3と5本、Eval.5と5本はSUMOを開始した。Eval.7の5本はすべてSUMO起動前に
+  `FileNotFoundError` で終了した。失敗の直接原因は、スケジューラがEval.7 1000/1000の
+  固定入力に `fixed_inputs/thesis/eval7/seed-<seed>.jsonl` を暗黙選択し、実在する
+  flow-sweep入力を `--fixed-input-override` で指定していなかったことである。
+- 失敗したEval.7は自動再実行しない。出力とrunner logを失敗証跡として保持する。
+  スケジューラに明示的なflow-sweep入力を追加し、コマンド生成テストで
+  3 cohortすべてのoverrideを確認する。
+- 空いた5枠には、失敗runの再実行ではなく、unsupportedの主要対象である
+  Eval.5 300/300/300/300のseed 18–22を別cohortとして起動した。unitは
+  `mcs-topology-heading-attribution-eval5-extra-20261128.service`、invocationは
+  `b97245a4f9904567b54771b6626d1a45`。起動後の実SUMO数は15。

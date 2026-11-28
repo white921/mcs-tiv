@@ -29,6 +29,7 @@ class TopologyHeadingAttributionDiagnosticTest(unittest.TestCase):
                 "--deceleration-convex-lambda") + 1], "0.95")
             self.assertIn("--diagnostic-traces", command)
             self.assertEqual(command[command.index("--workers") + 1], "5")
+            self.assertIn("--fixed-input-override", command)
 
 
 if __name__ == "__main__":

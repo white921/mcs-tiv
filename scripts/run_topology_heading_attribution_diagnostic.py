@@ -45,7 +45,10 @@ SPECS = (
         "case": "eval7",
         "seeds": (33, 34, 35, 36, 37),
         "flows": (1000, 1000),
-        "fixed_input": None,
+        "fixed_input": (
+            "fixed_inputs/thesis/eval7-flow-sweep/"
+            "requesting-1000-accepting-1000/seed-{seed}.jsonl"
+        ),
     },
 )
 
@@ -141,11 +144,6 @@ def preflight(output_root: Path, sumo_home: Path, python: str) -> dict[str, obje
         raise RuntimeError(f"output root already exists: {output_root}")
     for spec in SPECS:
         pattern = spec["fixed_input"]
-        if pattern is None:
-            pattern = (
-                "fixed_inputs/thesis/eval7-flow-sweep/"
-                "requesting-1000-accepting-1000/seed-{seed}.jsonl"
-            )
         missing = [
             str(pattern).format(seed=seed)
             for seed in spec["seeds"]
