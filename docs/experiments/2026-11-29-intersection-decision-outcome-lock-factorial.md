@@ -1,7 +1,7 @@
 # 交差点のAccept/Reject別判断ロック2×2要因診断
 
 - 台帳ID: `2026-11-29-intersection-decision-outcome-lock-factorial`
-- 状態: `running`
+- 状態: `completed`
 - 位置づけ: `diagnostic development factorial ablation`
 
 ## 目的
@@ -91,3 +91,27 @@ Reject時に対象path IDは`yetJudgedList`へ入り、次の希望経路は新�
 親schedulerだけを`SIGSTOP`した。子runnerとSUMOは中断していない。第1波15 run完了後は、
 外側manifestを`stopped_after_wave_1`とし、第2波を実行値として捏造せず、既存30 runと
 新規15 runの計45 runを専用finalizerで監査する。
+
+## 完了監査と結果
+
+- 第1波の15/15 runはexit 0、source不変、開始時clean、固定入力hash一致、
+  `lambda=0.95`、heading fallback有効、Accept lock 0.1秒、Reject lock 1.0秒、
+  checkpoint 5、必須artifact、致命ログ0、物理衝突0の監査に合格した。
+- 3 cohortは各5/5成功・失敗0。親schedulerのみ意図的に`SIGKILL`し、子runの中断は0。
+  outer manifestは`stopped_after_wave_1`、第2波は`reject_lock_key_unreachable`による
+  `omitted_waves`として記録した。
+- 既存1.0/1.0秒15 run、0.1/0.1秒15 run、0.1/1.0秒15 runの計45 runを専用finalizerが検証。
+  新規15 runは既存0.1/0.1秒と、`evaluation-metrics.json`、`negotiations.jsonl`、
+  `vehicle-states.jsonl`、`conflicts.jsonl`の全4 artifactで15/15完全一致した。
+- 1.0/1.0秒の5,062 Reject、0.1/0.1秒の4,936 Rejectで、Reject後1秒未満の
+  同一lock key再登場はいずれも0件。対してAcceptでは310/1,407判断が
+  同一keyの1秒未満再登場を持った。
+- `Accept=0.1/Reject=1.0 - Accept=0.1/Reject=0.1`は、両形状で速度、停止、
+  急減速、判断、Accept/Reject、適用、待機、取消、deferred、suppressedがすべて0。
+- summaryはUbuntuData上の
+  `intersection-decision-outcome-lock-degeneracy-summary-20261129.json`。byte size `11,335`、
+  SHA-256 `bd354dedc3b19d47464e2e9d00d1ec0d3cc3f560f0fd4a519917a5586f703600`。
+
+Reject lockは現実の分析要因になっていない。交差点間の逆方向の差を生んだのは、
+Accept後の判断再評価と代替経路更新の組み合わせである。その固定周期に形状共通の
+中間値があるかを、0.3/0.5/0.7秒スイープで次に確認する。

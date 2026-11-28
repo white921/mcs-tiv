@@ -1,7 +1,7 @@
 # 交差点のAccept後判断ロック中間周期スイープ
 
 - 台帳ID: `2026-11-29-intersection-accept-lock-sweep`
-- 状態: `planned`
+- 状態: `running`
 - 分類: `diagnostic development timing sweep`
 
 ## 目的
@@ -48,3 +48,17 @@ development seedであるため、選定された場合も一般的優越性を�
 - raw output: UbuntuData上の`mcs-tiv-diagnostic-artifacts/`。
 - 起動gateはAccept/Reject別第1波の15/15監査、既存対照との15/15完全一致、
   Reject後同一key再登場0件、物理衝突0とする。
+
+## 2026-11-29 起動
+
+- 退化診断summaryは45 runを検証し、新規15 runと既存0.1/0.1秒の15/15完全一致、
+  Reject後同一key再登場0、物理衝突0を確認した。
+- 実行sourceは`44b220c35ec4b7e97af5f72899cc4631c06f6864`。sgnlabのUbuntuData上の
+  cleanなdetached worktree `mcs-tiv-intersection-accept-lock-control`を使用し、preflightは成功した。
+- user systemd unitは`mcs-intersection-accept-lock-sweep-20261129.service`、invocation IDは
+  `698791cc688c4b0991a36956e81a81cd`。raw rootはUbuntuData上の
+  `mcs-tiv-diagnostic-artifacts/intersection-accept-lock-sweep-20261129/`。
+- 起動後readbackでunit `active/running`、Accept 0.3秒の第1波run manifest 15、SUMO 15、
+  runner 3を確認。全15 manifestでsource、開始時clean、generic lock 1.0秒、
+  Accept lock 0.3秒、Reject lock 1.0秒、heading fallback有効が一致し、失敗は0。
+- 各波は子batchがすべてreturn code 0の場合だけ次へ進み、失敗は自動再実行しない。
