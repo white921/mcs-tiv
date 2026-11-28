@@ -450,6 +450,34 @@ class DecelerationLossTests(unittest.TestCase):
 
         self.assertEqual([entry[0] for entry in found], ["b"])
 
+    def test_unsupported_heading_records_path_and_counterfactual_context(self):
+        def path(veh, kind, x, lane):
+            return NS(vehID=veh, type=kind, pathID=veh + kind,
+                      t=[0.0, 5.0, 10.0], s_d=[0.0, 0.0, 0.0],
+                      x=[x, x, x], y=[0.0, 0.0, 0.0],
+                      lane_id=lane, lane_position=x,
+                      allowed_speed_mps=10.0)
+
+        sender = path("a", "planned", 20.0, "main_0")
+        desired = path("a", "desired", 20.0, "main_0")
+        planned = path("b", "planned", 10.0, "other_0")
+        alternative = path("b", "alter", 10.0, "other_0")
+        receiver = NS(id="b", plannedPath=planned, receivedPaths=[sender])
+
+        prediction.configure("active")
+        record = prediction._record_evaluation(
+            receiver, desired, alternative, 0.0, self.region(), "active")
+        prediction.configure("off")
+
+        self.assertEqual(record["status"], "unsupported")
+        details = record["unsupported_details"]
+        self.assertEqual(details["counterfactual_case"], "reject")
+        self.assertEqual(details["leader_id"], "a")
+        self.assertEqual(details["heading_path"]["path_id"], "aplanned")
+        self.assertEqual(details["heading_path"]["lane_id"], "main_0")
+        self.assertEqual(details["heading_path"]["distinct_position_count"], 1)
+        self.assertEqual(details["heading_path"]["yaw_sample_count"], 0)
+
     def test_adjacent_parallel_lane_is_not_a_follower(self):
         def path(veh, x, lane, y):
             return NS(vehID=veh, type="planned", pathID=veh + "path",

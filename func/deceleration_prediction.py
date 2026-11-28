@@ -37,6 +37,41 @@ MERGE_TOLERANCE = 1.6
 ALIGNMENT_COSINE = math.cos(math.radians(30.0))
 
 
+class PredictionUnsupported(ValueError):
+    """Expected prediction limitation with machine-readable diagnostics."""
+
+    def __init__(self, message, **details):
+        super().__init__(message)
+        self.details = details
+
+
+def _path_diagnostics(path, now):
+    """Describe a path without changing how the predictor evaluates it."""
+    times = list(getattr(path, "t", ()) or ())
+    xs = list(getattr(path, "x", ()) or ())
+    ys = list(getattr(path, "y", ()) or ())
+    yaw = list(getattr(path, "yaw", ()) or ())
+    positions = list(zip(xs, ys))
+    finite_yaw = [value for value in yaw
+                  if isinstance(value, (int, float)) and math.isfinite(value)]
+    return {
+        "path_id": str(getattr(path, "pathID", "")),
+        "vehicle_id": str(getattr(path, "vehID", "")),
+        "path_type": str(getattr(path, "type", "")),
+        "lane_id": _lane_id(path),
+        "lane_position": _lane_position(path),
+        "road_id": getattr(path, "road_id", None),
+        "sample_count": len(times),
+        "position_sample_count": len(positions),
+        "distinct_position_count": len(set(positions)),
+        "yaw_sample_count": len(yaw),
+        "finite_yaw_count": len(finite_yaw),
+        "time_start": float(times[0]) if times else None,
+        "time_end": float(times[-1]) if times else None,
+        "prediction_time": float(now),
+    }
+
+
 def _convex_lambda_from_environment():
     value = float(os.environ.get(
         "MCS_DECELERATION_CONVEX_LAMBDA", str(DEFAULT_CONVEX_LAMBDA)))
@@ -141,7 +176,10 @@ def _heading(path, now):
         length = math.hypot(dx, dy)
         if length >= 1e-6:
             return (x0, y0, dx / length, dy / length)
-    raise ValueError("trajectory has no usable heading or yaw")
+    raise PredictionUnsupported(
+        "trajectory has no usable heading or yaw",
+        heading_path=_path_diagnostics(path, now),
+    )
 
 
 def _lane_id(path):
@@ -221,7 +259,11 @@ def _latest_planned(receiver):
 
 def _followers(leader_id, leader_path, candidates, now, excluded):
     """Return current-lane and future-merge followers, nearest first."""
-    x, y, hx, hy = _heading(leader_path, now)
+    try:
+        x, y, hx, hy = _heading(leader_path, now)
+    except PredictionUnsupported as error:
+        error.details.update(leader_id=str(leader_id))
+        raise
     leader_lane = _lane_id(leader_path)
     leader_lane_position = _lane_position(leader_path)
     queue = []
@@ -295,7 +337,7 @@ def _propagate_follower(vehicle_id, base, leader, gap):
     return SpeedProfile(vehicle_id, base.times, tuple(speeds))
 
 
-def _case_profiles(roots, candidates, now):
+def _case_profiles(roots, candidates, now, case_label):
     """Build roots and their follower queues for one counterfactual case."""
     profiles = {vehicle_id: _profile(path, vehicle_id, now)
                 for vehicle_id, path in roots.items()}
@@ -304,8 +346,17 @@ def _case_profiles(roots, candidates, now):
         leader = profiles[root_id]
         leader_path = root_path
         leader_x, leader_y = _position(leader_path, now)
-        for follower_id, follower_path, gap in _followers(
-                root_id, leader_path, candidates, now, assigned):
+        try:
+            followers = _followers(
+                root_id, leader_path, candidates, now, assigned)
+        except PredictionUnsupported as error:
+            error.details.update(
+                counterfactual_case=case_label,
+                root_vehicle_id=str(root_id),
+                assigned_vehicle_ids=sorted(assigned),
+            )
+            raise
+        for follower_id, follower_path, gap in followers:
             fx, fy = _position(follower_path, now)
             base = _profile(follower_path, follower_id, now)
             leader = _propagate_follower(follower_id, base, leader, gap)
@@ -338,8 +389,8 @@ def _evaluate_detail(receiver, desired, alternative, now, conflict_region):
     candidates[receiver_id] = receiver_planned
     reject_roots = {sender_id: sender_planned, receiver_id: receiver_planned}
     accept_roots = {sender_id: desired, receiver_id: receiver_alternative}
-    reject = _case_profiles(reject_roots, candidates, now)
-    accept = _case_profiles(accept_roots, candidates, now)
+    reject = _case_profiles(reject_roots, candidates, now, "reject")
+    accept = _case_profiles(accept_roots, candidates, now, "accept")
 
     # Accepting and rejecting can legitimately affect different following
     # queues.  Compare both cases over their union instead of dropping the
@@ -459,6 +510,8 @@ def _record_evaluation(receiver, desired, alternative, now, conflict_region, mod
         record = {"time": now, "receiver": str(receiver.id),
                   "sender": str(getattr(desired, "vehID", "unknown")),
                   "status": "unsupported", "reason": str(error)}
+        if isinstance(error, PredictionUnsupported):
+            record["unsupported_details"] = error.details
     else:
         COUNTS[mode + "_evaluations"] += 1
         COUNTS["follower_profiles"] += result["follower_count"]
