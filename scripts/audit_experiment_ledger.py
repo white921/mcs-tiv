@@ -26,7 +26,7 @@ INLINE_STATE = re.compile(
     r"^-\s*状態:\s*`(?P<state>planned|running|completed|failed|incomplete|superseded)`\s*$"
 )
 BLOCK_STATE = re.compile(
-    r"^##\s+状態\s*$\n(?:\s*\n)*`(?P<state>planned|running|completed|failed|incomplete|superseded)`\s*$",
+    r"^##\s+状態\s*$\n(?:\s*\n)*-?\s*`(?P<state>planned|running|completed|failed|incomplete|superseded)`\s*$",
     re.MULTILINE,
 )
 
@@ -60,7 +60,7 @@ def main() -> int:
     records = {
         path.name: path
         for path in LEDGER.glob("*.md")
-        if path.name not in {"README.md", "template.md"}
+        if path.name not in {"README.md", "template.md", "monitoring.md"}
     }
 
     for relative, index_state in indexed.items():

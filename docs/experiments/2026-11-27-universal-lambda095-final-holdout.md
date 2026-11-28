@@ -1,7 +1,7 @@
 # 3シナリオ共通λ=0.95の最終holdout
 
 - 台帳ID `2026-11-27-universal-lambda095-final-holdout`
-- 状態 `completed`
+- 状態: `completed`
 - 分類 `formal`
 
 ## 目的

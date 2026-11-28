@@ -1,9 +1,9 @@
 # 全シナリオ共通lambda選定のためのEval.3/5広域スイープ
 
-- 台帳ID: \`2026-11-23-universal-lambda-eval35-wide-sweep-development\`
-- 状態: \`scope revised to 220 runs; preflight pending\`
-- 分類: \`development screening\`
-- 実行対象: Ubuntu \`sgnlab\`
+- 台帳ID: `2026-11-23-universal-lambda-eval35-wide-sweep-development`
+- 状態: `completed`
+- 分類: `development screening`
+- 実行対象: Ubuntu `sgnlab`
 
 ## 目的
 
@@ -102,3 +102,14 @@ evaluation metrics、物理衝突、集約済み判断件数、ログ、retentio
 
 広域・細密developmentで単一lambdaを事前固定した後、未使用seedでT字路、十字路、合流を
 山下TIVtepと再比較する。最終holdoutの結果を見てlambdaを再調整しない。
+
+## 完了監査
+
+- attempt 2のEval.3 500/500/500と11 lambda×10 seed、Eval.5 300/300/300/300の
+  11 lambda×10 seed、合220 runはすべて`exit_code: 0`、`source_unchanged: true`、
+  物理衝突0。各22 cohortのexperiment manifestも`completed`、失敗0を確認した。
+- 結果commitはEval.3が`37220c29517639ee7945ea04ae6c4174112e01a0`、
+  Eval.5が`b28c400b34f2b81e73b909aa96cf4de1f05f2197`。
+- 広域結果だけで形状間の共通最適を確定せず、高lambda領域の追加developmentへ
+  進めた。その結果から`lambda=0.95`を事前固定し、
+  [3シナリオ最終holdout](2026-11-27-universal-lambda095-final-holdout.md)で独立評価した。
