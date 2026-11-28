@@ -1,7 +1,7 @@
 # 交差点の判断ロック周期アブレーション
 
 - 台帳ID: `2026-11-29-intersection-decision-lock-cadence-ablation`
-- 状態: `planned`
+- 状態: `running`
 - 位置づけ: `diagnostic development ablation`
 
 ## 目的
@@ -59,7 +59,23 @@
 ## 実行・保存
 
 - scheduler: `scripts/run_intersection_decision_lock_cadence_ablation.py`
+- finalizer: `scripts/finalize_intersection_decision_lock_cadence_ablation.py`
 - source branch: `codex/intersection-heading-diagnostic`
 - raw output: UbuntuData上の`mcs-tiv-diagnostic-artifacts/`。
 - 完了後はmanifest、metrics、物理衝突、固定入力hash、診断artifact、checkpoint、
   致命ログを監査し、この記録へ対応比較を追記する。
+
+## 2026-11-29 起動
+
+- 実行sourceは`708f7334476068cc6cd8cbc942fc18e71e04e0e6`。sgnlabのUbuntuData上に
+  cleanなdetached worktreeを作成し、関連49テストとpreflightを通過した。
+- user systemd unit
+  `mcs-intersection-decision-lock-cadence-ablation-20261129.service`で起動した。
+  invocation IDは`435fd04859e4417fa3a9205331550c4d`。
+- 起動後readbackはunit `active/running`、run manifest 15、SUMO 15/15。全manifestで
+  source commit、開始時clean、`lambda=0.95`、heading fallback有効、decision lock `0.1 s`を
+  確認した。失敗は0。
+- raw rootは
+  `/media/yamada/UbuntuData/home-yamada/Documents/卒業研究/mcs-tiv-diagnostic-artifacts/intersection-decision-lock-cadence-ablation-20261129/`。
+- heartbeat `mcs-heading`は30分間隔で有効。最遅active runが180/300 s以上になったら
+  15分へ変更し、完了監査後に停止する。
