@@ -68,7 +68,7 @@
 ## 2026-11-29 起動
 
 - 実行sourceは`708f7334476068cc6cd8cbc942fc18e71e04e0e6`。sgnlabのUbuntuData上に
-  cleanなdetached worktreeを作成し、関連49テストとpreflightを通過した。
+  cleanなdetached worktreeを作成し、関連47テストとpreflightを通過した。
 - user systemd unit
   `mcs-intersection-decision-lock-cadence-ablation-20261129.service`で起動した。
   invocation IDは`435fd04859e4417fa3a9205331550c4d`。
