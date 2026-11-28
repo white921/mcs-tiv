@@ -148,3 +148,25 @@ CIは0をまたぐため、この10 seedだけで安定改善とはしない。
 次は新規runを起動せず、完成traceを用いてEval.3の増加した判断をturn・競合点・判断種別・
 車両単位に分解し、Eval.5 seed 15/20で縮小した交渉増幅との違いを特定する。heartbeatは
 完了監査後に停止した。development seedのため正式な優越性主張や未使用seed検証は行わない。
+
+## 完了traceによるEval.3分解
+
+1.0秒対照と0.1秒runの`vehicle-states.jsonl`を同一seedで対応させ、速度`<0.1 m/s`を
+0.1秒刻みで経路別に再集計した。5 seedの停止時間差合計は`+470.6 s`で、正式metricsの
+平均差`+94.12 s × 5`と一致した。
+
+- `RB`は`+261.0 s`、`RL`は`+192.0 s`で、右側流入2経路がnet停止増加の96.3%を占めた。
+- 一方、`BL`は`-44.3 s`、`LB`は`-9.2 s`であり、全方向が一様に悪化したのではない。
+- 5 seed合計の判断数は`+898`、`decision_locked`抑止は`-568`、適用は`+354`だった。
+- 増加した主な判断は`RB→LR Reject +211`、`BL→RB Accept +205`、
+  `RB→LB Accept +161`、`BL→LR Reject +126`、`RB→BL Reject +113`、
+  `RB→LB Reject +99`で、中央付近の右・下流入間の競合に集中した。
+- `missing_sender_conflict_region`によるdeferredはnet`+110`、
+  `desired_path_disappeared`による取消はnet`+29`増えた。
+
+したがってEval.3では、0.1秒化が単に最新情報へ追従したのではなく、同じ中央競合を短周期で
+再発火させ、経路生成・適用・消失を繰り返す判断churnを作った。1秒lockはここではdebounceとして
+機能していた。一方、Eval.5 seed 15/20では1秒保持の解除が交渉増幅を縮小したため、固定の
+`0.1 s`または`1.0 s`を全形状へ共通適用する方針は採らない。次の変更候補は、経過秒数ではなく
+conflict region、desired path、agreement setなどの実質的状態変化があった場合だけ再評価する
+state-aware hysteresisとする。実装・回帰テスト・15-run診断条件を用意するまでは追加runを起動しない。
