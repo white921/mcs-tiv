@@ -1,7 +1,7 @@
 # 3シナリオ共通λ=0.95の最終holdout
 
 - 台帳ID `2026-11-27-universal-lambda095-final-holdout`
-- 状態 `running`
+- 状態 `completed`
 - 分類 `formal`
 
 ## 目的
@@ -106,12 +106,45 @@ screeningで事前固定した正規化凸結合式の `lambda=0.95`を、選定
   へ退避したが、一般ユーザー向け空きはまだ0。ChatGPTアプリもユーザー許可後に正常終了したが
   容量は変わらず、当初の「削除済みバイナリ保持」という推定は誤りだった。再取得可能なAPT
   cache約614MBの清掃にはsudoが必要。実験artifact先のUbuntuDataは約1.1TB空き。
+- filler v3は2026-11-28 11:37 JSTに60 runをすべてexit code 0、source unchangedで
+  完了し、`aborted: false`で正常終了した。resume v4は、増分監査の一時ファイル
+  `results/runs/incremental-audit-latest.json`を想定外の未追跡変更と判定し、シミュレーションを
+  再実行せず停止した。一時ファイルは実験worktree外の
+  `mcs-tiv-temp-backup/20261127-root-full/incremental-audit-latest-20261128.json`へ退避した。
+- Eval.7 run manifestの`flows_vph` が`{requesting, accepting}`の辞書であるのに、旧監査は
+  交差点と同じ配列を期待していた。実条件は1000/1000で正しく、形状別にmanifest
+  表現を検査するcommit `58fbbb72`へ監査を修正した。修正後の増分監査は60 runが
+  エラー0、物理衝突0。
+- 最終処理はv5 unit
+  `mcs-universal-lambda095-final-holdout-resume-v5-20261128.service`、invocation
+  `fae9a61aba56466d9cadf40a0bc45916`が2026-11-28 21:53 JSTに正常終了した。
+  preflightは完了60、残り0、追加実行0を確認し、6条件すべてでpre-compression
+  audit、可逆圧縮、storage splitの検証に成功した。
+
+## 正式結果
+
+| 形状 | 山下平均速度 (m/s) | 提案平均速度 (m/s) | 改善率 | 提案勝利seed | 対応差95% bootstrap (m/s) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Eval.3 T字路 500 | 5.5897 | 5.8126 | +3.99% | 5 / 10 | [-0.1111, 0.6062] |
+| Eval.5 十字路 300 | 7.1844 | 7.2585 | +1.03% | 6 / 10 | [-0.0761, 0.2464] |
+| Eval.7 合流 1000/1000 | 4.1756 | 4.4154 | +5.74% | 9 / 10 | [0.1276, 0.3502] |
+
+- 3形状等重みの相対改善率は`+3.59%`、最悪形状はEval.5の`+1.03%`。
+- 提案法は3形状すべてで平均速度の点推定が山下TIVtepを上回った。一方、交差点2条件は
+  95%区間が0をまたぎ、seedごとの勝利も5/10と6/10である。したがって、合流の改善は
+  独立holdoutでも再現したが、交差点の改善は点推定では正でもseedに対して安定とは
+  まだ言えない。
+- 平均停止時間はEval.3で1463.91→1227.18 s、Eval.5で282.12→238.03 s、Eval.7で
+  7152.53→6229.09 sと、すべて提案法が低かった。
+- 数値のsource of truthは各出力の`universal-holdout-summary.json`、`post-run-audit.json`、
+  `compression-audit.json`、`storage-split-audit.json`。大容量生artifactはUbuntuData上に保持し、
+  外部保存先は引き続きpending。
 
 ## 制約と判定
 
 - 本holdoutはλ=0.95の独立性能評価であり、追加のλ選定には使わない。
 - 3形状で山下TIVtepをすべて上回らない場合も、不都合な形状を除外せず結果として保持する。
-- 実行結果と結論は未検証。
+- 正式結果は検証済み。本holdout結果を使ってlambdaを再調整しない。
 
 ## 事後的に生じた説明仮説
 
@@ -145,3 +178,29 @@ unsupported率と理由、後続車数、`Z_time/Z_follow`寄与、Accept率、�
 60 runの完全性を確認した後にだけ実行し、既定出力
 `results/runs/universal-lambda095-topology-mechanism-20261127.json`を生成する。方向別の
 待ち時間と連続Rejectは、この集計で形状差を確認した後に診断JSONLから追加する。
+
+## 事後的機序分析の結果
+
+`scripts/summarize_universal_lambda095_topology_mechanism.py`を正式finalize成功後に実行し、
+`results/runs/universal-lambda095-topology-mechanism-20261127.json`を生成した。この分析は
+post-hoc exploratoryであり、因果の確定には使わない。
+
+| 形状 | unsupported率 | 平均後続車数* | 重み付きfollow/time比* | 判断不一致率 | 速度改善率 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Eval.3 T字路 | 8.45% | 6.00 | 0.412 | 7.88% | +3.99% |
+| Eval.5 十字路 | 8.62% | 2.86 | 0.230 | 7.00% | +1.03% |
+| Eval.7 合流 | 0.28% | 17.39 | 1.730 | 14.49% | +5.74% |
+
+`*` 保存上限5,000件の時系列sampleに基づく。unsupported率と判断不一致率は全counterの厳密値。
+
+- 合流は提案評価の99.72%が実行可能で、1判断あたりの後続車が多く、重み付き
+  `Z_follow`の絶対寄与が`Z_time`の1.73倍だった。提案法が山下法と異なる判断をする率も
+  14.49%と高く、後続車影響を追加した変更が実際に強く作用している。
+- 交差点はunsupportedが約8.5%あり、保存された理由はすべて
+  `trajectory has no usable heading or yaw`だった。特にEval.5は平均後続車数2.86、
+  follow/time比0.230で、同じ`lambda=0.95`でも追加した後続車項の実効性が小さい。
+- したがって、developmentで合流のみ大きく改善し、十字路が改善しなかった主因の
+  有力な説明は、(1) 交差点で予測器が評価できない軌跡が多い、(2) 交差点では
+  後続車項の実効寄与が小さい、(3) 交差点は方向と競合点が多く、単一の下流回廊を持つ合流より
+  seed依存が大きい、の3点である。ただし(3)は現行診断と性能分布に基づく解釈で、
+  予測器を変更した反証実験は未実施。

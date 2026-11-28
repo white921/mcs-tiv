@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "record_type": "experiment-run",
+  "experiment_id": "universal-lambda095-holdout-eval5-300-proposal-seeds23-32-600s-20261127",
+  "status": "completed",
+  "classification": "formal",
+  "started_at": "2026-11-27T16:32:49.198766+09:00",
+  "started_epoch": 1795764769.198766,
+  "directory": "/media/yamada/UbuntuData/home-yamada/Documents/\u5352\u696d\u7814\u7a76/mcs-tiv-universal-lambda095-holdout/results/runs/universal-lambda095-holdout-eval5-300-proposal-seeds23-32-600s-20261127",
+  "condition": "eval5-300",
+  "case": "eval5",
+  "flows_vph": [
+    300,
+    300,
+    300,
+    300
+  ],
+  "method": "normalized-deceleration-propagation",
+  "requested_decision_method": "tivtep",
+  "deceleration_convex_lambda": 0.95,
+  "tasks": [
+    {
+      "case": "eval5",
+      "seed": 23
+    },
+    {
+      "case": "eval5",
+      "seed": 24
+    },
+    {
+      "case": "eval5",
+      "seed": 25
+    },
+    {
+      "case": "eval5",
+      "seed": 26
+    },
+    {
+      "case": "eval5",
+      "seed": 27
+    },
+    {
+      "case": "eval5",
+      "seed": 28
+    },
+    {
+      "case": "eval5",
+      "seed": 29
+    },
+    {
+      "case": "eval5",
+      "seed": 30
+    },
+    {
+      "case": "eval5",
+      "seed": 31
+    },
+    {
+      "case": "eval5",
+      "seed": 32
+    }
+  ],
+  "duration_s": 600.0,
+  "bus_share": 0.25,
+  "workers": 15,
+  "scheduler": {
+    "type": "condition-method-seed-work-conserving-shared-queue",
+    "slots": 15,
+    "condition_order": [
+      "eval3-500",
+      "eval5-300",
+      "eval7-1000"
+    ],
+    "method_order": [
+      "proposal",
+      "yamashita"
+    ],
+    "seed_order": [
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32
+    ],
+    "machine_wide_limit": 15,
+    "orchestration_log": "orchestration.jsonl"
+  },
+  "diagnostic_traces": true,
+  "checkpoint_interval_s": 60.0,
+  "git": {
+    "commit": "f7590fd4d73d78c4f7863512b12985f33d6540bf",
+    "branch": "codex/universal-lambda095-holdout",
+    "dirty": false
+  },
+  "preflight": {
+    "source_commit": "f7590fd4d73d78c4f7863512b12985f33d6540bf",
+    "python_version": "3.15.1",
+    "sumo_version": "1.28.0",
+    "existing_sumo_processes": 0,
+    "existing_sumo_commands": [],
+    "allowed_existing_sumo_processes": 0,
+    "allowed_external_fragment": null,
+    "runner_sha256": "b7d6e6d586c0399ae4857417ef49eb134decde0f8da7d77e92ca020aefd68c98",
+    "scheduler_sha256": "22d922eb374ae1c1977a8c471d3505b2e27311c8ca05c82126ebea8fb4766a70",
+    "fixed_input_sha256": {
+      "eval3-500/seed-23": "a491a3e2898ac25cb69be5d54363d1f98750ed4a9605c0db12b946896b42590b",
+      "eval3-500/seed-24": "e2270fb7781415a4eb8817c3f71049e437de9169aae25278f230fab372d85556",
+      "eval3-500/seed-25": "873bc89e95cf20bfeb137f57f88f69bf0ea4dc6a71f528e87ae2a79e9368d664",
+      "eval3-500/seed-26": "08d9a808901e6c2c4669a0de5c6c7dd857aff8fb8833febd8eab61128aba7f63",
+      "eval3-500/seed-27": "aa9301bc76bc192182b1da202483f6dd372b3bc248b6d85d0ea0cb59583b44d0",
+      "eval3-500/seed-28": "df88b9b811e03468691e29eb66eb6614c7a67778b968dc8692ae022e9413002b",
+      "eval3-500/seed-29": "ba88b61039d491b1453412d11174182dde111a80a97a2455fa670b5426c5bcb5",
+      "eval3-500/seed-30": "ef238698a2163bbe32daa3b3206b4b479ffd550796155f32b69375da78da5605",
+      "eval3-500/seed-31": "f6f00f614ed33b4da10f249b323112bf253b84cd0f4f0e9fef575a12ad9a68f2",
+      "eval3-500/seed-32": "bbb6f0daf187b090762fe7c310dee13968c0dc446c1d5b93062eccdc60548a9d",
+      "eval5-300/seed-23": "3943bb27019e5c3a44e87447e5e1bc2805341b2bd9c1525d39e4df35e8a07a17",
+      "eval5-300/seed-24": "3d510418af71cddc6d4699069b07857cc1c0322aacece01bbe827adf6d5e67d1",
+      "eval5-300/seed-25": "5e932389bbeeab0b3605636063fbff4677acbda80affee5d5d0c1c68baffc1f7",
+      "eval5-300/seed-26": "a838cd097952ee1ca15d0f882e9823cafa856269c8de0e371d5c0f2a95a4ad58",
+      "eval5-300/seed-27": "cb3f95e19b314044cbee9969d7e0385cf809199ccb35626c8df4cdadeb0b8ae2",
+      "eval5-300/seed-28": "55ff13c2bf9c017ac697f878fdabc8841c27041f326e236582635892f056885a",
+      "eval5-300/seed-29": "4977d682e8d259be676ccd9281a70e2d1a6ee6d41cf7bdb833dde7bc8db5ed0e",
+      "eval5-300/seed-30": "569bc5eb4be2d36f74baa55408ee2a72bfc7bd73273afc95d0443c96a1db30a2",
+      "eval5-300/seed-31": "33a3365c437d7972583a0f14d89e2d82c1e37ff7adc6463183f68ef9f59a90a6",
+      "eval5-300/seed-32": "ee83ef32cbdb012ed7a64bcb6378c85b74ffda863f40958753b16f632b941c33",
+      "eval7-1000/seed-23": "b6571fd1e0fb7dff7cf0a49e8710187679e9c2b6439c7dfd97d136f06ee78c24",
+      "eval7-1000/seed-24": "c6c66d5aa1165bcbe1823a8f5869135e0075b7ebcff97b11593aedb80e1d68c1",
+      "eval7-1000/seed-25": "cf29dc14de9c30810bd6e0d5912f52cbd080742c21c08f2898bf5f25331e9ced",
+      "eval7-1000/seed-26": "f97cb8f7bf959cc37061ad04b60f9a3ad19b7618b6231e8dd2ea470b9de611a2",
+      "eval7-1000/seed-27": "e1cbd8dfd04e1ba21cb659e1483342409c70e12c5a7fa4d44899517f3d8c074f",
+      "eval7-1000/seed-28": "652d3aed186a9cc128f6032710d986df588a3e22e4477715b5a9e6ada83d5de9",
+      "eval7-1000/seed-29": "a8936f09b7a55937f32d6bf0b3c0e6849d56b6177529a20b521da95fa358df85",
+      "eval7-1000/seed-30": "ef8b220f2be82d4fa1ebb52853b0ae18f236c620e5b9ac34130cd0b3d22815aa",
+      "eval7-1000/seed-31": "6d5060063ded8b381d046324015c08e9242583c48d73d9f7e990bfb61108b6c2",
+      "eval7-1000/seed-32": "47261944db79af25a442c3f94ab74bf44b1db9e81f6d30f4fed9ccb0b8a99167"
+    }
+  },
+  "finished_at": "2026-11-28T20:53:43.752909+09:00",
+  "finished_epoch": 1795866823.752909,
+  "elapsed_seconds": 102054.55414295197,
+  "completed_simulations": 10,
+  "failed_simulations": 0,
+  "missing_simulations": 0,
+  "summary_file": "summary.json",
+  "runner_log": "runner.log",
+  "max_shared_active_runs": 0,
+  "max_machine_sumo_processes": 0,
+  "machine_slot_violation": null,
+  "resumed_at": "2026-11-28T20:53:43.696422+09:00",
+  "resume_count": 1,
+  "completed_before_resume": 10
+}
