@@ -49,8 +49,26 @@ gateを満たさない場合は起動せず、追加計測または別のfallbac
 ## 実行・保存
 
 - scheduler: `scripts/run_intersection_lane_heading_fallback_ablation.py`
+- finalizer: `scripts/finalize_intersection_lane_heading_fallback_ablation.py`
 - source branch: `codex/intersection-heading-diagnostic`
 - source commit: 起動前に追記する。
 - raw output: UbuntuData上の`mcs-tiv-diagnostic-artifacts/`。
 - 完了後はmanifest、metrics、物理衝突、固定入力hash、診断artifact、checkpoint、
   致命ログを監査し、原因の説明と回帰テスを永続化してからraw traceを縮約する。
+
+## 完了後の次段判断
+
+本アブレーションはdevelopment seedを使うため、結果が良くてもそのまま最終性能主張には
+使わない。完了後、同一seed・固定入力の現行方式と対応比較し、次を事前gateとする。
+
+1. Eval.3とEval.5の両方でunsupported率が現行方式から80%以上相対減少する。
+2. Eval.3とEval.5の両方で全車平均速度の対応平均差が正である。
+3. 合計15 seed中10 seed以上で全車平均速度が現行方式を上回る。
+4. 全runの完全性監査が成功し、物理衝突0である。
+
+全条件を満たした場合だけ、Eval.3/5の未使用seed 33–42について600秒固定入力を新規生成・
+hash監査し、山下TIVtep・現行lambda=0.95・fallback有効lambda=0.95の3方式を各形状10 seed、
+計60 runで独立検証する。その正式batchは起動前に別記録を作り、条件・source・採否基準を
+固定する。いずれかを満たさない場合はこの変更を性能改善として進めず、既存traceから
+方向別・turn別・競合点別の後続車捕捉範囲を先に解析する。追加計測が必要な場合だけ、
+計測内容と回帰テストを用意してから次の15-run診断を設計する。
