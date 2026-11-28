@@ -132,7 +132,7 @@ def configure(mode):
 
 
 def active_decision_is_locked(receiver, desired, now):
-    """Whether this receiver already decided this desired MCM this second.
+    """Whether this receiver already decided this MCM inside the lock window.
 
     This is deliberately only an active-control guard.  Shadow measurements
     remain able to observe every incoming packet, while the live proposal
