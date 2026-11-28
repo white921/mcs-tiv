@@ -103,6 +103,9 @@
   heading/yaw欠損の再発ではない。0.1秒化によって評価機会自体が変わるため、finalizerは
   unsupportedをrun失敗条件にせず、対照との差と理由をcadence outcomeとして集計する。
 - 残りrunは自動再実行せず継続し、全15本の完全性とunsupported総数を完了後に監査する。
+- Eval.3 seed 14にもunsupportedが1件あったが、578 attemptに対して監査recordsが500件で
+  上限打ち切りされ、理由レコードは保持されていなかった。finalizerは総数カウンタを正本とし、
+  理由を保持できなかった件数を`unsupported_reasons_unattributed`として別集計する。
 
 ### Eval.5先行完了結果
 

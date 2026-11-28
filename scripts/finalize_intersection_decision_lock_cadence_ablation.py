@@ -123,8 +123,10 @@ def validate_run(
         for record in audit.get("records", [])
         if record.get("status") == "unsupported"
     )
-    require(sum(unsupported_reasons.values()) == unsupported,
-            f"unsupported reason count mismatch: {run}")
+    retained_unsupported = sum(unsupported_reasons.values())
+    require(retained_unsupported <= unsupported,
+            f"unsupported reason count exceeds counter: {run}")
+    unsupported_reasons_unattributed = unsupported - retained_unsupported
     events = negotiation_counts(run / "negotiations.jsonl")
     require(events["suppressed"] == int(
         counts.get("active_duplicate_decisions_suppressed", 0)),
@@ -140,6 +142,7 @@ def validate_run(
         "evaluated": evaluated,
         "unsupported": unsupported,
         "unsupported_reasons": dict(unsupported_reasons),
+        "unsupported_reasons_unattributed": unsupported_reasons_unattributed,
         "duplicate_suppressed": events["suppressed"],
         "decisions": events["decision"],
         "cancellations": events["cancelled"],
@@ -216,6 +219,8 @@ def summarize(
             "short_lock_unsupported": after["unsupported"],
             "unsupported_delta": after["unsupported"] - before["unsupported"],
             "short_lock_unsupported_reasons": after["unsupported_reasons"],
+            "short_lock_unsupported_reasons_unattributed": (
+                after["unsupported_reasons_unattributed"]),
             "decision_delta": after["decisions"] - before["decisions"],
             "duplicate_suppressed_delta": (
                 after["duplicate_suppressed"] - before["duplicate_suppressed"]),
@@ -243,6 +248,9 @@ def summarize(
                 item["baseline_unsupported"] for item in pairs),
             "short_lock_unsupported_total": sum(
                 item["short_lock_unsupported"] for item in pairs),
+            "short_lock_unsupported_reasons_unattributed": sum(
+                item["short_lock_unsupported_reasons_unattributed"]
+                for item in pairs),
             "mean_unsupported_delta": statistics.fmean(
                 item["unsupported_delta"] for item in pairs),
             "mean_decision_delta": statistics.fmean(
@@ -281,6 +289,12 @@ def summarize(
                 int(record["unsupported"]) for record in short.values()),
             "short_lock_unsupported_reasons": dict(
                 short_lock_unsupported_reasons),
+            "baseline_unsupported_reasons_unattributed": sum(
+                int(record["unsupported_reasons_unattributed"])
+                for record in baseline.values()),
+            "short_lock_unsupported_reasons_unattributed": sum(
+                int(record["unsupported_reasons_unattributed"])
+                for record in short.values()),
         },
         "conditions": conditions,
         "cadence_hypothesis": {
