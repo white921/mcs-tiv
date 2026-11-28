@@ -1,7 +1,7 @@
 # 交差点のlane metadata heading fallbackアブレーション
 
 - 台帳ID: `2026-11-28-intersection-lane-heading-fallback-ablation`
-- 状態: `planned`
+- 状態: `running`
 - 位置づけ: `diagnostic development ablation`
 
 ## 目的
@@ -51,10 +51,25 @@ gateを満たさない場合は起動せず、追加計測または別のfallbac
 - scheduler: `scripts/run_intersection_lane_heading_fallback_ablation.py`
 - finalizer: `scripts/finalize_intersection_lane_heading_fallback_ablation.py`
 - source branch: `codex/intersection-heading-diagnostic`
-- source commit: 起動前に追記する。
+- source commit: `90e6f9d39dcf7e881cd82516fb9b396191fd0ee4`。
 - raw output: UbuntuData上の`mcs-tiv-diagnostic-artifacts/`。
 - 完了後はmanifest、metrics、物理衝突、固定入力hash、診断artifact、checkpoint、
-  致命ログを監査し、原因の説明と回帰テスを永続化してからraw traceを縮約する。
+  致命ログを監査し、原因の説明と回帰テストを永続化してからraw traceを縮約する。
+
+## 2026-11-28 起動
+
+- 帰属診断は有効15/15 run成功、物理衝突0。詳細付きunsupported 474件のうち、
+  停止軌跡・finite yawなし、lane positionあり、既知lane IDは各474件で、
+  事前gateは各100%として成立した。
+- 23:39 JSTに専用unit
+  `mcs-intersection-lane-heading-fallback-ablation-20261128.service`で起動した。
+  invocation IDは`0ae95feb377a4b558999a964f66f5676`。
+- 起動preflightはsource clean、source commit一致、固定入力15本、SUMO 0、出力先未使用、
+  PythonからのTraCI importを確認した。起動後readbackはunit active/running、
+  run manifest 15、SUMO 15/15。全manifestでfallback有効、既定挙動は未変更と記録された。
+- raw rootはUbuntuData上の
+  `mcs-tiv-diagnostic-artifacts/intersection-lane-heading-fallback-ablation-20261128/`。
+  失敗時は自動再実行しない。
 
 ## 完了後の次段判断
 

@@ -1,7 +1,7 @@
 # 形状別 heading/yaw unsupported 帰属診断
 
 - 台帳ID: `2026-11-28-topology-heading-attribution-diagnostic`
-- 状態: `running`
+- 状態: `completed`
 - 位置づけ: `diagnostic`
 - 実行対象: Ubuntu `sgnlab`
 
@@ -50,7 +50,25 @@ prediction attemptの約8.5%が `trajectory has no usable heading or yaw` とな
 
 ## 結果
 
-実行中。
+有効15 runはすべて正常終了し、完全性監査に成功した。物理衝突は0。
+
+| 条件 | run | attempt | unsupported | unsupported率 | 詳細保持 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Eval.3 500/500/500 | 5 | 2,940 | 171 | 5.82% | 147 |
+| Eval.5 300/300/300/300 | 10 | 3,363 | 335 | 9.96% | 327 |
+
+- 詳細付きunsupportedは合計474件で、474/474件が停止軌跡、finite yawなし、
+  lane positionあり、既知lane IDだった。理由はすべて
+  `trajectory has no usable heading or yaw`、反実仮はすべて`reject`、path typeは
+  すべて`planned`だった。
+- Eval.3のlane IDは`left_0` 31件、`bottom_0` 48件、`-right_0` 68件。
+  Eval.5は`bottom_0` 199件、`left_0` 27件、`top_0` 90件、`-right_0` 11件。
+- source commit、開始時clean、固定入力hash、必須artifact、5 checkpoint以上、
+  prediction counter、物理衝突0を15/15 runで検証した。数値の正本はUbuntuData上の
+  `topology-heading-attribution-summary-20261128.json`。
+- 帰属は関連を示す診断であり、性能差の因果推定ではない。ただしlane metadata heading
+  fallbackアブレーションの事前gate（詳細20件以上、3比率各80%以上）は3比率すべて
+  100%で成立したため、別記録の反証実験へ進む。
 
 ### 2026-11-28 起動とEval.7の送出前失敗
 
@@ -68,3 +86,11 @@ prediction attemptの約8.5%が `trajectory has no usable heading or yaw` とな
   Eval.5 300/300/300/300のseed 18–22を別cohortとして起動した。unitは
   `mcs-topology-heading-attribution-eval5-extra-20261128.service`、invocationは
   `b97245a4f9904567b54771b6626d1a45`。起動後の実SUMO数は15。
+
+### 2026-11-28 完了監査
+
+- 有効15 runは15/15成功、失敗0、物理衝突0。完了後にSUMO 0、runner 0を確認した。
+- 当初失敗したEval.7 seed 33–37は再実行しておらず、本集計のvalidated runには
+  含めていない。失敗証跡は保持している。
+- finalizer sourceは`148ea5359a478885c49e66176ff83df5b7ed1f45`、実行結果の
+  `validated_run_count`は15。
