@@ -1,7 +1,7 @@
 # 交差点のlane metadata heading fallbackアブレーション
 
 - 台帳ID: `2026-11-28-intersection-lane-heading-fallback-ablation`
-- 状態: `running`
+- 状態: `completed`
 - 位置づけ: `diagnostic development ablation`
 
 ## 目的
@@ -70,6 +70,39 @@ gateを満たさない場合は起動せず、追加計測または別のfallbac
 - raw rootはUbuntuData上の
   `mcs-tiv-diagnostic-artifacts/intersection-lane-heading-fallback-ablation-20261128/`。
   失敗時は自動再実行しない。
+
+## 2026-11-29 結果
+
+15/15 runが正常終了し、失敗0、物理衝突0だった。完了後にSUMO 0、runner 0、
+unit `inactive/dead`、`Result=success`を確認した。finalizerはsource commit
+`148ea5359a478885c49e66176ff83df5b7ed1f45`から実行し、対照15 runと
+アブレーション15 runについてsource commit、開始時clean、source unchanged、固定入力hash、
+必須artifact、5 checkpoint以上、prediction counter、全車平均速度、物理衝突を検証した。
+
+| 条件 | unsupported率（対照→fallback） | 相対減少 | 平均速度差 | 95% bootstrap区間 | 勝ちseed |
+| --- | --- | ---: | ---: | --- | ---: |
+| Eval.3 500/500/500 | 5.82% → 0% | 100% | +0.0943 m/s | [-0.0850, +0.3057] | 3/5 |
+| Eval.5 300/300/300/300 | 9.96% → 0% | 100% | -0.2994 m/s | [-0.6355, -0.0203] | 2/10 |
+
+- heading/yaw欠損由来のunsupportedは両形状で完全に解消し、機序gateは成立した。
+- 性能gateは不成立だった。速度勝ちは合計5/15 seedで、Eval.5は平均速度が低下し、
+  bootstrap区間も負だった。平均停止時間差はEval.3で+8.52 s、Eval.5で+78.30 sだった。
+- 数値の正本はUbuntuData上の
+  `intersection-lane-heading-fallback-ablation-summary-20261129.json`。
+- 完全性・安全性gateは成立したが、`eligible_for_fresh_seed_validation`は`false`。
+
+## 結論
+
+停止軌跡のheading/yaw欠損は、交差点で後続車影響項が評価されない直接原因だった。
+ただし、それをlane metadataで補っても性能は一貫して改善せず、十字路では有意方向に
+悪化した。したがって、heading欠損だけでは「合流では山下手法より良いが、交差点では
+安定して良くならない」理由を説明できない。むしろ、現行の後続車捕捉・影響評価を
+交差点で全面適用すると過度な停止または不適切な追従影響を生む可能性が高い。
+
+事前gateに従い、未使用seedの60-run正式検証は起動しない。次は既存traceを用いて、
+方向別・turn別・競合点別に、どのreceiver/leader/followerが捕捉され、Accept/Rejectの
+どちらで停止時間を増やしたかを解析する。追加計測は既存traceで不足する項目を確認してから
+設計し、自動再実行は行わない。
 
 ## 完了後の次段判断
 

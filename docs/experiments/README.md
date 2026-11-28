@@ -49,7 +49,7 @@
 | 状態 | 開始日 | 実験 | 記録 |
 | --- | --- | --- | --- |
 | completed | 2026-11-28 | 形状別 heading/yaw unsupported 帰属診断 | [記録](2026-11-28-topology-heading-attribution-diagnostic.md) |
-| running | 2026-11-28 | 交差点のlane metadata heading fallbackアブレーション | [記録](2026-11-28-intersection-lane-heading-fallback-ablation.md) |
+| completed | 2026-11-28 | 交差点のlane metadata heading fallbackアブレーション | [記録](2026-11-28-intersection-lane-heading-fallback-ablation.md) |
 | completed | 2026-11-27 | 3シナリオ共通 lambda 0.95の最終holdout | [記録](2026-11-27-universal-lambda095-final-holdout.md) |
 | completed | 2026-11-23 | 全シナリオ共通lambda選定のEval.3/5広域スイープ | [記録](2026-11-23-universal-lambda-eval35-wide-sweep-development.md) |
 | completed | 2026-11-22 | 正規化凸結合式 lambda 0.525・Eval.3/5 600秒正式比較 | [記録](2026-11-22-normalized-convex-lambda0525-eval35-600s-formal.md) |
