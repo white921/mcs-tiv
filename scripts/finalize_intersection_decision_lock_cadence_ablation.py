@@ -62,12 +62,18 @@ def negotiation_counts(path: Path) -> Counter:
         for line_number, line in enumerate(stream, 1):
             require(bool(line.strip()), f"blank negotiation line: {path}:{line_number}")
             record = json.loads(line)
-            counts[str(record.get("event", "unknown"))] += 1
+            event = str(record.get("event", "unknown"))
+            counts[event] += 1
+            if event == "decision":
+                counts["accept_decision" if record.get("accept")
+                       else "reject_decision"] += 1
     return counts
 
 
 def validate_run(
     run: Path, expected_source: str, expected_lock_s: float,
+    expected_accept_lock_s: float | None = None,
+    expected_reject_lock_s: float | None = None,
 ) -> dict[str, object]:
     manifest = load_json(run / "manifest.json")
     require(manifest.get("exit_code") == 0, f"nonzero exit: {run}")
@@ -89,6 +95,20 @@ def validate_run(
     lock_s = float(prediction.get("decision_lock_s", 1.0))
     require(math.isclose(lock_s, expected_lock_s, abs_tol=1e-12),
             f"decision lock mismatch: {run}")
+    accept_lock_s = float(prediction.get("decision_lock_accept_s", lock_s))
+    reject_lock_s = float(prediction.get("decision_lock_reject_s", lock_s))
+    expected_accept_lock_s = (
+        expected_lock_s if expected_accept_lock_s is None
+        else expected_accept_lock_s)
+    expected_reject_lock_s = (
+        expected_lock_s if expected_reject_lock_s is None
+        else expected_reject_lock_s)
+    require(math.isclose(
+        accept_lock_s, expected_accept_lock_s, abs_tol=1e-12),
+        f"Accept decision lock mismatch: {run}")
+    require(math.isclose(
+        reject_lock_s, expected_reject_lock_s, abs_tol=1e-12),
+        f"Reject decision lock mismatch: {run}")
     require(manifest.get("diagnostic_traces_enabled") is True,
             f"diagnostic traces disabled: {run}")
     fixed = manifest.get("fixed_vehicle_input") or {}
@@ -138,21 +158,30 @@ def validate_run(
         "fixed_input_sha256": fixed["sha256"],
         "fixed_input_prefix_sha256": fixed["prefix_sha256"],
         "decision_lock_s": lock_s,
+        "decision_lock_accept_s": accept_lock_s,
+        "decision_lock_reject_s": reject_lock_s,
         "attempts": attempts,
         "evaluated": evaluated,
         "unsupported": unsupported,
         "unsupported_reasons": dict(unsupported_reasons),
         "unsupported_reasons_unattributed": unsupported_reasons_unattributed,
         "duplicate_suppressed": events["suppressed"],
+        "started": events["started"],
         "decisions": events["decision"],
+        "accepts": events["accept_decision"],
+        "rejects": events["reject_decision"],
+        "applied": events["applied"],
         "cancellations": events["cancelled"],
         "waiting_for_agreement": events["waiting_for_agreement"],
+        "deferred": events["deferred"],
         **totals,
     }
 
 
 def collect(
     roots: list[Path], expected_source: str, expected_lock_s: float,
+    expected_accept_lock_s: float | None = None,
+    expected_reject_lock_s: float | None = None,
 ) -> dict[tuple[str, int], dict[str, object]]:
     runs = {}
     declared = 0
@@ -168,7 +197,9 @@ def collect(
                 f"failed simulation present: {root}")
         for task in tasks:
             run = root / task["case"] / f"seed-{task['seed']}"
-            record = validate_run(run, expected_source, expected_lock_s)
+            record = validate_run(
+                run, expected_source, expected_lock_s,
+                expected_accept_lock_s, expected_reject_lock_s)
             key = (str(record["condition"]), int(record["seed"]))
             require(key not in runs, f"duplicate run key: {key}")
             runs[key] = record

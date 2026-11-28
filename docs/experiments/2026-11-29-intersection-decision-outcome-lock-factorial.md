@@ -53,6 +53,7 @@ lockは判断だけでなく、lock中のalternative path再生成も抑止す�
 ## 実行・保存
 
 - scheduler: `scripts/run_intersection_decision_outcome_lock_factorial.py`
+- finalizer: `scripts/finalize_intersection_decision_outcome_lock_factorial.py`
 - source branch: `codex/intersection-heading-diagnostic`
 - raw output: UbuntuData上の`mcs-tiv-diagnostic-artifacts/`。
 - 完了後はmanifest、metrics、固定入力hash、checkpoint、物理衝突、致命ログを監査し、
