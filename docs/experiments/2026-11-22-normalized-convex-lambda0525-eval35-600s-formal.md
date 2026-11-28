@@ -1,7 +1,7 @@
 # 正規化凸結合式 lambda 0.525・Eval.3/5 600秒正式比較
 
 - 台帳ID: `2026-11-22-normalized-convex-lambda0525-eval35-600s-formal`
-- 状態: `running`
+- 状態: `completed`
 - 位置づけ: `formal`
 
 ## 目的
@@ -77,17 +77,24 @@ commit/pushしない。終了日時、結果branch/commit、完全性監査と�
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Eval.3 400/400/400 | 7.1478 | 7.2965 | +0.1487 | +2.08% | 7/10 | [-0.0654, 0.3667] |
 | Eval.3 500/500/500 | 5.7409 | 5.3255 | -0.4154 | -7.24% | 3/10 | [-0.7139, -0.1252] |
-| Eval.5 300/300/300/300 | 7.2834 | 7.1584 | -0.1250 | -1.72% | 3/10 | [-0.4212, 0.0801] |
+| Eval.5 300/300/300/300 | 7.2834 | 7.1584 | -0.1250 | -1.72% | 3/10 | [-0.4205, 0.0805] |
 
 - Eval.3の4 cohortは監査・圧縮・結果push済み。結果commitは
   `a1d6843fe328c132a4ed4eedd38f37c6cca32738`、
   `64d26e2f5c334f90cc139fce467d5db8e6ded210`、
   `5fbedab73eb0746bbc5636e9bd1cb92bda962faa`、
   `ee872c05a203e610202b9518971a7823498eb91b`。
-- Eval.5の2 cohortはraw結果とmanifestを保持したまま後処理が残っていた。
-  2026-11-28にCPU/I/O低優先度、cleanup worker 1の
-  `mcs-eval35-l0525-eval5-finalize-20261128.service`（invocation
-  `e6d359755e1748949116a33781f864c4`）で完全性監査・可逆圧縮・結果pushを開始した。
-- したがって数値上の主結果は確定済みだが、Eval.5のretention・push完了を
-  確認するまで台帳状態は`running`とする。
+- Eval.5の2 cohortも2026-11-28に完全性監査、可逆圧縮、復元hash検証、storage split
+  検証を完了した。最初のfinalizerは圧縮rawまで結果branchへstageする旧仕様だったため、
+  commit前に停止した。その後、manifest、metrics、method audit、比較summary、checkpoint
+  metadata、圧縮・retention auditだけを選択するcompact保存へ切り替えた。
+- Eval.5提案結果commitは`afe2910991d04d0865aa031f3ab38b9cf8281b5d`、山下結果commitは
+  `abea2f4bf44aceea136a5dcd576c111b88caaa67`。どちらも対応する専用結果branchへpush済みで、
+  今回の出力配下にFCD、runtime、交渉・競合・車両状態・予測stream、checkpoint stateは
+  trackingしていない。
+- 圧縮rawはUbuntuData上に保持しており、提案230,382,381 bytes、山下172,411,247 bytes。
+  外部保存先は`pending`であり、検証済みコピーができるまで削除しない。
+- 以上により60/60 runの数値、完全性、物理衝突0、retention、結果pushを確認し、
+  本台帳を`completed`とする。lambda=0.525はEval.3 500とEval.5 300で山下法を下回り、
+  交差点へ一様に改善を移せるという結論は支持されなかった。
 
