@@ -98,15 +98,26 @@ LANE_METADATA_HEADING_FALLBACK = _boolean_from_environment(
     "MCS_DECELERATION_LANE_METADATA_HEADING_FALLBACK")
 
 
-def _decision_lock_seconds_from_environment():
-    value = float(os.environ.get("MCS_DECELERATION_DECISION_LOCK_S", "1.0"))
+def _decision_lock_seconds_from_environment(name, default):
+    value = float(os.environ.get(name, str(default)))
     if not math.isfinite(value) or value < DT:
         raise ValueError(
-            "MCS_DECELERATION_DECISION_LOCK_S must be finite and at least 0.1")
+            f"{name} must be finite and at least 0.1")
     return value
 
 
-DECISION_LOCK_S = _decision_lock_seconds_from_environment()
+def _optional_decision_lock_seconds_from_environment(name):
+    if name not in os.environ:
+        return None
+    return _decision_lock_seconds_from_environment(name, 1.0)
+
+
+DECISION_LOCK_S = _decision_lock_seconds_from_environment(
+    "MCS_DECELERATION_DECISION_LOCK_S", 1.0)
+DECISION_LOCK_ACCEPT_S = _optional_decision_lock_seconds_from_environment(
+    "MCS_DECELERATION_DECISION_LOCK_ACCEPT_S")
+DECISION_LOCK_REJECT_S = _optional_decision_lock_seconds_from_environment(
+    "MCS_DECELERATION_DECISION_LOCK_REJECT_S")
 # 200 m communication range / (5 m vehicle + 5 m minimum gap) = 20
 # followers per lane; the lane-closure model has two same-direction lanes.
 MAXIMUM_FOLLOWERS = 40
@@ -615,8 +626,11 @@ def active_decision(receiver, desired, alternative, now, conflict_region):
     if record is None or record["status"] != "evaluated":
         return None
     key = (str(receiver.id), str(desired.vehID), str(desired.pathID))
-    ACTIVE_DECISION_UNTIL[key] = now + DECISION_LOCK_S
-    return record["decision"] == "accept"
+    accept = record["decision"] == "accept"
+    duration = DECISION_LOCK_ACCEPT_S if accept else DECISION_LOCK_REJECT_S
+    ACTIVE_DECISION_UNTIL[key] = now + (
+        DECISION_LOCK_S if duration is None else duration)
+    return accept
 
 
 def record_tiv_comparison(proposal_accept, tiv_accept):
@@ -639,6 +653,13 @@ def _write_audit():
                 "maximum_followers": MAXIMUM_FOLLOWERS,
                 "lane_metadata_heading_fallback": (
                     LANE_METADATA_HEADING_FALLBACK),
+                "decision_lock_s": DECISION_LOCK_S,
+                "decision_lock_accept_s": (
+                    DECISION_LOCK_S if DECISION_LOCK_ACCEPT_S is None
+                    else DECISION_LOCK_ACCEPT_S),
+                "decision_lock_reject_s": (
+                    DECISION_LOCK_S if DECISION_LOCK_REJECT_S is None
+                    else DECISION_LOCK_REJECT_S),
                 "counts": dict(COUNTS),
                 "records": RECORDS,
             }), stream, indent=2,

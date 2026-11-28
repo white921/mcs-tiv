@@ -642,5 +642,41 @@ class DecelerationLossTests(unittest.TestCase):
             prediction.DECISION_LOCK_S = original
             prediction.configure("off")
 
+    def test_active_decision_uses_outcome_specific_lock_duration(self):
+        def path(veh, kind, name, speeds):
+            return NS(vehID=veh, type=kind, pathID=name,
+                      t=[0.0, 5.0, 10.0], s_d=speeds,
+                      x=[0.0, 40.0, 80.0], y=[0.0, 0.0, 0.0],
+                      allowed_speed_mps=10.0)
+        sender = path("a", "planned", "a_planned", [8, 8, 8])
+        desired = path("a", "desired", "a_desired", [13, 13, 13])
+        planned = path("b", "planned", "b_planned", [8, 8, 8])
+        accept_alternative = path("b", "alter", "b_accept", [8, 8, 8])
+        reject_alternative = path("b", "alter", "b_reject", [0, 0, 0])
+        receiver = NS(id="b", plannedPath=planned, receivedPaths=[sender])
+        original_accept = prediction.DECISION_LOCK_ACCEPT_S
+        original_reject = prediction.DECISION_LOCK_REJECT_S
+        try:
+            prediction.DECISION_LOCK_ACCEPT_S = 0.1
+            prediction.DECISION_LOCK_REJECT_S = 1.0
+            prediction.configure("active")
+            self.assertTrue(prediction.active_decision(
+                receiver, desired, accept_alternative, 0.0, self.region()))
+            self.assertFalse(
+                prediction.active_decision_is_locked(receiver, desired, 0.1))
+
+            prediction.configure("active")
+            with patch.object(
+                    prediction, "_record_evaluation",
+                    return_value={"status": "evaluated", "decision": "reject"}):
+                self.assertFalse(prediction.active_decision(
+                    receiver, desired, reject_alternative, 0.0, self.region()))
+            self.assertTrue(
+                prediction.active_decision_is_locked(receiver, desired, 0.1))
+        finally:
+            prediction.DECISION_LOCK_ACCEPT_S = original_accept
+            prediction.DECISION_LOCK_REJECT_S = original_reject
+            prediction.configure("off")
+
 if __name__ == "__main__":
     unittest.main()

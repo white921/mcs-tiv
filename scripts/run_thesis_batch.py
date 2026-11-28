@@ -50,6 +50,8 @@ CONTROLLED_MCS_ENV = {
     "MCS_DECELERATION_MODE",
     "MCS_DECELERATION_CONVEX_LAMBDA",
     "MCS_DECELERATION_DECISION_LOCK_S",
+    "MCS_DECELERATION_DECISION_LOCK_ACCEPT_S",
+    "MCS_DECELERATION_DECISION_LOCK_REJECT_S",
     "MCS_DECELERATION_LANE_METADATA_HEADING_FALLBACK",
     # Retired proposal switches are also scrubbed so old shell state cannot
     # silently describe or influence a new normalized-formula run.
@@ -223,6 +225,11 @@ def deceleration_prediction_manifest(args):
     """Return the complete active-proposal condition recorded per run."""
     if not args.deceleration_active:
         return None
+    decision_lock_s = args.deceleration_decision_lock_seconds
+    decision_lock_accept_s = getattr(
+        args, "deceleration_decision_lock_accept_seconds", None)
+    decision_lock_reject_s = getattr(
+        args, "deceleration_decision_lock_reject_seconds", None)
     return {
         "horizon_s": 10.0,
         "maximum_followers": 40,
@@ -250,7 +257,13 @@ def deceleration_prediction_manifest(args):
             "detected followers excluding request and receiver vehicles"),
         "excluded_follower_roles": ["request_vehicle", "receiver_vehicle"],
         "score_bounds": [-1.0, 1.0],
-        "decision_lock_s": args.deceleration_decision_lock_seconds,
+        "decision_lock_s": decision_lock_s,
+        "decision_lock_accept_s": (
+            decision_lock_s if decision_lock_accept_s is None
+            else decision_lock_accept_s),
+        "decision_lock_reject_s": (
+            decision_lock_s if decision_lock_reject_s is None
+            else decision_lock_reject_s),
         "default_decision_lock_s": 1.0,
         "lane_metadata_heading_fallback": {
             "enabled": getattr(
@@ -404,6 +417,10 @@ def run_task(task, args):
                    if args.deceleration_active else DEFAULT_CONVEX_LAMBDA),
                MCS_DECELERATION_DECISION_LOCK_S=str(
                    args.deceleration_decision_lock_seconds),
+               MCS_DECELERATION_DECISION_LOCK_ACCEPT_S=str(
+                   args.deceleration_decision_lock_accept_seconds),
+               MCS_DECELERATION_DECISION_LOCK_REJECT_S=str(
+                   args.deceleration_decision_lock_reject_seconds),
                MCS_DECELERATION_LANE_METADATA_HEADING_FALLBACK=(
                    "1" if getattr(
                        args, "deceleration_lane_metadata_heading_fallback", False)
@@ -638,6 +655,14 @@ def main():
         help=("active proposal duplicate-decision lock in seconds; "
               "default 1.0 preserves the documented behavior"))
     parser.add_argument(
+        "--deceleration-decision-lock-accept-seconds", type=float,
+        help=("active proposal duplicate-decision lock after Accept; "
+              "defaults to --deceleration-decision-lock-seconds"))
+    parser.add_argument(
+        "--deceleration-decision-lock-reject-seconds", type=float,
+        help=("active proposal duplicate-decision lock after Reject; "
+              "defaults to --deceleration-decision-lock-seconds"))
+    parser.add_argument(
         "--deceleration-lane-metadata-heading-fallback", action="store_true",
         help=("diagnostic ablation: use lane identity/position without "
               "requiring heading when they fully determine same-lane following"))
@@ -658,6 +683,12 @@ def main():
     parser.add_argument("--resume-checkpoint", type=Path,
                         help="resume one Eval.3/5/7 task from a paired checkpoint")
     args = parser.parse_args()
+    if args.deceleration_decision_lock_accept_seconds is None:
+        args.deceleration_decision_lock_accept_seconds = (
+            args.deceleration_decision_lock_seconds)
+    if args.deceleration_decision_lock_reject_seconds is None:
+        args.deceleration_decision_lock_reject_seconds = (
+            args.deceleration_decision_lock_seconds)
     if args.workers < 1:
         parser.error("--workers must be positive")
     if args.seeds_per_case is not None and args.seeds_per_case < 1:
@@ -691,6 +722,14 @@ def main():
             args.deceleration_decision_lock_seconds < 0.1):
         parser.error(
             "--deceleration-decision-lock-seconds must be finite and at least 0.1")
+    if (not math.isfinite(args.deceleration_decision_lock_accept_seconds) or
+            args.deceleration_decision_lock_accept_seconds < 0.1):
+        parser.error(
+            "--deceleration-decision-lock-accept-seconds must be finite and at least 0.1")
+    if (not math.isfinite(args.deceleration_decision_lock_reject_seconds) or
+            args.deceleration_decision_lock_reject_seconds < 0.1):
+        parser.error(
+            "--deceleration-decision-lock-reject-seconds must be finite and at least 0.1")
     if (not math.isfinite(args.agreement_lease_seconds) or
             args.agreement_lease_seconds < 0):
         parser.error("--agreement-lease-seconds must be finite and non-negative")
@@ -796,6 +835,12 @@ def main():
             if args.deceleration_active else None),
         "deceleration_decision_lock_seconds": (
             args.deceleration_decision_lock_seconds
+            if args.deceleration_active else None),
+        "deceleration_decision_lock_accept_seconds": (
+            args.deceleration_decision_lock_accept_seconds
+            if args.deceleration_active else None),
+        "deceleration_decision_lock_reject_seconds": (
+            args.deceleration_decision_lock_reject_seconds
             if args.deceleration_active else None),
         "deceleration_lane_metadata_heading_fallback": getattr(
             args, "deceleration_lane_metadata_heading_fallback", False),

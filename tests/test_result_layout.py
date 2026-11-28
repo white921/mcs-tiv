@@ -66,6 +66,8 @@ class ResultLayoutTests(unittest.TestCase):
             "MCS_DECELERATION_MODE": "active",
             "MCS_DECELERATION_CONVEX_LAMBDA": "0.25",
             "MCS_DECELERATION_DECISION_LOCK_S": "9.0",
+            "MCS_DECELERATION_DECISION_LOCK_ACCEPT_S": "8.0",
+            "MCS_DECELERATION_DECISION_LOCK_REJECT_S": "7.0",
             "MCS_DECELERATION_LANE_METADATA_HEADING_FALLBACK": "1",
             "MCS_DECELERATION_TIME_HALF_LIFE_S": "99",
             "MCS_DECELERATION_LOSS_LAMBDA": "99",
@@ -101,7 +103,17 @@ class ResultLayoutTests(unittest.TestCase):
             manifest["maximum_followers_basis"]["same_direction_lanes"], 2)
         self.assertEqual(manifest["score_bounds"], [-1.0, 1.0])
         self.assertEqual(manifest["decision_lock_s"], 1.0)
+        self.assertEqual(manifest["decision_lock_accept_s"], 1.0)
+        self.assertEqual(manifest["decision_lock_reject_s"], 1.0)
         self.assertEqual(manifest["default_decision_lock_s"], 1.0)
+
+    def test_manifest_records_outcome_specific_decision_locks(self):
+        manifest = RUNNER.deceleration_prediction_manifest(self.args(
+            deceleration_decision_lock_accept_seconds=0.1,
+            deceleration_decision_lock_reject_seconds=1.0))
+
+        self.assertEqual(manifest["decision_lock_accept_s"], 0.1)
+        self.assertEqual(manifest["decision_lock_reject_s"], 1.0)
         self.assertEqual(
             manifest["follower_scope"],
             "detected followers excluding request and receiver vehicles")

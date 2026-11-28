@@ -167,6 +167,12 @@ CIは0をまたぐため、この10 seedだけで安定改善とはしない。
 したがってEval.3では、0.1秒化が単に最新情報へ追従したのではなく、同じ中央競合を短周期で
 再発火させ、経路生成・適用・消失を繰り返す判断churnを作った。1秒lockはここではdebounceとして
 機能していた。一方、Eval.5 seed 15/20では1秒保持の解除が交渉増幅を縮小したため、固定の
-`0.1 s`または`1.0 s`を全形状へ共通適用する方針は採らない。次の変更候補は、経過秒数ではなく
-conflict region、desired path、agreement setなどの実質的状態変化があった場合だけ再評価する
-state-aware hysteresisとする。実装・回帰テスト・15-run診断条件を用意するまでは追加runを起動しない。
+`0.1 s`または`1.0 s`を全形状へ共通適用する方針は採らない。
+
+その後、Accept/Reject別に交渉eventを再集計した。Eval.3は判断`+898`の内訳が
+Accept `+390`、Reject `+508`で、適用は`+354`。Eval.5は判断総数`-47`の一方で
+Accept `+720`、Reject `-767`だった。特に改善が大きいseed 15/20はRejectがそれぞれ
+`-421/-402`で、Acceptは`-40/+1`だった。またseed 15の78.2–79.1 sでは、同じdesired path、
+conflict point、participantのままalternative path IDだけが0.1秒ごとに変わった。従って、単純な
+state-aware early unlockだけではEval.5の改善を再現できない。次はAccept後とReject後のlock周期を
+2×2要因分解し、経路更新とReject再評価の寄与を切り分ける。
