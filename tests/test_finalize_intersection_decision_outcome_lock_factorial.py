@@ -54,6 +54,9 @@ class DecisionOutcomeLockFinalizerTest(unittest.TestCase):
                 },
                 "checkpoints_written": 5,
                 "all_speed_mps": speed,
+                "python_version": "3.15.1",
+                "sumo_version": "Eclipse SUMO sumo 1.28.0",
+                "source_sha256": {"func/thesis_tiv.py": "source-hash"},
             })
             self.write_json(run / "evaluation-metrics.json", {
                 "groups": {"all": {
@@ -96,6 +99,13 @@ class DecisionOutcomeLockFinalizerTest(unittest.TestCase):
                     self.write_json(path, {})
                 else:
                     path.write_bytes(b"")
+            for index in range(1, 6):
+                checkpoint = run / "checkpoints" / f"t{index:07d}.0"
+                checkpoint.mkdir(parents=True)
+                self.write_json(checkpoint / "checkpoint.json", {
+                    "simulation_time": index * 60.0})
+                (checkpoint / "mcs-state.pkl").write_bytes(b"mcs")
+                (checkpoint / "sumo-state.xml.gz").write_bytes(b"sumo")
         return root
 
     def old_roots(self, parent, prefix, source, generic, accept, reject, speed):

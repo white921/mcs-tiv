@@ -47,6 +47,9 @@ class DecisionLockFinalizerTest(unittest.TestCase):
                 "fixed_vehicle_input": {
                     "sha256": sha, "prefix_sha256": "prefix-" + sha},
                 "checkpoints_written": 5, "all_speed_mps": speed,
+                "python_version": "3.15.1",
+                "sumo_version": "Eclipse SUMO sumo 1.28.0",
+                "source_sha256": {"func/thesis_tiv.py": "source-hash"},
             })
             self.write_json(run / "evaluation-metrics.json", {
                 "groups": {"car": {
@@ -79,6 +82,13 @@ class DecisionLockFinalizerTest(unittest.TestCase):
                     self.write_json(path, {})
                 else:
                     path.write_bytes(b"")
+            for index in range(1, 6):
+                checkpoint = run / "checkpoints" / f"t{index:07d}.0"
+                checkpoint.mkdir(parents=True)
+                self.write_json(checkpoint / "checkpoint.json", {
+                    "simulation_time": index * 60.0})
+                (checkpoint / "mcs-state.pkl").write_bytes(b"mcs")
+                (checkpoint / "sumo-state.xml.gz").write_bytes(b"sumo")
         return root
 
     def roots(self, directory, prefix, source, lock_s, speed):
@@ -175,6 +185,35 @@ class DecisionLockFinalizerTest(unittest.TestCase):
             and item["seed"] == 14)
         self.assertEqual(
             pair["short_lock_unsupported_reasons_unattributed"], 1)
+
+    def test_rejects_missing_checkpoint_artifact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            baseline = self.roots(
+                directory, "before", MODULE.BASELINE_SOURCE, 1.0, 5.0)
+            short = self.roots(
+                directory, "after", "short-source", 0.1, 5.2)
+            missing = (
+                short[0] / "eval3" / "seed-13" / "checkpoints" /
+                "t0000001.0" / "mcs-state.pkl")
+            missing.unlink()
+            with self.assertRaisesRegex(
+                    RuntimeError, "checkpoint artifact missing or empty"):
+                MODULE.summarize(
+                    baseline, short, MODULE.BASELINE_SOURCE, "short-source")
+
+    def test_rejects_fatal_log_signature(self):
+        with tempfile.TemporaryDirectory() as directory:
+            baseline = self.roots(
+                directory, "before", MODULE.BASELINE_SOURCE, 1.0, 5.0)
+            short = self.roots(
+                directory, "after", "short-source", 0.1, 5.2)
+            stderr = short[0] / "eval3" / "seed-13" / "stderr.log"
+            stderr.write_text(
+                "Traceback (most recent call last):\nboom\n",
+                encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "fatal run log signature"):
+                MODULE.summarize(
+                    baseline, short, MODULE.BASELINE_SOURCE, "short-source")
 
 
 if __name__ == "__main__":

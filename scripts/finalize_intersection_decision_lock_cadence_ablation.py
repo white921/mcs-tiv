@@ -8,6 +8,7 @@ import json
 import math
 from pathlib import Path
 import random
+import re
 import statistics
 
 
@@ -23,6 +24,12 @@ REQUIRED_ARTIFACTS = (
     "negotiations.jsonl",
     "runtime.jsonl",
     "fcd.xml.gz",
+    "stdout.log",
+    "stderr.log",
+)
+FATAL_LOG_PATTERN = re.compile(
+    r"Traceback \(most recent call last\):|FatalTraCIError|"
+    r"Segmentation fault|ModuleNotFoundError"
 )
 
 
@@ -70,6 +77,47 @@ def negotiation_counts(path: Path) -> Counter:
     return counts
 
 
+def validate_runtime_evidence(run: Path, manifest: dict) -> dict[str, object]:
+    python_version = str(manifest.get("python_version", "")).strip()
+    sumo_version = str(manifest.get("sumo_version", "")).strip()
+    source_sha256 = manifest.get("source_sha256")
+    require(bool(python_version), f"Python version missing: {run}")
+    require("SUMO" in sumo_version and "sumo" in sumo_version,
+            f"SUMO version missing: {run}")
+    require(isinstance(source_sha256, dict) and bool(source_sha256),
+            f"source hashes missing: {run}")
+
+    declared = int(manifest.get("checkpoints_written", 0))
+    checkpoint_dirs = sorted((run / "checkpoints").glob("t*"))
+    require(len(checkpoint_dirs) == declared,
+            f"checkpoint directory count mismatch: {run}")
+    require(declared >= 5, f"checkpoint count too small: {run}")
+    checkpoint_files = (
+        "checkpoint.json", "mcs-state.pkl", "sumo-state.xml.gz")
+    for directory in checkpoint_dirs:
+        for name in checkpoint_files:
+            path = directory / name
+            require(path.is_file() and path.stat().st_size > 0,
+                    f"checkpoint artifact missing or empty: {path}")
+        load_json(directory / "checkpoint.json")
+
+    fatal_matches = []
+    for name in ("stdout.log", "stderr.log"):
+        path = run / name
+        require(path.is_file(), f"run log missing: {path}")
+        text = path.read_text(encoding="utf-8", errors="replace")
+        fatal_matches.extend(
+            f"{name}:{match.group(0)}"
+            for match in FATAL_LOG_PATTERN.finditer(text))
+    require(not fatal_matches, f"fatal run log signature: {run}: {fatal_matches}")
+    return {
+        "python_version": python_version,
+        "sumo_version": sumo_version.splitlines()[0],
+        "checkpoint_count": declared,
+        "fatal_log_match_count": 0,
+    }
+
+
 def validate_run(
     run: Path, expected_source: str, expected_lock_s: float,
     expected_accept_lock_s: float | None = None,
@@ -114,10 +162,9 @@ def validate_run(
     fixed = manifest.get("fixed_vehicle_input") or {}
     require(bool(fixed.get("sha256")) and bool(fixed.get("prefix_sha256")),
             f"fixed input hashes missing: {run}")
-    require(manifest.get("checkpoints_written", 0) >= 5,
-            f"checkpoint count too small: {run}")
     for name in REQUIRED_ARTIFACTS:
         require((run / name).is_file(), f"required artifact missing: {run / name}")
+    runtime_evidence = validate_runtime_evidence(run, manifest)
 
     metrics = load_json(run / "evaluation-metrics.json")
     safety = metrics.get("physical_safety", {})
@@ -174,6 +221,7 @@ def validate_run(
         "cancellations": events["cancelled"],
         "waiting_for_agreement": events["waiting_for_agreement"],
         "deferred": events["deferred"],
+        **runtime_evidence,
         **totals,
     }
 
