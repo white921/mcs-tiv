@@ -48,6 +48,7 @@
 
 | 状態 | 開始日 | 実験 | 記録 |
 | --- | --- | --- | --- |
+| planned | 2026-11-29 | 交差点の判断ロック周期アブレーション | [記録](2026-11-29-intersection-decision-lock-cadence-ablation.md) |
 | completed | 2026-11-28 | 形状別 heading/yaw unsupported 帰属診断 | [記録](2026-11-28-topology-heading-attribution-diagnostic.md) |
 | completed | 2026-11-28 | 交差点のlane metadata heading fallbackアブレーション | [記録](2026-11-28-intersection-lane-heading-fallback-ablation.md) |
 | completed | 2026-11-27 | 3シナリオ共通 lambda 0.95の最終holdout | [記録](2026-11-27-universal-lambda095-final-holdout.md) |

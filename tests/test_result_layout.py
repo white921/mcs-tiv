@@ -19,6 +19,7 @@ class ResultLayoutTests(unittest.TestCase):
             "run_name": None,
             "deceleration_active": True,
             "deceleration_convex_lambda": RUNNER.DEFAULT_CONVEX_LAMBDA,
+            "deceleration_decision_lock_seconds": 1.0,
             "deceleration_lane_metadata_heading_fallback": False,
             "agreement_lease_seconds": 0.0,
             "merge_negotiation_lead_seconds": 0.0,
@@ -64,6 +65,7 @@ class ResultLayoutTests(unittest.TestCase):
             "MCS_PRIORITY_HOLD_MODE": "conditional",
             "MCS_DECELERATION_MODE": "active",
             "MCS_DECELERATION_CONVEX_LAMBDA": "0.25",
+            "MCS_DECELERATION_DECISION_LOCK_S": "9.0",
             "MCS_DECELERATION_LANE_METADATA_HEADING_FALLBACK": "1",
             "MCS_DECELERATION_TIME_HALF_LIFE_S": "99",
             "MCS_DECELERATION_LOSS_LAMBDA": "99",
@@ -98,6 +100,8 @@ class ResultLayoutTests(unittest.TestCase):
         self.assertEqual(
             manifest["maximum_followers_basis"]["same_direction_lanes"], 2)
         self.assertEqual(manifest["score_bounds"], [-1.0, 1.0])
+        self.assertEqual(manifest["decision_lock_s"], 1.0)
+        self.assertEqual(manifest["default_decision_lock_s"], 1.0)
         self.assertEqual(
             manifest["follower_scope"],
             "detected followers excluding request and receiver vehicles")
@@ -115,6 +119,13 @@ class ResultLayoutTests(unittest.TestCase):
             manifest["lane_metadata_heading_fallback"]["enabled"])
         self.assertFalse(
             manifest["lane_metadata_heading_fallback"]["changes_default"])
+
+    def test_manifest_records_decision_lock_ablation(self):
+        manifest = RUNNER.deceleration_prediction_manifest(self.args(
+            deceleration_decision_lock_seconds=0.1))
+
+        self.assertEqual(manifest["decision_lock_s"], 0.1)
+        self.assertEqual(manifest["default_decision_lock_s"], 1.0)
 
 
 if __name__ == "__main__":

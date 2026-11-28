@@ -617,5 +617,30 @@ class DecelerationLossTests(unittest.TestCase):
         self.assertFalse(prediction.active_decision_is_locked(receiver, newer_desired, 0.1))
         prediction.configure("off")
 
+    def test_active_decision_uses_configured_lock_duration(self):
+        def path(veh, kind, name, speeds):
+            return NS(vehID=veh, type=kind, pathID=name,
+                      t=[0.0, 5.0, 10.0], s_d=speeds,
+                      x=[0.0, 40.0, 80.0], y=[0.0, 0.0, 0.0],
+                      allowed_speed_mps=10.0)
+        sender = path("a", "planned", "a_planned", [8, 8, 8])
+        desired = path("a", "desired", "a_desired", [13, 13, 13])
+        planned = path("b", "planned", "b_planned", [8, 8, 8])
+        alternative = path("b", "alter", "b_alter", [8, 8, 8])
+        receiver = NS(id="b", plannedPath=planned, receivedPaths=[sender])
+        original = prediction.DECISION_LOCK_S
+        try:
+            prediction.DECISION_LOCK_S = 0.1
+            prediction.configure("active")
+            prediction.active_decision(
+                receiver, desired, alternative, 0.0, self.region())
+            self.assertTrue(
+                prediction.active_decision_is_locked(receiver, desired, 0.09))
+            self.assertFalse(
+                prediction.active_decision_is_locked(receiver, desired, 0.1))
+        finally:
+            prediction.DECISION_LOCK_S = original
+            prediction.configure("off")
+
 if __name__ == "__main__":
     unittest.main()

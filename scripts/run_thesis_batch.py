@@ -49,6 +49,7 @@ CONTROLLED_MCS_ENV = {
     "MCS_DECELERATION_AUDIT",
     "MCS_DECELERATION_MODE",
     "MCS_DECELERATION_CONVEX_LAMBDA",
+    "MCS_DECELERATION_DECISION_LOCK_S",
     "MCS_DECELERATION_LANE_METADATA_HEADING_FALLBACK",
     # Retired proposal switches are also scrubbed so old shell state cannot
     # silently describe or influence a new normalized-formula run.
@@ -249,6 +250,8 @@ def deceleration_prediction_manifest(args):
             "detected followers excluding request and receiver vehicles"),
         "excluded_follower_roles": ["request_vehicle", "receiver_vehicle"],
         "score_bounds": [-1.0, 1.0],
+        "decision_lock_s": args.deceleration_decision_lock_seconds,
+        "default_decision_lock_s": 1.0,
         "lane_metadata_heading_fallback": {
             "enabled": getattr(
                 args, "deceleration_lane_metadata_heading_fallback", False),
@@ -399,6 +402,8 @@ def run_task(task, args):
                MCS_DECELERATION_CONVEX_LAMBDA=str(
                    args.deceleration_convex_lambda
                    if args.deceleration_active else DEFAULT_CONVEX_LAMBDA),
+               MCS_DECELERATION_DECISION_LOCK_S=str(
+                   args.deceleration_decision_lock_seconds),
                MCS_DECELERATION_LANE_METADATA_HEADING_FALLBACK=(
                    "1" if getattr(
                        args, "deceleration_lane_metadata_heading_fallback", False)
@@ -629,6 +634,10 @@ def main():
         help=("convex weight on normalized follower impact in [0,1]; "
               "default 80/81 preserves the former raw A+2B threshold"))
     parser.add_argument(
+        "--deceleration-decision-lock-seconds", type=float, default=1.0,
+        help=("active proposal duplicate-decision lock in seconds; "
+              "default 1.0 preserves the documented behavior"))
+    parser.add_argument(
         "--deceleration-lane-metadata-heading-fallback", action="store_true",
         help=("diagnostic ablation: use lane identity/position without "
               "requiring heading when they fully determine same-lane following"))
@@ -678,6 +687,10 @@ def main():
     if (not math.isfinite(args.deceleration_convex_lambda) or
             not 0 <= args.deceleration_convex_lambda <= 1):
         parser.error("--deceleration-convex-lambda must lie in [0, 1]")
+    if (not math.isfinite(args.deceleration_decision_lock_seconds) or
+            args.deceleration_decision_lock_seconds < 0.1):
+        parser.error(
+            "--deceleration-decision-lock-seconds must be finite and at least 0.1")
     if (not math.isfinite(args.agreement_lease_seconds) or
             args.agreement_lease_seconds < 0):
         parser.error("--agreement-lease-seconds must be finite and non-negative")
@@ -780,6 +793,9 @@ def main():
         "requested_decision_method": args.decision_method,
         "deceleration_convex_lambda": (
             args.deceleration_convex_lambda
+            if args.deceleration_active else None),
+        "deceleration_decision_lock_seconds": (
+            args.deceleration_decision_lock_seconds
             if args.deceleration_active else None),
         "deceleration_lane_metadata_heading_fallback": getattr(
             args, "deceleration_lane_metadata_heading_fallback", False),

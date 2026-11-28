@@ -96,6 +96,17 @@ def _boolean_from_environment(name, default=False):
 CONVEX_LAMBDA = _convex_lambda_from_environment()
 LANE_METADATA_HEADING_FALLBACK = _boolean_from_environment(
     "MCS_DECELERATION_LANE_METADATA_HEADING_FALLBACK")
+
+
+def _decision_lock_seconds_from_environment():
+    value = float(os.environ.get("MCS_DECELERATION_DECISION_LOCK_S", "1.0"))
+    if not math.isfinite(value) or value < DT:
+        raise ValueError(
+            "MCS_DECELERATION_DECISION_LOCK_S must be finite and at least 0.1")
+    return value
+
+
+DECISION_LOCK_S = _decision_lock_seconds_from_environment()
 # 200 m communication range / (5 m vehicle + 5 m minimum gap) = 20
 # followers per lane; the lane-closure model has two same-direction lanes.
 MAXIMUM_FOLLOWERS = 40
@@ -604,7 +615,7 @@ def active_decision(receiver, desired, alternative, now, conflict_region):
     if record is None or record["status"] != "evaluated":
         return None
     key = (str(receiver.id), str(desired.vehID), str(desired.pathID))
-    ACTIVE_DECISION_UNTIL[key] = now + REPLAN_INTERVAL
+    ACTIVE_DECISION_UNTIL[key] = now + DECISION_LOCK_S
     return record["decision"] == "accept"
 
 
