@@ -1,7 +1,7 @@
 # 交差点の判断ロック周期アブレーション
 
 - 台帳ID: `2026-11-29-intersection-decision-lock-cadence-ablation`
-- 状態: `running`
+- 状態: `completed`
 - 位置づけ: `diagnostic development ablation`
 
 ## 目的
@@ -119,3 +119,32 @@ CIは0をまたぐため、この10 seedだけで安定改善とはしない。
 - seed 20は速度`+1.1349 m/s`、停止時間`-417.0 s`、判断`-401`、合意取消`-74`。
 - 10 seed平均で合意取消は`-14.5`、`decision_locked`抑止は`-152.9`だった。
 - unsupported差はseed 19の1件だけ。全体のcadence gateはEval.3完了まで判定しない。
+
+## 完了監査と最終結果
+
+- 15/15 run正常終了、failed 0、unit `Result=success`、残存SUMO/runner 0。
+- 全runでsource commit `708f7334476068cc6cd8cbc942fc18e71e04e0e6`、開始時clean、
+  source不変、固定入力hash、`lambda=0.95`、heading fallback有効、decision lock `0.1 s`、
+  checkpoint 5以上、必須artifactを確認した。
+- 物理衝突0、致命ログ0。unsupportedは全15 runで2件だった。Eval.5 seed 19の1件は
+  conflict regionが予測horizon内にないためで、Eval.3 seed 14の1件は500-record上限外だった。
+- 比較summaryはUbuntuData上の
+  `mcs-tiv-diagnostic-artifacts/intersection-decision-lock-cadence-ablation-summary-20261129.json`。
+  byte sizeは`12,578`、SHA-256は
+  `4296f73c8344de852a9bc8713369eff91b2369e3b1846ccc2f9e0f385304fcd0`。
+
+| 条件 | 速度差 (0.1 s - 1.0 s) | 95% CI | 速度勝利 | 停止時間差 | 判断数差 | 取消数差 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Eval.3 T字路 | `-0.3468 m/s` | `[-0.7507, +0.2386]` | 1/5 | `+94.12 s` | `+179.6` | `+7.4` |
+| Eval.5 十字路 | `+0.3094 m/s` | `[-0.0689, +0.7555]` | 6/10 | `-84.52 s` | `-4.7` | `-14.5` |
+
+事前定義した`cadence_hypothesis.supported`は`false`だった。Eval.5では点推定、停止時間、
+特にseed 15/20の交渉増幅が改善したため、1秒ロックが一部の十字路渋滞を悪化させた証拠は
+得られた。一方、Eval.3では0.1秒化により判断が平均179.6件増え、速度と停止時間が悪化した。
+したがって、1秒ロックを「交差点が山下法を安定して上回らない」共通の単独原因とはしない。
+ロックはT字路では再判断振動を抑える安定化要素、十字路の一部では古い判断を保持する要素として
+逆向きに作用した可能性が高い。
+
+次は新規runを起動せず、完成traceを用いてEval.3の増加した判断をturn・競合点・判断種別・
+車両単位に分解し、Eval.5 seed 15/20で縮小した交渉増幅との違いを特定する。heartbeatは
+完了監査後に停止した。development seedのため正式な優越性主張や未使用seed検証は行わない。
