@@ -1,7 +1,7 @@
 # 交差点のAccept/Reject別判断ロック2×2要因診断
 
 - 台帳ID: `2026-11-29-intersection-decision-outcome-lock-factorial`
-- 状態: `planned`
+- 状態: `running`
 - 位置づけ: `diagnostic development factorial ablation`
 
 ## 目的
@@ -57,3 +57,20 @@ lockは判断だけでなく、lock中のalternative path再生成も抑止す�
 - raw output: UbuntuData上の`mcs-tiv-diagnostic-artifacts/`。
 - 完了後はmanifest、metrics、固定入力hash、checkpoint、物理衝突、致命ログを監査し、
   4条件の対応比較summaryを作成する。
+
+## 2026-11-29 起動
+
+- 実行sourceは`26edd1f07c113c2c61002c362358e9381978039e`。sgnlabのUbuntuData上にあるcleanな
+  detached worktreeを同commitへ更新し、関連92テスと実験台帳監査を通過した。
+- schedulerのpreflightは、既存の1.0/1.0秒と15 run、0.1/0.1秒と15 run、物理衝突0、
+  共通cadence仮説不成立を起動gateとして検証した。
+- user systemd unitは
+  `mcs-intersection-decision-outcome-lock-factorial-20261129.service`、invocation IDは
+  `c14b3f8416924807ab52ba640ed2d826`。
+- raw rootは
+  `/media/yamada/UbuntuData/home-yamada/Documents/卒業研究/mcs-tiv-diagnostic-artifacts/intersection-decision-outcome-lock-factorial-20261129/`。
+- 起動後readbackでunit `active/running`、第1波run manifest 15、SUMO 15/15、runner 3を確認。
+  全manifestでsource commit、開始時clean、共通lock 1.0秒、Accept lock 0.1秒、Reject lock 1.0秒が
+  一致した。失敗は0。
+- heartbeat `mcs-heading`は30分間隔でACTIVE。最遅active runが180/300秒以上なら15分へ変更し、
+  第2波開始で180秒未満へ戻れば30分へ戻す。
