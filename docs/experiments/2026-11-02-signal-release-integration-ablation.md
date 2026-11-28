@@ -1,9 +1,10 @@
 # 信号形成車群における積算・終端値アブレーション
 
 - 台帳ID: `2026-11-02-signal-release-integration-ablation`
-- 状態: `running`
+- 状態: `completed`
 - 位置づけ: `development`
 - 開始日: 2026-11-02
+- 終了日時: 2026-11-02 06:31:55 JST
 - 実験ディレクトリ:
   - `results/runs/signal-red08-integrated-harm-lambda2-seeds1-2-3-7-11-300s-20261102T/`
   - `results/runs/signal-red08-terminal-harm-lambda2-seeds1-2-3-7-11-300s-20261102T/`
@@ -57,3 +58,31 @@
 - runner/stdout/stderr/SUMOログ、必須artifact、物理衝突、警告。
 - 条件別・seed別の主要指標、判断不一致の内訳、限界。
 - 実行ソースcommit、結果commit、記録commit。
+
+## 完全性監査
+
+- red-08・red-16、integrated・terminal-heldの4 batch、合計20 runはすべて
+  `exit_code: 0`、`source_unchanged: true`、開始時Git clean、5 checkpoint/runだった。
+- 実行ソースは全runで`6b9c192056d4882417ebf632427f081ca9ad94b6`、固定入力hashは
+  各run manifestに記録されている。
+- 全20 runで物理衝突episodeは0。
+- 結果commit: `429b7d7ba34b3d852a86b866bc937589e165cb9e`
+  (`codex/integration-condition-search-night-results`)。
+
+## 結果
+
+| 放流条件 | integrated平均 (m/s) | terminal-held平均 (m/s) | 対応平均差 (m/s) | integrated勝利seed |
+| --- | ---: | ---: | ---: | ---: |
+| red-08 | 5.0841 | 4.7674 | +0.3167 | 4 / 5 |
+| red-16 | 4.9289 | 4.7980 | +0.1308 | 3 / 5 |
+
+red-08ではseed 3だけintegratedが低く、red-16ではseed 2と7で低かった。どちらも
+平均点推定はintegratedが上だが、5 seedのdevelopmentであり一般的優越性は主張しない。
+
+## 結論
+
+信号放流車群では10秒後の終端値だけでなく途中の速度損失を積算することで、平均速度が
+改善する条件が存在するという仮説と整合した。ただし条件は旧・dirtyな単一seed診断を
+見て選ばれており、方式も現在の正規化凸結合式ではなく旧`lambda=2`害のみ加点である。
+その後の正規化式・共通lambda選定・独立holdoutが主系列となったため、本結果を理由に
+red条件や旧方式を追加実行しない。積算表現の補助的development証拠として保持する。
