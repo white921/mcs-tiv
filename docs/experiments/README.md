@@ -48,6 +48,7 @@
 
 | 状態 | 開始日 | 実験 | 記録 |
 | --- | --- | --- | --- |
+| planned | 2026-11-29 | 交差点のAccept後判断ロック中間周期スイープ | [記録](2026-11-29-intersection-accept-lock-sweep.md) |
 | running | 2026-11-29 | 交差点のAccept/Reject別判断ロック2×2要因診断 | [記録](2026-11-29-intersection-decision-outcome-lock-factorial.md) |
 | completed | 2026-11-29 | 交差点の判断ロック周期アブレーション | [記録](2026-11-29-intersection-decision-lock-cadence-ablation.md) |
 | completed | 2026-11-28 | 形状別 heading/yaw unsupported 帰属診断 | [記録](2026-11-28-topology-heading-attribution-diagnostic.md) |

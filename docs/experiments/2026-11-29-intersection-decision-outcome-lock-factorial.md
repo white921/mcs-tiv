@@ -75,3 +75,19 @@ lockは判断だけでなく、lock中のalternative path再生成も抑止す�
   一致した。失敗は0。
 - heartbeat `mcs-heading`は30分間隔でACTIVE。最遅active runが180/300秒以上なら15分へ変更し、
   第2波開始で180秒未満へ戻れば30分へ戻す。
+
+## 実行中の要因退化検出と第2波停止
+
+第1波の最初の完了runと進行中prefixを既存の`Accept=0.1/Reject=0.1`と照合した。
+完了したEval.5 seed 19は速度・停止・交渉ログ・車両状態・競合ログが完全一致し、
+進行中15/15 runもそれぞれの時点まで同一prefixだった。
+
+既存の1.0/1.0秒の5,062 Reject判断、0.1/0.1秒の4,936 Reject判断のいずれでも、
+Reject後1秒未満に同じ`receiver/sender/desired_path_id`のイベントが再登場した例は0件だった。
+Reject時に対象path IDは`yetJudgedList`へ入り、次の希望経路は新しいpath IDでロックkeyを
+回避する。したがってReject後lockは現設計では到達不能な要因で、2×2は実質1要因に退化した。
+
+既存1.0/1.0の決定論的再実行になる第2波を避けるため、第1波の現在15 runは継続したまま
+親schedulerだけを`SIGSTOP`した。子runnerとSUMOは中断していない。第1波15 run完了後は、
+外側manifestを`stopped_after_wave_1`とし、第2波を実行値として捏造せず、既存30 runと
+新規15 runの計45 runを専用finalizerで監査する。
