@@ -1,10 +1,10 @@
 # 正規化凸結合式 lambda 0.90・交通量比600秒比較
 
 - 台帳ID: `2026-11-17-normalized-convex-lambda090-flow-sweep-600s-development`
-- 状態: `running`
+- 状態: `completed`
 - 位置づけ: `development`
 - 開始日時: 2026-11-17 01:56:51 JST
-- 終了日時:
+- 終了日時: 2026-11-17 18:31:10 JST
 - 実験ディレクトリ:
   - `results/runs/normalized-convex-lambda090-eval7-r300-a1000-seeds33-42-600s-20261117/`
   - `results/runs/normalized-convex-lambda090-eval7-r500-a1000-seeds33-42-600s-20261117/`
@@ -66,7 +66,7 @@
 | 実行ソースcommit | `36b50544997eb020e45426b5956e394cb6068742` |
 | source変更 | 固定入力、対応交通量・seedの宣言、固定入力テストのみ。評価式は不変 |
 | 記録ブランチ | `codex/normalized-convex-lambda090-flow-sweep-600s-development` |
-| 結果commit | 完了後に交通量ごとに記録 |
+| 結果commit | 300: `435260ad0442e3a2a4c20b5341b8b8d6fcba77d8` / 500: `a73c35b60cabd889408246efb62039d0941d8b6a` / 700: `addca00985eae542da9775cd4665fcfa287cafb4` / 1200 compact: `048d782d78e3371b6ba0101d04806490dee9f758` |
 
 ## 起動
 
@@ -95,21 +95,42 @@ scripts/run_thesis_batch.py --cases eval7 --seeds 33 34 35 36 37 38 39 40 41 42
 
 ## 完了・完全性確認
 
-- [ ] 4バッチ・40 runが正常完了
-- [ ] 全runが`exit_code: 0`、`source_unchanged: true`
-- [ ] 実行開始時Git cleanとsource SHAを確認
-- [ ] 固定入力SHA、Python/SUMO版、lambda、duration、交通量を確認
-- [ ] runner/stdout/stderr、必須artifact、10 checkpoint/run、FCD終端を確認
-- [ ] 物理衝突と致命的ログを確認
-- [ ] 交通量ごとの結果ディレクトリだけを専用commitでpush
+- [x] 4バッチ・40 runが正常完了
+- [x] 全runが`exit_code: 0`、`source_unchanged: true`
+- [x] 実行開始時Git cleanとsource SHAを確認
+- [x] 固定入力SHA、Python/SUMO版、lambda、duration、交通量を確認
+- [x] runner/stdout/stderr、必須artifact、10 checkpoint/run、FCD終端を確認
+- [x] 物理衝突と致命的ログを確認
+- [x] 交通量ごとの結果証拠を専用commitでpush
 
 ## 結果
 
-完了後に交通量別・seed別の指標と既存1000/1000、山下、UTF、旧integratedの比較を記録する。
+全40 runが正常終了し、物理衝突は0だった。`1000/1000`は同一lambda・同一seedの
+既存600秒結果を再利用した。
+
+| 合流側/本線側 (veh/h) | 全車速度 (m/s) | 合流側速度 (m/s) | 本線側速度 (m/s) | 停止時間 (s) | 流出台数 | 最悪seed速度 (m/s) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 300/1000 | 9.7547 | 8.6680 | 10.2962 | 407.83 | 200.0 | 5.5569 (seed 41) |
+| 500/1000 | 7.0948 | 5.2040 | 8.7147 | 1534.46 | 216.5 | 5.3365 (seed 38) |
+| 700/1000 | 5.0178 | 2.5583 | 9.3595 | 4250.33 | 220.6 | 4.3386 (seed 41) |
+| 1000/1000 | 4.5829 | 2.2115 | 9.6058 | 5214.93 | 222.0 | 既存記録参照 |
+| 1200/1000 | 4.4623 | 2.0879 | 9.6664 | 5535.00 | 219.8 | 4.1372 (seed 37) |
+
+1200/1000のraw artifactはUbuntuData上の元worktreeに保持し、外部保存先はpendingである。
+未pushだった旧local commitはrun別source snapshotと大容量rawを含んだため使用せず、
+manifest、metrics、audit、summary、logだけのcompact結果commitを新たに作成した。
 
 ## 結論
 
-完了後に記録する。
+lambda 0.90では、合流側負荷の増加に伴って全車・合流側速度が低下し、停止時間と
+未挿入車両が増えた。300/1000でもseed 41だけは大きく崩れ、低負荷なら常に安定する
+わけではない。700/1000以降は合流側速度が約2 m/s台となり、本線側を9 m/s前後に
+保つ代償が合流側渋滞として現れる。1200/1000では流出台数も1000/1000を下回り、
+飽和条件での処理性能改善は支持されない。
+
+本系列はdevelopment seedであり、対照方式とのsourceも揃っていないため一般的優越性は
+主張しない。その後の共通lambda選定と独立holdoutでlambda 0.95が主系列になったため、
+lambda 0.90の追加交通量実験は行わず、交通量依存性を示す補助結果として保持する。
 
 ## 限界
 
@@ -119,7 +140,5 @@ seed 33–42は1000/1000のlambda選択と既存の交通量比較に使用済�
 
 ## 後続実験
 
-交通量比較の後、1000/1000でlambdaを横軸、seed平均速度を縦軸とする感度曲線を作る。
-既存300秒sweepと600秒のlambda 0.90/0.95を再利用し、不足するlambdaだけを追加する。
-探索用seedと最終評価seedを分離し、平均速度だけでなく進入路別速度、停止、流出量、
-急減速、最悪seedを同時に確認する。
+後続のlambda広域・細密探索、3形状共通lambda選定、独立holdoutでこの判断を更新済み。
+本記録を理由に旧lambda 0.90の不足条件を追加実行しない。
